@@ -528,17 +528,7 @@ class CloudLinkMonitor(_PluginBase):
                             logger.info(f"copyhash模式：文件重命名成功 {target_file.name} -> {new_file_path.name}")
                             logger.info(f"copyhash模式：处理完成 {new_file_path}")
                         
-                        # 记录历史
-                        if self._history:
-                            file_item = self.storagechain.get_file_item(storage="local", path=file_path)
-                            if file_item:
-                                self.transferhis.add_success(
-                                    fileitem=file_item,
-                                    mode="copyhash",
-                                    meta=file_meta,
-                                    mediainfo=None,
-                                    transferinfo=None
-                                )
+                        logger.info(f"copyhash模式：{file_path.name} 处理成功")
                         return
                     except Exception as e:
                         logger.error(f"copyhash模式处理失败：{str(e)}")
