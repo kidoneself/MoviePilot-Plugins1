@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import random
 import re
 import shutil
@@ -406,12 +407,53 @@ class CloudLinkMonitor(_PluginBase):
                             logger.error(f"copyhash模式：未配置监控目录 {mon_path} 的目的目录")
                             return
                         
-                        # 构建目标路径（保持原始文件名）
-                        target_file = target / file_path.name
+                        # 计算相对路径，保持目录结构
+                        mon_path_obj = Path(mon_path)
+                        relative_path = file_path.relative_to(mon_path_obj)
+                        logger.info(f"copyhash模式：相对路径 {relative_path}")
+                        
+                        # 处理目录名：对最后一级父目录名使用固定算法添加繁体字
+                        if relative_path.parent != Path('.'):
+                            # 有父目录
+                            parent_parts = list(relative_path.parent.parts)
+                            if parent_parts:
+                                # 对最后一级目录名进行固定算法改变
+                                last_dir = parent_parts[-1]
+                                # 使用MD5 hash确保同名文件夹每次结果相同
+                                hash_obj = hashlib.md5(last_dir.encode('utf-8'))
+                                hash_int = int(hash_obj.hexdigest(), 16)
+                                
+                                traditional_chars = ['繁', '體', '字', '隨', '機', '變', '換', '檔', '案', '雜', '湊', '測', '試', '電', '影', '視', '頻', '劇', '集', '節', '檔']
+                                # 使用hash值作为随机种子，确保每次结果相同
+                                char_count = (hash_int % 3) + 2  # 2-4个字符
+                                selected_chars = []
+                                for i in range(char_count):
+                                    idx = (hash_int >> (i * 5)) % len(traditional_chars)
+                                    selected_chars.append(traditional_chars[idx])
+                                random_chars = ''.join(selected_chars)
+                                
+                                # 在目录名中间插入
+                                if len(last_dir) > 3:
+                                    insert_pos = (hash_int % (len(last_dir) - 2)) + 1
+                                    new_last_dir = last_dir[:insert_pos] + random_chars + last_dir[insert_pos:]
+                                else:
+                                    new_last_dir = last_dir + random_chars
+                                
+                                logger.info(f"copyhash模式：目录名固定算法改变 {last_dir} -> {new_last_dir}")
+                                parent_parts[-1] = new_last_dir
+                                target_dir = target / Path(*parent_parts)
+                            else:
+                                target_dir = target
+                        else:
+                            # 没有父目录，直接放在目标目录
+                            target_dir = target
+                        
+                        # 构建目标文件路径
+                        target_file = target_dir / file_path.name
                         logger.info(f"copyhash模式：目标路径 {target_file}")
                         
                         # 确保目标目录存在
-                        target.mkdir(parents=True, exist_ok=True)
+                        target_dir.mkdir(parents=True, exist_ok=True)
                         
                         # 复制文件
                         logger.info(f"copyhash模式：开始复制文件 {file_path} -> {target_file}")
