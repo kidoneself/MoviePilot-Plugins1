@@ -438,10 +438,12 @@ class CloudLinkMonitor(_PluginBase):
 
                 # 查询转移目的目录
                 target_dir = DirectoryHelper().get_dir(mediainfo, src_path=Path(mon_path))
+                # copyhash模式使用copy方式转移，后续再处理hash和重命名
+                actual_transfer_type = "copy" if transfer_type == "copyhash" else transfer_type
                 if not target_dir or not target_dir.library_path or not target_dir.download_path.startswith(mon_path):
                     target_dir = TransferDirectoryConf()
                     target_dir.library_path = target
-                    target_dir.transfer_type = transfer_type
+                    target_dir.transfer_type = actual_transfer_type
                     target_dir.scraping = self._scrape
                     target_dir.renaming = True
                     target_dir.notify = False
@@ -449,7 +451,7 @@ class CloudLinkMonitor(_PluginBase):
                     target_dir.library_storage = "local"
                     target_dir.library_category_folder = self._category
                 else:
-                    target_dir.transfer_type = transfer_type
+                    target_dir.transfer_type = actual_transfer_type
                     target_dir.scraping = self._scrape
 
                 if not target_dir.library_path:
