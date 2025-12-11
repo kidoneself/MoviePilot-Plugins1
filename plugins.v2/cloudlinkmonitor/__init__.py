@@ -1,4 +1,5 @@
 import datetime
+import random
 import re
 import shutil
 import threading
@@ -585,6 +586,80 @@ class CloudLinkMonitor(_PluginBase):
                         'action': 'cloudstrm_file'
                     })
 
+                # copyhash模式：在文件末尾添加随机空白字符改变hash + 重命名文件
+                if transfer_type == "copyhash":
+                    try:
+                        target_file = Path(transferinfo.target_item.path)
+                        logger.info(f"copyhash模式开始处理文件：{target_file}")
+                        
+                        if target_file.exists() and target_file.is_file():
+                            # 1. 重命名文件
+                            file_stem = target_file.stem
+                            file_suffix = target_file.suffix
+                            logger.info(f"copyhash模式：原始文件名={file_stem}, 扩展名={file_suffix}")
+                            
+                            # 查找文件名中的数字（优先提取集数E后的数字）
+                            # 先尝试匹配 E 后面的数字（如 S01E02 -> 02, E05 -> 05）
+                            episode_pattern = re.search(r'[Ee](\d+)', file_stem)
+                            
+                            if episode_pattern:
+                                # 如果找到E后的数字，使用集数
+                                new_stem = episode_pattern.group(1)
+                                logger.info(f"copyhash模式：检测到集数标识E，提取集数={new_stem}")
+                            else:
+                                # 否则查找任意数字
+                                number_pattern = re.search(r'(\d+)', file_stem)
+                                if number_pattern:
+                                    new_stem = number_pattern.group(1)
+                                    logger.info(f"copyhash模式：未检测到集数标识，提取第一个数字={new_stem}")
+                                else:
+                                    # 如果没有数字，在名字中随机位置插入繁体字
+                                    logger.info(f"copyhash模式：文件名不包含数字，将插入繁体字")
+                                    traditional_chars = ['繁', '體', '字', '隨', '機', '變', '換', '檔', '案', '雜', '湊', '測', '試', '電', '影', '視', '頻', '劇', '集', '節', '檔']
+                                    # 随机选择2-4个繁体字
+                                    char_count = random.randint(2, 4)
+                                    random_chars = ''.join(random.sample(traditional_chars, char_count))
+                                    logger.info(f"copyhash模式：随机选择{char_count}个繁体字={random_chars}")
+                                    # 在文件名中随机位置插入
+                                    if len(file_stem) > 3:
+                                        insert_pos = random.randint(1, len(file_stem) - 1)
+                                        new_stem = file_stem[:insert_pos] + random_chars + file_stem[insert_pos:]
+                                        logger.info(f"copyhash模式：在位置{insert_pos}插入繁体字")
+                                    else:
+                                        new_stem = file_stem + random_chars
+                                        logger.info(f"copyhash模式：文件名较短，在末尾追加繁体字")
+                            
+                            logger.info(f"copyhash模式：新文件名={new_stem}{file_suffix}")
+                            
+                            # 构建新文件路径
+                            new_file_path = target_file.parent / f"{new_stem}{file_suffix}"
+                            logger.info(f"copyhash模式：新文件路径={new_file_path}")
+                            
+                            # 2. 在文件末尾追加随机空白字符改变hash
+                            whitespace_chars = [' ', '\t', '\n']
+                            random_count = random.randint(10, 30)
+                            random_whitespaces = ''.join(random.choices(whitespace_chars, k=random_count))
+                            logger.info(f"copyhash模式：准备在文件末尾添加{random_count}个随机空白字符")
+                            
+                            original_size = target_file.stat().st_size
+                            with open(target_file, 'ab') as f:
+                                f.write(random_whitespaces.encode('utf-8'))
+                            new_size = target_file.stat().st_size
+                            logger.info(f"copyhash模式：文件大小从{original_size}字节增加到{new_size}字节")
+                            
+                            # 3. 重命名文件
+                            target_file.rename(new_file_path)
+                            logger.info(f"copyhash模式：文件重命名成功 {target_file.name} -> {new_file_path.name}")
+                            
+                            # 更新transferinfo中的路径信息
+                            transferinfo.target_item.path = str(new_file_path)
+                            logger.info(f"copyhash模式：已更新transferinfo路径信息")
+                        else:
+                            logger.warn(f"copyhash模式：目标文件不存在或不是文件 {target_file}")
+                    except Exception as e:
+                        logger.error(f"copyhash模式处理失败：{str(e)}")
+                        logger.error(f"copyhash模式：错误详情 {traceback.format_exc()}")
+
                 # 移动模式删除空目录
                 if transfer_type == "move":
                     for file_dir in file_path.parents:
@@ -934,7 +1009,8 @@ class CloudLinkMonitor(_PluginBase):
                                                 {'title': '硬链接', 'value': 'link'},
                                                 {'title': '软链接', 'value': 'softlink'},
                                                 {'title': 'Rclone复制', 'value': 'rclone_copy'},
-                                                {'title': 'Rclone移动', 'value': 'rclone_move'}
+                                                {'title': 'Rclone移动', 'value': 'rclone_move'},
+                                                {'title': '复制改Hash', 'value': 'copyhash'}
                                             ]
                                         }
                                     }
@@ -996,7 +1072,7 @@ class CloudLinkMonitor(_PluginBase):
                                             'model': 'monitor_dirs',
                                             'label': '监控目录',
                                             'rows': 5,
-                                            'placeholder': '每一行一个目录，支持以下几种配置方式，转移方式支持 move、copy、link、softlink、rclone_copy、rclone_move：\n'
+                                            'placeholder': '每一行一个目录，支持以下几种配置方式，转移方式支持 move、copy、link、softlink、rclone_copy、rclone_move、copyhash：\n'
                                                            '监控目录:转移目的目录\n'
                                                            '监控目录:转移目的目录#转移方式\n'
                                         }
