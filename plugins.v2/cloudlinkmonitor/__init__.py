@@ -337,10 +337,15 @@ class CloudLinkMonitor(_PluginBase):
                 return
             # 全程加锁
             with lock:
-                transfer_history = self.transferhis.get_by_src(event_path)
-                if transfer_history:
-                    logger.info("文件已处理过：%s" % event_path)
-                    return
+                # 查询转移方式（提前获取，用于判断是否跳过历史检查）
+                transfer_type = self._transferconf.get(mon_path)
+                
+                # copyhash模式不检查历史记录，允许重复处理
+                if transfer_type != "copyhash":
+                    transfer_history = self.transferhis.get_by_src(event_path)
+                    if transfer_history:
+                        logger.info("文件已处理过：%s" % event_path)
+                        return
 
                 # 回收站及隐藏的文件不处理
                 if event_path.find('/@Recycle/') != -1 \
@@ -396,8 +401,6 @@ class CloudLinkMonitor(_PluginBase):
 
                 # 查询转移目的目录
                 target: Path = self._dirconf.get(mon_path)
-                # 查询转移方式
-                transfer_type = self._transferconf.get(mon_path)
 
                 # copyhash模式：纯复制模式，跳过识别和整理流程
                 if transfer_type == "copyhash":
