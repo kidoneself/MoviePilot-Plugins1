@@ -494,17 +494,34 @@ class CloudLinkMonitor(_PluginBase):
                             logger.info(f"copyhash模式：新文件名={new_stem}{file_suffix}")
                             new_file_path = target_file.parent / f"{new_stem}{file_suffix}"
                             
+                            # 计算原始文件hash
+                            original_size = target_file.stat().st_size
+                            hash_md5_original = hashlib.md5()
+                            with open(target_file, 'rb') as f:
+                                for chunk in iter(lambda: f.read(8192), b""):
+                                    hash_md5_original.update(chunk)
+                            original_hash = hash_md5_original.hexdigest()
+                            logger.info(f"copyhash模式：原始文件hash={original_hash}")
+                            
                             # 在文件末尾追加随机空白字符改变hash
                             whitespace_chars = [' ', '\t', '\n']
                             random_count = random.randint(10, 30)
                             random_whitespaces = ''.join(random.choices(whitespace_chars, k=random_count))
                             logger.info(f"copyhash模式：准备在文件末尾添加{random_count}个随机空白字符")
                             
-                            original_size = target_file.stat().st_size
                             with open(target_file, 'ab') as f:
                                 f.write(random_whitespaces.encode('utf-8'))
                             new_size = target_file.stat().st_size
                             logger.info(f"copyhash模式：文件大小从{original_size}字节增加到{new_size}字节")
+                            
+                            # 计算修改后的文件hash
+                            hash_md5_new = hashlib.md5()
+                            with open(target_file, 'rb') as f:
+                                for chunk in iter(lambda: f.read(8192), b""):
+                                    hash_md5_new.update(chunk)
+                            new_hash = hash_md5_new.hexdigest()
+                            logger.info(f"copyhash模式：修改后文件hash={new_hash}")
+                            logger.info(f"copyhash模式：hash已改变 {original_hash} -> {new_hash}")
                             
                             # 重命名文件
                             target_file.rename(new_file_path)
