@@ -528,6 +528,30 @@ class CloudLinkMonitor(_PluginBase):
                             logger.info(f"copyhash模式：文件重命名成功 {target_file.name} -> {new_file_path.name}")
                             logger.info(f"copyhash模式：处理完成 {new_file_path}")
                         
+                        # 发送通知
+                        if self._notify:
+                            # 构建通知内容
+                            original_dir = relative_path.parent if relative_path.parent != Path('.') else "根目录"
+                            target_relative = new_file_path.relative_to(target)
+                            target_dir_display = target_relative.parent if target_relative.parent != Path('.') else "根目录"
+                            
+                            notify_text = (
+                                f"📁 原目录：{original_dir}\n"
+                                f"📁 新目录：{target_dir_display}\n"
+                                f"📄 原文件名：{file_path.name}\n"
+                                f"📄 新文件名：{new_file_path.name}\n"
+                                f"🔐 原Hash：{original_hash[:16]}...\n"
+                                f"🔐 新Hash：{new_hash[:16]}...\n"
+                                f"💾 文件大小：{original_size} → {new_size} 字节"
+                            )
+                            
+                            self.post_message(
+                                mtype=NotificationType.Manual,
+                                title=f"✅ copyhash处理完成：{file_path.name}",
+                                text=notify_text
+                            )
+                            logger.info(f"copyhash模式：已发送通知")
+                        
                         logger.info(f"copyhash模式：{file_path.name} 处理成功")
                         return
                     except Exception as e:
