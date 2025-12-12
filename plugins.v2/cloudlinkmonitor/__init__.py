@@ -65,7 +65,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.3.2"
+    plugin_version = "3.3.3"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -357,14 +357,14 @@ class CloudLinkMonitor(_PluginBase):
             
             # 构建目录汇总文本
             dir_summary_lines = []
-            for stats in dir_stats.values():
+            for i, stats in enumerate(dir_stats.values(), 1):
                 size_gb = stats['size'] / (1024**3)
                 dir_summary_lines.append(
-                    f"  📂 {stats['source']} ({stats['count']}个 | {size_gb:.1f}GB)\n"
-                    f"  ↓\n"
-                    f"  📂 {stats['target']}\n"
+                    f"  {i}. � {stats['source']} ({stats['count']}个 | {size_gb:.1f}GB)\n"
+                    f"     ⬇️  \n"
+                    f"     � {stats['target']}"
                 )
-            dir_summary = "\n".join(dir_summary_lines)
+            dir_summary = "\n\n".join(dir_summary_lines)
             
             # 格式化总大小
             if total_size >= 1024**3:
@@ -376,10 +376,15 @@ class CloudLinkMonitor(_PluginBase):
             
             # 发送通知
             notify_text = (
-                f"📊 统计：{total_files} 个文件 | {size_str}\n"
-                f"⏱️ 用时：{duration_str}\n"
-                f"🔗 转移方式：{self._batch_files[0].get('method', '未知')}\n\n"
-                f"📂 目录汇总：\n{dir_summary}"
+                f"📊 本批次统计\n"
+                f"━━━━━━━━━━━━━━\n"
+                f"📦 文件数量：{total_files} 个\n"
+                f"💾 总大小：{size_str}\n"
+                f"⏱️ 耗时：{duration_str}\n"
+                f"🔗 方式：{self._batch_files[0].get('method', '未知')}\n\n"
+                f"📂 目录详情\n"
+                f"━━━━━━━━━━━━━━\n"
+                f"{dir_summary}"
             )
             
             self.post_message(
