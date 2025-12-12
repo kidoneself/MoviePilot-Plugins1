@@ -65,7 +65,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.0.2"
+    plugin_version = "3.1.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -94,6 +94,7 @@ class CloudLinkMonitor(_PluginBase):
     _size = 0
     _monitor_dirs = ""
     _exclude_keywords = ""
+    _transfer_type = "copyhash"
     # 存储源目录与目的目录关系
     _dirconf: Dict[str, Optional[Path]] = {}
     # 存储源目录转移方式
@@ -118,6 +119,7 @@ class CloudLinkMonitor(_PluginBase):
             self._enabled = config.get("enabled")
             self._notify = config.get("notify")
             self._onlyonce = config.get("onlyonce")
+            self._transfer_type = config.get("transfer_type") or "copyhash"
             self._monitor_dirs = config.get("monitor_dirs") or ""
             self._exclude_keywords = config.get("exclude_keywords") or ""
             self._cron = config.get("cron")
@@ -139,8 +141,8 @@ class CloudLinkMonitor(_PluginBase):
                 if not mon_path:
                     continue
 
-                # 自定义转移方式（仅支持copyhash）
-                _transfer_type = "copyhash"
+                # 自定义转移方式（支持copy和copyhash）
+                _transfer_type = self._transfer_type
                 if mon_path.count("#") == 1:
                     _transfer_type = mon_path.split("#")[1]
                     mon_path = mon_path.split("#")[0]
@@ -231,6 +233,7 @@ class CloudLinkMonitor(_PluginBase):
             "enabled": self._enabled,
             "notify": self._notify,
             "onlyonce": self._onlyonce,
+            "transfer_type": self._transfer_type,
             "monitor_dirs": self._monitor_dirs,
             "exclude_keywords": self._exclude_keywords,
             "cron": self._cron,
@@ -360,8 +363,58 @@ class CloudLinkMonitor(_PluginBase):
                 # 查询转移目的目录
                 target: Path = self._dirconf.get(mon_path)
 
+                # copy模式：纯复制模式，保持目录结构和文件名不变
+                if transfer_type == "copy":
+                    logger.info(f"copy模式：开始纯复制处理 {file_path.name}")
+                    try:
+                        if not target:
+                            logger.error(f"copy模式：未配置监控目录 {mon_path} 的目的目录")
+                            return
+                        
+                        # 计算相对路径，保持目录结构
+                        mon_path_obj = Path(mon_path)
+                        relative_path = file_path.relative_to(mon_path_obj)
+                        logger.info(f"copy模式：相对路径 {relative_path}")
+                        
+                        # 构建目标路径（保持完整的目录结构和文件名）
+                        target_file = target / relative_path
+                        logger.info(f"copy模式：目标路径 {target_file}")
+                        
+                        # 确保目标目录存在
+                        target_file.parent.mkdir(parents=True, exist_ok=True)
+                        
+                        # 复制文件
+                        logger.info(f"copy模式：开始复制文件 {file_path} -> {target_file}")
+                        shutil.copy2(file_path, target_file)
+                        logger.info(f"copy模式：文件复制完成")
+                        
+                        # 发送通知
+                        if self._notify:
+                            file_size = target_file.stat().st_size
+                            original_dir = relative_path.parent if relative_path.parent != Path('.') else "根目录"
+                            
+                            notify_text = (
+                                f"📁 目录：{original_dir}\n"
+                                f"📄 文件名：{file_path.name}\n"
+                                f"💾 文件大小：{file_size} 字节"
+                            )
+                            
+                            self.post_message(
+                                mtype=NotificationType.Manual,
+                                title=f"✅ copy处理完成：{file_path.name}",
+                                text=notify_text
+                            )
+                            logger.info(f"copy模式：已发送通知")
+                        
+                        logger.info(f"copy模式：{file_path.name} 处理成功")
+                        return
+                    except Exception as e:
+                        logger.error(f"copy模式处理失败：{str(e)}")
+                        logger.error(f"copy模式：错误详情 {traceback.format_exc()}")
+                        return
+
                 # copyhash模式：纯复制模式，跳过识别和整理流程
-                if transfer_type == "copyhash":
+                elif transfer_type == "copyhash":
                     logger.info(f"copyhash模式：开始纯复制处理 {file_path.name}")
                     try:
                         if not target:
@@ -520,9 +573,10 @@ class CloudLinkMonitor(_PluginBase):
                         logger.error(f"copyhash模式：错误详情 {traceback.format_exc()}")
                         return
                 
-                # copyhash是唯一支持的转移方式，不应该执行到这里
-                logger.error(f"不支持的转移方式：{transfer_type}，仅支持copyhash")
-                return
+                else:
+                    # 不支持的转移方式
+                    logger.error(f"不支持的转移方式：{transfer_type}，仅支持copy和copyhash")
+                    return
         
         except Exception as e:
             logger.error("目录监控发生错误：%s - %s" % (str(e), traceback.format_exc()))
@@ -653,6 +707,26 @@ class CloudLinkMonitor(_PluginBase):
                                 },
                                 'content': [
                                     {
+                                        'component': 'VSelect',
+                                        'props': {
+                                            'model': 'transfer_type',
+                                            'label': '转移方式',
+                                            'items': [
+                                                {'title': '纯复制', 'value': 'copy'},
+                                                {'title': '复制改Hash', 'value': 'copyhash'}
+                                            ]
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                    {
                                         'component': 'VTextField',
                                         'props': {
                                             'model': 'cron',
@@ -679,8 +753,9 @@ class CloudLinkMonitor(_PluginBase):
                                             'model': 'monitor_dirs',
                                             'label': '监控目录',
                                             'rows': 5,
-                                            'placeholder': '每一行一个目录，支持以下几种配置方式，转移方式仅支持 copyhash：\n'
+                                            'placeholder': '每一行一个目录，支持以下几种配置方式：\n'
                                                            '监控目录:转移目的目录\n'
+                                                           '监控目录:转移目的目录#copy\n'
                                                            '监控目录:转移目的目录#copyhash\n'
                                         }
                                     }
@@ -724,7 +799,7 @@ class CloudLinkMonitor(_PluginBase):
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
-                                            'text': 'copyhash模式：纯复制模式，保持目录结构，对最后一级目录名和文件名进行固定算法改变，修改文件hash。'
+                                            'text': 'copy模式：纯复制，保持目录结构和文件名不变。\ncopyhash模式：纯复制，保持目录结构，对最后一级目录名和文件名进行固定算法改变，修改文件hash。'
                                         }
                                     }
                                 ]
@@ -737,6 +812,7 @@ class CloudLinkMonitor(_PluginBase):
             "enabled": False,
             "notify": False,
             "onlyonce": False,
+            "transfer_type": "copyhash",
             "monitor_dirs": "",
             "exclude_keywords": "",
             "cron": "",
