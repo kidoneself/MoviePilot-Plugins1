@@ -65,7 +65,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.1.0"
+    plugin_version = "3.2.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -94,7 +94,7 @@ class CloudLinkMonitor(_PluginBase):
     _size = 0
     _monitor_dirs = ""
     _exclude_keywords = ""
-    _transfer_type = "copyhash"
+    _transfer_type = "link"
     # 存储源目录与目的目录关系
     _dirconf: Dict[str, Optional[Path]] = {}
     # 存储源目录转移方式
@@ -119,7 +119,7 @@ class CloudLinkMonitor(_PluginBase):
             self._enabled = config.get("enabled")
             self._notify = config.get("notify")
             self._onlyonce = config.get("onlyonce")
-            self._transfer_type = config.get("transfer_type") or "copyhash"
+            self._transfer_type = config.get("transfer_type") or "link"
             self._monitor_dirs = config.get("monitor_dirs") or ""
             self._exclude_keywords = config.get("exclude_keywords") or ""
             self._cron = config.get("cron")
@@ -141,7 +141,7 @@ class CloudLinkMonitor(_PluginBase):
                 if not mon_path:
                     continue
 
-                # 自定义转移方式（支持copy和copyhash）
+                # 自定义转移方式（支持link和copyhash）
                 _transfer_type = self._transfer_type
                 if mon_path.count("#") == 1:
                     _transfer_type = mon_path.split("#")[1]
@@ -426,38 +426,54 @@ class CloudLinkMonitor(_PluginBase):
                         relative_path = file_path.relative_to(mon_path_obj)
                         logger.info(f"copyhash模式：相对路径 {relative_path}")
                         
-                        # 处理目录名：对最后一级父目录名使用固定算法添加繁体字
+                        # 处理目录名：保留1-2个原名字+MD5生成的繁体字+保留(年份)
                         if relative_path.parent != Path('.'):
                             # 有父目录
                             parent_parts = list(relative_path.parent.parts)
-                            if parent_parts:
-                                # 对最后一级目录名进行固定算法改变
-                                last_dir = parent_parts[-1]
-                                # 使用MD5 hash确保同名文件夹每次结果相同
-                                hash_obj = hashlib.md5(last_dir.encode('utf-8'))
+                            new_parent_parts = []
+                            
+                            for i, dir_name in enumerate(parent_parts):
+                                # 跳过Season目录（不改）
+                                if re.match(r'^Season\s+\d+$', dir_name, re.IGNORECASE):
+                                    new_parent_parts.append(dir_name)
+                                    logger.info(f"copyhash模式：保留Season目录 {dir_name}")
+                                    continue
+                                
+                                # 提取年份（如果有）
+                                year_match = re.search(r'\((\d{4})\)$', dir_name)
+                                year_suffix = f" ({year_match.group(1)})" if year_match else ""
+                                
+                                # 去掉年份后的目录名
+                                dir_name_without_year = re.sub(r'\s*\(\d{4}\)$', '', dir_name)
+                                
+                                # 使用MD5确保确定性
+                                hash_obj = hashlib.md5(dir_name.encode('utf-8'))
                                 hash_int = int(hash_obj.hexdigest(), 16)
                                 
-                                traditional_chars = ['繁', '體', '字', '隨', '機', '變', '換', '檔', '案', '雜', '湊', '測', '試', '電', '影', '視', '頻', '劇', '集', '節', '檔']
-                                # 使用hash值作为随机种子，确保每次结果相同
-                                char_count = (hash_int % 3) + 2  # 2-4个字符
+                                # 繁体字库
+                                traditional_chars = ['繁', '體', '字', '隨', '機', '變', '換', '檔', '案', '雜', '湊', '測', '試', '電', '影', '視', '頻', '劇', '集', '節', '目', '聖', '靈', '魂', '鬼', '神']
+                                
+                                # 保留前1-2个字（根据hash确定保留几个）
+                                keep_count = 1 if (hash_int % 2 == 0) else 2
+                                if len(dir_name_without_year) < keep_count:
+                                    keep_count = len(dir_name_without_year)
+                                
+                                prefix = dir_name_without_year[:keep_count] if dir_name_without_year else ""
+                                
+                                # 生成3-5个繁体字
+                                char_count = (hash_int % 3) + 3  # 3-5个字符
                                 selected_chars = []
-                                for i in range(char_count):
-                                    idx = (hash_int >> (i * 5)) % len(traditional_chars)
+                                for j in range(char_count):
+                                    idx = (hash_int >> (j * 5)) % len(traditional_chars)
                                     selected_chars.append(traditional_chars[idx])
                                 random_chars = ''.join(selected_chars)
                                 
-                                # 在目录名中间插入
-                                if len(last_dir) > 3:
-                                    insert_pos = (hash_int % (len(last_dir) - 2)) + 1
-                                    new_last_dir = last_dir[:insert_pos] + random_chars + last_dir[insert_pos:]
-                                else:
-                                    new_last_dir = last_dir + random_chars
-                                
-                                logger.info(f"copyhash模式：目录名固定算法改变 {last_dir} -> {new_last_dir}")
-                                parent_parts[-1] = new_last_dir
-                                target_dir = target / Path(*parent_parts)
-                            else:
-                                target_dir = target
+                                # 构建新目录名：前缀 + 繁体字 + 年份
+                                new_dir = prefix + random_chars + year_suffix
+                                new_parent_parts.append(new_dir)
+                                logger.info(f"copyhash模式：目录名混淆 {dir_name} -> {new_dir}")
+                            
+                            target_dir = target / Path(*new_parent_parts) if new_parent_parts else target
                         else:
                             # 没有父目录，直接放在目标目录
                             target_dir = target
@@ -480,30 +496,26 @@ class CloudLinkMonitor(_PluginBase):
                             file_suffix = target_file.suffix
                             logger.info(f"copyhash模式：原始文件名={file_stem}, 扩展名={file_suffix}")
                             
-                            # 查找文件名中的数字（优先提取集数E后的数字）
-                            episode_pattern = re.search(r'[Ee](\d+)', file_stem)
+                            # 提取季集号（S01E01格式）
+                            season_episode = re.search(r'[Ss](\d+)[Ee](\d+)', file_stem)
                             
-                            if episode_pattern:
-                                new_stem = episode_pattern.group(1)
-                                logger.info(f"copyhash模式：检测到集数标识E，提取集数={new_stem}")
+                            # 提取视频格式信息（1080p, 4K, 2160p等）
+                            video_format = re.search(r'(\d{3,4}[pP]|[248][kK]|[hH][dD]|[uU][hH][dD])', file_stem)
+                            
+                            if season_episode:
+                                # 电视剧：S01E01-1080p.mkv
+                                new_stem = f"S{season_episode.group(1)}E{season_episode.group(2)}"
+                                if video_format:
+                                    new_stem += f"-{video_format.group(1)}"
+                                logger.info(f"copyhash模式：电视剧文件名={new_stem}")
+                            elif video_format:
+                                # 电影：1080p.mkv
+                                new_stem = video_format.group(1)
+                                logger.info(f"copyhash模式：电影文件名={new_stem}")
                             else:
-                                number_pattern = re.search(r'(\d+)', file_stem)
-                                if number_pattern:
-                                    new_stem = number_pattern.group(1)
-                                    logger.info(f"copyhash模式：未检测到集数标识，提取第一个数字={new_stem}")
-                                else:
-                                    logger.info(f"copyhash模式：文件名不包含数字，将插入繁体字")
-                                    traditional_chars = ['繁', '體', '字', '隨', '機', '變', '換', '檔', '案', '雜', '湊', '測', '試', '電', '影', '視', '頻', '劇', '集', '節', '檔']
-                                    char_count = random.randint(2, 4)
-                                    random_chars = ''.join(random.sample(traditional_chars, char_count))
-                                    logger.info(f"copyhash模式：随机选择{char_count}个繁体字={random_chars}")
-                                    if len(file_stem) > 3:
-                                        insert_pos = random.randint(1, len(file_stem) - 1)
-                                        new_stem = file_stem[:insert_pos] + random_chars + file_stem[insert_pos:]
-                                        logger.info(f"copyhash模式：在位置{insert_pos}插入繁体字")
-                                    else:
-                                        new_stem = file_stem + random_chars
-                                        logger.info(f"copyhash模式：文件名较短，在末尾追加繁体字")
+                                # 没有识别到格式，使用movie作为前缀
+                                new_stem = "movie"
+                                logger.info(f"copyhash模式：未识别到格式，使用默认文件名={new_stem}")
                             
                             logger.info(f"copyhash模式：新文件名={new_stem}{file_suffix}")
                             new_file_path = target_file.parent / f"{new_stem}{file_suffix}"
@@ -575,7 +587,7 @@ class CloudLinkMonitor(_PluginBase):
                 
                 else:
                     # 不支持的转移方式
-                    logger.error(f"不支持的转移方式：{transfer_type}，仅支持copy和copyhash")
+                    logger.error(f"不支持的转移方式：{transfer_type}，仅支持link和copyhash")
                     return
         
         except Exception as e:
@@ -712,7 +724,7 @@ class CloudLinkMonitor(_PluginBase):
                                             'model': 'transfer_type',
                                             'label': '转移方式',
                                             'items': [
-                                                {'title': '纯复制', 'value': 'copy'},
+                                                {'title': '硬链接', 'value': 'link'},
                                                 {'title': '复制改Hash', 'value': 'copyhash'}
                                             ]
                                         }
@@ -755,7 +767,7 @@ class CloudLinkMonitor(_PluginBase):
                                             'rows': 5,
                                             'placeholder': '每一行一个目录，支持以下几种配置方式：\n'
                                                            '监控目录:转移目的目录\n'
-                                                           '监控目录:转移目的目录#copy\n'
+                                                           '监控目录:转移目的目录#link\n'
                                                            '监控目录:转移目的目录#copyhash\n'
                                         }
                                     }
@@ -799,7 +811,7 @@ class CloudLinkMonitor(_PluginBase):
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
-                                            'text': 'copy模式：纯复制，保持目录结构和文件名不变。\ncopyhash模式：纯复制，保持目录结构，对最后一级目录名和文件名进行固定算法改变，修改文件hash。'
+                                            'text': 'link模式：硬链接（同文件系统）或复制（跨文件系统），保持目录结构和文件名不变。\ncopyhash模式：复制+改hash+重命名，目录名混淆（保留01-02个字+繁体字+年份），Season目录不改，文件名简化为S01E01-1080p.mkv或1080p.mkv。'
                                         }
                                     }
                                 ]
@@ -812,7 +824,7 @@ class CloudLinkMonitor(_PluginBase):
             "enabled": False,
             "notify": False,
             "onlyonce": False,
-            "transfer_type": "copyhash",
+            "transfer_type": "link",
             "monitor_dirs": "",
             "exclude_keywords": "",
             "cron": "",
