@@ -4,11 +4,12 @@
     "name": "监控转移文件",
     "description": "监控目录文件变化，支持硬链接(link)和复制改Hash(copyhash)两种转移方式，身认证网盘审查。",
     "labels": "云盘,工具",
-    "version": "3.3.1",
+    "version": "3.3.2",
     "icon": "Linkease_A.png",
     "author": "thsrite",
     "level": 1,
     "history": {
+      "v3.3.2": "修夏datetime导入错误，正确导入datetime和timedelta",
       "v3.3.1": "修复启动监控时_mode属性引用错误",
       "v3.3.0": "新增批次汇总通知：简化单文件通知+30秒后发送批次统计，显示目录汇总和总用时",
       "v3.2.1": "link模式也添加改名功能，两种模式都混淆目录和文件名",
