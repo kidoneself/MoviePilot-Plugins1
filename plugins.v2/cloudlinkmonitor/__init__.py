@@ -59,13 +59,13 @@ class FileMonitorHandler(FileSystemEventHandler):
 
 class CloudLinkMonitor(_PluginBase):
     # 插件名称
-    plugin_name = "目录实时监控1"
+    plugin_name = "监控转移文件"
     # 插件描述
-    plugin_desc = "监控目录文件变化，自动转移媒体文件。"
+    plugin_desc = "监控目录文件变化，纯复制模式转移文件，保持目录结构并修改hash。"
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "2.5.9"
+    plugin_version = "3.0.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -1094,31 +1094,8 @@ class CloudLinkMonitor(_PluginBase):
                                             'model': 'transfer_type',
                                             'label': '转移方式',
                                             'items': [
-                                                {'title': '移动', 'value': 'move'},
-                                                {'title': '复制', 'value': 'copy'},
-                                                {'title': '硬链接', 'value': 'link'},
-                                                {'title': '软链接', 'value': 'softlink'},
-                                                {'title': 'Rclone复制', 'value': 'rclone_copy'},
-                                                {'title': 'Rclone移动', 'value': 'rclone_move'},
                                                 {'title': '复制改Hash', 'value': 'copyhash'}
                                             ]
-                                        }
-                                    }
-                                ]
-                            },
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VTextField',
-                                        'props': {
-                                            'model': 'interval',
-                                            'label': '入库消息延迟',
-                                            'placeholder': '10'
                                         }
                                     }
                                 ]
@@ -1162,9 +1139,9 @@ class CloudLinkMonitor(_PluginBase):
                                             'model': 'monitor_dirs',
                                             'label': '监控目录',
                                             'rows': 5,
-                                            'placeholder': '每一行一个目录，支持以下几种配置方式，转移方式支持 move、copy、link、softlink、rclone_copy、rclone_move、copyhash：\n'
+                                            'placeholder': '每一行一个目录，支持以下几种配置方式，转移方式仅支持 copyhash：\n'
                                                            '监控目录:转移目的目录\n'
-                                                           '监控目录:转移目的目录#转移方式\n'
+                                                           '监控目录:转移目的目录#copyhash\n'
                                         }
                                     }
                                 ]
@@ -1207,28 +1184,7 @@ class CloudLinkMonitor(_PluginBase):
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
-                                            'text': '入库消息延迟默认10s，如网络较慢可酌情调大，有助于发送统一入库消息。'
-                                        }
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        'component': 'VRow',
-                        'content': [
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VAlert',
-                                        'props': {
-                                            'type': 'info',
-                                            'variant': 'tonal',
-                                            'text': '如果监控目录与目录设置一致，则默认使用目录设置配置。否则可在监控目录后拼接@覆盖方式（默认never覆盖方式）。'
+                                            'text': 'copyhash模式：纯复制模式，保持目录结构，对最后一级目录名和文件名进行固定算法改变，修改文件hash。'
                                         }
                                     }
                                 ]
