@@ -70,7 +70,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.4.2"
+    plugin_version = "3.4.3"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -1021,7 +1021,7 @@ class CloudLinkMonitor(_PluginBase):
             "transfer_type": "link",
             "monitor_dirs": "",
             "exclude_keywords": "",
-            "cron": "",
+            "cron": "0 0 * * *",
             "size": 0
         }
 
