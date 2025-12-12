@@ -65,7 +65,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.3.0"
+    plugin_version = "3.3.1"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -187,12 +187,8 @@ class CloudLinkMonitor(_PluginBase):
                         pass
 
                     try:
-                        if self._mode == "compatibility":
-                            # 兼容模式，目录同步性能降低且NAS不能休眠，但可以兼容挂载的远程共享目录如SMB
-                            observer = PollingObserver(timeout=10)
-                        else:
-                            # 内部处理系统操作类型选择最优解
-                            observer = Observer(timeout=10)
+                        # 使用默认Observer
+                        observer = Observer(timeout=10)
                         self._observer.append(observer)
                         observer.schedule(FileMonitorHandler(mon_path, self), path=mon_path, recursive=True)
                         observer.daemon = True
