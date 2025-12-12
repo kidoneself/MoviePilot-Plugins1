@@ -92,8 +92,6 @@ class CloudLinkMonitor(_PluginBase):
     _scrape = False
     _category = False
     _refresh = False
-    _softlink = False
-    _strm = False
     _cron = None
     filetransfer = None
     mediaChain = None
@@ -143,8 +141,6 @@ class CloudLinkMonitor(_PluginBase):
             self._interval = config.get("interval") or 10
             self._cron = config.get("cron")
             self._size = config.get("size") or 0
-            self._softlink = config.get("softlink")
-            self._strm = config.get("strm")
 
         # 停止现有任务
         self.stop_service()
@@ -270,9 +266,7 @@ class CloudLinkMonitor(_PluginBase):
             "exclude_keywords": self._exclude_keywords,
             "interval": self._interval,
             "history": self._history,
-            "softlink": self._softlink,
             "cron": self._cron,
-            "strm": self._strm,
             "scrape": self._scrape,
             "category": self._category,
             "size": self._size,
@@ -736,20 +730,6 @@ class CloudLinkMonitor(_PluginBase):
                         'transferinfo': transferinfo
                     })
 
-                if self._softlink:
-                    # 通知实时软连接生成
-                    self.eventmanager.send_event(EventType.PluginAction, {
-                        'file_path': str(transferinfo.target_item.path),
-                        'action': 'softlink_file'
-                    })
-
-                if self._strm:
-                    # 通知Strm助手生成
-                    self.eventmanager.send_event(EventType.PluginAction, {
-                        'file_path': str(transferinfo.target_item.path),
-                        'action': 'cloudstrm_file'
-                    })
-
                 # 移动模式删除空目录
                 if transfer_type == "move":
                     for file_dir in file_path.parents:
@@ -1022,38 +1002,6 @@ class CloudLinkMonitor(_PluginBase):
                                             }
                                         ]
                                     },
-                                    {
-                                        'component': 'VCol',
-                                        'props': {
-                                            'cols': 12,
-                                            'md': 4
-                                        },
-                                        'content': [
-                                            {
-                                                'component': 'VSwitch',
-                                                'props': {
-                                                    'model': 'softlink',
-                                                    'label': '联动实时软连接',
-                                                },
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        'component': 'VCol',
-                                        'props': {
-                                            'cols': 12,
-                                            'md': 4
-                                        },
-                                        'content': [
-                                            {
-                                                'component': 'VSwitch',
-                                                'props': {
-                                                    'model': 'strm',
-                                                    'label': '联动Strm生成',
-                                                },
-                                            }
-                                        ]
-                                    }
                                 ]
                             }
                         ]
@@ -1191,27 +1139,6 @@ class CloudLinkMonitor(_PluginBase):
                             }
                         ]
                     },
-                    {
-                        'component': 'VRow',
-                        'content': [
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VAlert',
-                                        'props': {
-                                            'type': 'info',
-                                            'variant': 'tonal',
-                                            'text': '开启联动实时软连接/Strm会在监控转移后联动【实时软连接】/【云盘Strm[助手]】插件生成软连接/Strm（只处理媒体文件，不处理刮削文件）。'
-                                        }
-                                    }
-                                ]
-                            }
-                        ]
-                    }
                 ]
             }
         ], {
