@@ -88,27 +88,16 @@ class CloudLinkMonitor(_PluginBase):
     _enabled = False
     _notify = False
     _onlyonce = False
-    _history = False
-    _scrape = False
-    _category = False
-    _refresh = False
     _cron = None
     filetransfer = None
     mediaChain = None
     _size = 0
-    # 模式 compatibility/fast
-    _mode = "compatibility"
-    # 转移方式
-    _transfer_type = "softlink"
     _monitor_dirs = ""
     _exclude_keywords = ""
-    _interval: int = 10
     # 存储源目录与目的目录关系
     _dirconf: Dict[str, Optional[Path]] = {}
     # 存储源目录转移方式
     _transferconf: Dict[str, Optional[str]] = {}
-    _overwrite_mode: Dict[str, Optional[str]] = {}
-    _medias = {}
     # 退出事件
     _event = threading.Event()
 
@@ -123,22 +112,14 @@ class CloudLinkMonitor(_PluginBase):
         # 清空配置
         self._dirconf = {}
         self._transferconf = {}
-        self._overwrite_mode = {}
 
         # 读取配置
         if config:
             self._enabled = config.get("enabled")
             self._notify = config.get("notify")
             self._onlyonce = config.get("onlyonce")
-            self._history = config.get("history")
-            self._scrape = config.get("scrape")
-            self._category = config.get("category")
-            self._refresh = config.get("refresh")
-            self._mode = config.get("mode")
-            self._transfer_type = config.get("transfer_type")
             self._monitor_dirs = config.get("monitor_dirs") or ""
             self._exclude_keywords = config.get("exclude_keywords") or ""
-            self._interval = config.get("interval") or 10
             self._cron = config.get("cron")
             self._size = config.get("size") or 0
 
@@ -148,9 +129,6 @@ class CloudLinkMonitor(_PluginBase):
         if self._enabled or self._onlyonce:
             # 定时服务管理器
             self._scheduler = BackgroundScheduler(timezone=settings.TZ)
-            if self._notify:
-                # 追加入库消息统一发送服务
-                self._scheduler.add_job(self.send_msg, trigger='interval', seconds=15)
 
             # 读取目录配置
             monitor_dirs = self._monitor_dirs.split("\n")
@@ -260,17 +238,10 @@ class CloudLinkMonitor(_PluginBase):
             "enabled": self._enabled,
             "notify": self._notify,
             "onlyonce": self._onlyonce,
-            "mode": self._mode,
-            "transfer_type": self._transfer_type,
             "monitor_dirs": self._monitor_dirs,
             "exclude_keywords": self._exclude_keywords,
-            "interval": self._interval,
-            "history": self._history,
             "cron": self._cron,
-            "scrape": self._scrape,
-            "category": self._category,
             "size": self._size,
-            "refresh": self._refresh,
         })
 
     @eventmanager.register(EventType.PluginAction)
@@ -744,69 +715,6 @@ class CloudLinkMonitor(_PluginBase):
         except Exception as e:
             logger.error("目录监控发生错误：%s - %s" % (str(e), traceback.format_exc()))
 
-    def send_msg(self):
-        """
-        定时检查是否有媒体处理完，发送统一消息
-        """
-        if not self._medias or not self._medias.keys():
-            return
-
-        # 遍历检查是否已刮削完，发送消息
-        for medis_title_year_season in list(self._medias.keys()):
-            media_list = self._medias.get(medis_title_year_season)
-            logger.info(f"开始处理媒体 {medis_title_year_season} 消息")
-
-            if not media_list:
-                continue
-
-            # 获取最后更新时间
-            last_update_time = media_list.get("time")
-            media_files = media_list.get("files")
-            if not last_update_time or not media_files:
-                continue
-
-            transferinfo = media_files[0].get("transferinfo")
-            file_meta = media_files[0].get("file_meta")
-            mediainfo = media_files[0].get("mediainfo")
-            # 判断剧集最后更新时间距现在是已超过10秒或者电影，发送消息
-            if (datetime.datetime.now() - last_update_time).total_seconds() > int(self._interval) \
-                    or mediainfo.type == MediaType.MOVIE:
-                # 发送通知
-                if self._notify:
-
-                    # 汇总处理文件总大小
-                    total_size = 0
-                    file_count = 0
-
-                    # 剧集汇总
-                    episodes = []
-                    for file in media_files:
-                        transferinfo = file.get("transferinfo")
-                        total_size += transferinfo.total_size
-                        file_count += 1
-
-                        file_meta = file.get("file_meta")
-                        if file_meta and file_meta.begin_episode:
-                            episodes.append(file_meta.begin_episode)
-
-                    transferinfo.total_size = total_size
-                    # 汇总处理文件数量
-                    transferinfo.file_count = file_count
-
-                    # 剧集季集信息 S01 E01-E04 || S01 E01、E02、E04
-                    season_episode = None
-                    # 处理文件多，说明是剧集，显示季入库消息
-                    if mediainfo.type == MediaType.TV:
-                        # 季集文本
-                        season_episode = f"{file_meta.season} {StringUtils.format_ep(episodes)}"
-                    # 发送消息
-                    self.transferchian.send_transfer_message(meta=file_meta,
-                                                             mediainfo=mediainfo,
-                                                             transferinfo=transferinfo,
-                                                             season_episode=season_episode)
-                # 发送完消息，移出key
-                del self._medias[medis_title_year_season]
-                continue
 
     def get_state(self) -> bool:
         return self._enabled
@@ -916,134 +824,6 @@ class CloudLinkMonitor(_PluginBase):
                                         'props': {
                                             'model': 'onlyonce',
                                             'label': '立即运行一次',
-                                        }
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        'component': 'VForm',
-                        'content': [
-                            {
-                                'component': 'VRow',
-                                'content': [
-                                    {
-                                        'component': 'VCol',
-                                        'props': {
-                                            'cols': 12,
-                                            'md': 4
-                                        },
-                                        'content': [
-                                            {
-                                                'component': 'VSwitch',
-                                                'props': {
-                                                    'model': 'history',
-                                                    'label': '存储历史记录',
-                                                }
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        'component': 'VCol',
-                                        'props': {
-                                            'cols': 12,
-                                            'md': 4
-                                        },
-                                        'content': [
-                                            {
-                                                'component': 'VSwitch',
-                                                'props': {
-                                                    'model': 'scrape',
-                                                    'label': '是否刮削',
-                                                }
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        'component': 'VCol',
-                                        'props': {
-                                            'cols': 12,
-                                            'md': 4
-                                        },
-                                        'content': [
-                                            {
-                                                'component': 'VSwitch',
-                                                'props': {
-                                                    'model': 'category',
-                                                    'label': '是否二级分类',
-                                                }
-                                            }
-                                        ]
-                                    },
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        'component': 'VForm',
-                        'content': [
-                            {
-                                'component': 'VRow',
-                                'content': [
-                                    {
-                                        'component': 'VCol',
-                                        'props': {
-                                            'cols': 12,
-                                            'md': 4
-                                        },
-                                        'content': [
-                                            {
-                                                'component': 'VSwitch',
-                                                'props': {
-                                                    'model': 'refresh',
-                                                    'label': '刷新媒体库',
-                                                },
-                                            }
-                                        ]
-                                    },
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        'component': 'VRow',
-                        'content': [
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VSelect',
-                                        'props': {
-                                            'model': 'mode',
-                                            'label': '监控模式',
-                                            'items': [
-                                                {'title': '兼容模式', 'value': 'compatibility'},
-                                                {'title': '性能模式', 'value': 'fast'}
-                                            ]
-                                        }
-                                    }
-                                ]
-                            },
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VSelect',
-                                        'props': {
-                                            'model': 'transfer_type',
-                                            'label': '转移方式',
-                                            'items': [
-                                                {'title': '复制改Hash', 'value': 'copyhash'}
-                                            ]
                                         }
                                     }
                                 ]
