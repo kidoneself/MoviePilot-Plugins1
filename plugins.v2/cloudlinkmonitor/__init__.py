@@ -8,6 +8,11 @@ import traceback
 from pathlib import Path
 from typing import List, Tuple, Dict, Any, Optional
 
+try:
+    from .pinyin_map import PINYIN_MAP
+except ImportError:
+    PINYIN_MAP = {}
+
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -61,11 +66,11 @@ class CloudLinkMonitor(_PluginBase):
     # 插件名称
     plugin_name = "监控转移文件"
     # 插件描述
-    plugin_desc = "监控目录文件变化，支持硬链接和复制改Hash，自动混淆目录和文件名，批次汇总通知。"
+    plugin_desc = "监控目录文件变化，支持硬链接和复制改Hash，拼音混淆剧名（保留分类目录），批次汇总通知。"
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.3.3"
+    plugin_version = "3.4.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -402,6 +407,43 @@ class CloudLinkMonitor(_PluginBase):
             self._batch_files = []
             self._last_process_time = None
     
+    def __obfuscate_name(self, name: str) -> str:
+        """
+        混淆剧名：中文+拼音+特殊字符
+        :param name: 原始名称
+        :return: 混淆后的名称
+        """
+        # 特殊字符库
+        special_chars = ['@', '!', '~', '#', '$', '%', '^', '&', '*', '_', '-']
+        
+        # 使用MD5确保确定性
+        hash_obj = hashlib.md5(name.encode('utf-8'))
+        hash_int = int(hash_obj.hexdigest(), 16)
+        
+        result = []
+        for i, char in enumerate(name):
+            # 根据hash决定处理方式
+            choice = (hash_int >> (i * 3)) % 2
+            
+            if '\u4e00' <= char <= '\u9fff':  # 中文字符
+                if choice == 0:
+                    # 保留中文
+                    result.append(char)
+                else:
+                    # 转拼音
+                    pinyin = PINYIN_MAP.get(char, char)
+                    result.append(pinyin)
+                
+                # 添加特殊字符（概率30%）
+                if (hash_int >> (i * 5)) % 10 < 3:
+                    special_idx = (hash_int >> (i * 7)) % len(special_chars)
+                    result.append(special_chars[special_idx])
+            else:
+                # 非中文字符保持不变
+                result.append(char)
+        
+        return ''.join(result)
+    
     def __generate_new_paths(self, relative_path: Path, target: Path, file_name: str):
         """
         生成混淆后的目录和文件名
@@ -410,16 +452,22 @@ class CloudLinkMonitor(_PluginBase):
         :param file_name: 原始文件名
         :return: (目标目录, 新文件名)
         """
-        # 处理目录名：保留1-2个原名字+MD5生成的繁体字+保留(年份)
+        # 处理目录名：只混淆剧名文件夹，保留分类目录和Season目录
         if relative_path.parent != Path('.'):
             parent_parts = list(relative_path.parent.parts)
             new_parent_parts = []
             
             for i, dir_name in enumerate(parent_parts):
-                # 跳过Season目录（不改）
+                # 保留Season目录不变
                 if re.match(r'^Season\s+\d+$', dir_name, re.IGNORECASE):
                     new_parent_parts.append(dir_name)
                     logger.info(f"保留Season目录: {dir_name}")
+                    continue
+                
+                # 保留第一层分类目录不变（电视剧、电影等）
+                if i == 0:
+                    new_parent_parts.append(dir_name)
+                    logger.info(f"保留分类目录: {dir_name}")
                     continue
                 
                 # 提取年份（如果有）
@@ -429,30 +477,11 @@ class CloudLinkMonitor(_PluginBase):
                 # 去掉年份后的目录名
                 dir_name_without_year = re.sub(r'\s*\(\d{4}\)$', '', dir_name)
                 
-                # 使用MD5确保确定性
-                hash_obj = hashlib.md5(dir_name.encode('utf-8'))
-                hash_int = int(hash_obj.hexdigest(), 16)
+                # 混淆剧名
+                obfuscated_name = self.__obfuscate_name(dir_name_without_year)
                 
-                # 繁体字库
-                traditional_chars = ['繁', '體', '字', '隨', '機', '變', '換', '檔', '案', '雜', '湊', '測', '試', '電', '影', '視', '頻', '劇', '集', '節', '目', '聖', '靈', '魂', '鬼', '神']
-                
-                # 保留前1-2个字（根据hash确定保留几个）
-                keep_count = 1 if (hash_int % 2 == 0) else 2
-                if len(dir_name_without_year) < keep_count:
-                    keep_count = len(dir_name_without_year)
-                
-                prefix = dir_name_without_year[:keep_count] if dir_name_without_year else ""
-                
-                # 生成3-5个繁体字
-                char_count = (hash_int % 3) + 3  # 3-5个字符
-                selected_chars = []
-                for j in range(char_count):
-                    idx = (hash_int >> (j * 5)) % len(traditional_chars)
-                    selected_chars.append(traditional_chars[idx])
-                random_chars = ''.join(selected_chars)
-                
-                # 构建新目录名：前缀 + 繁体字 + 年份
-                new_dir = prefix + random_chars + year_suffix
+                # 构建新目录名：混淆名 + 年份
+                new_dir = obfuscated_name + year_suffix
                 new_parent_parts.append(new_dir)
                 logger.info(f"目录名混淆: {dir_name} -> {new_dir}")
             
