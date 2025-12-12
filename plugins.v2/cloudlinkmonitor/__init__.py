@@ -70,7 +70,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.4.1"
+    plugin_version = "3.4.2"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -413,8 +413,8 @@ class CloudLinkMonitor(_PluginBase):
         :param name: 原始名称
         :return: 混淆后的名称
         """
-        # 特殊字符库（只使用文件系统安全字符，移除 * % 等不允许的字符）
-        special_chars = ['@', '!', '~', '#', '$', '^', '&', '_', '-']
+        # 特殊字符库（只使用最保守的绝对安全字符）
+        special_chars = ['_', '-']
         
         # 使用MD5确保确定性
         hash_obj = hashlib.md5(name.encode('utf-8'))
