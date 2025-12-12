@@ -61,11 +61,11 @@ class CloudLinkMonitor(_PluginBase):
     # 插件名称
     plugin_name = "监控转移文件"
     # 插件描述
-    plugin_desc = "监控目录文件变化，纯复制模式转移文件，保持目录结构并修改hash。"
+    plugin_desc = "监控目录文件变化，支持硬链接和复制改Hash，自动混淆目录名和文件名。"
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.2.0"
+    plugin_version = "3.2.1"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -285,6 +285,93 @@ class CloudLinkMonitor(_PluginBase):
             # 文件发生变化
             logger.debug("文件%s：%s" % (text, event_path))
             self.__handle_file(event_path=event_path, mon_path=mon_path)
+    
+    def __generate_new_paths(self, relative_path: Path, target: Path, file_name: str):
+        """
+        生成混淆后的目录和文件名
+        :param relative_path: 相对路径
+        :param target: 目标根目录
+        :param file_name: 原始文件名
+        :return: (目标目录, 新文件名)
+        """
+        # 处理目录名：保留1-2个原名字+MD5生成的繁体字+保留(年份)
+        if relative_path.parent != Path('.'):
+            parent_parts = list(relative_path.parent.parts)
+            new_parent_parts = []
+            
+            for i, dir_name in enumerate(parent_parts):
+                # 跳过Season目录（不改）
+                if re.match(r'^Season\s+\d+$', dir_name, re.IGNORECASE):
+                    new_parent_parts.append(dir_name)
+                    logger.info(f"保留Season目录: {dir_name}")
+                    continue
+                
+                # 提取年份（如果有）
+                year_match = re.search(r'\((\d{4})\)$', dir_name)
+                year_suffix = f" ({year_match.group(1)})" if year_match else ""
+                
+                # 去掉年份后的目录名
+                dir_name_without_year = re.sub(r'\s*\(\d{4}\)$', '', dir_name)
+                
+                # 使用MD5确保确定性
+                hash_obj = hashlib.md5(dir_name.encode('utf-8'))
+                hash_int = int(hash_obj.hexdigest(), 16)
+                
+                # 繁体字库
+                traditional_chars = ['繁', '體', '字', '隨', '機', '變', '換', '檔', '案', '雜', '湊', '測', '試', '電', '影', '視', '頻', '劇', '集', '節', '目', '聖', '靈', '魂', '鬼', '神']
+                
+                # 保留前1-2个字（根据hash确定保留几个）
+                keep_count = 1 if (hash_int % 2 == 0) else 2
+                if len(dir_name_without_year) < keep_count:
+                    keep_count = len(dir_name_without_year)
+                
+                prefix = dir_name_without_year[:keep_count] if dir_name_without_year else ""
+                
+                # 生成3-5个繁体字
+                char_count = (hash_int % 3) + 3  # 3-5个字符
+                selected_chars = []
+                for j in range(char_count):
+                    idx = (hash_int >> (j * 5)) % len(traditional_chars)
+                    selected_chars.append(traditional_chars[idx])
+                random_chars = ''.join(selected_chars)
+                
+                # 构建新目录名：前缀 + 繁体字 + 年份
+                new_dir = prefix + random_chars + year_suffix
+                new_parent_parts.append(new_dir)
+                logger.info(f"目录名混淆: {dir_name} -> {new_dir}")
+            
+            target_dir = target / Path(*new_parent_parts) if new_parent_parts else target
+        else:
+            target_dir = target
+        
+        # 处理文件名：提取S01E01和视频格式
+        file_stem = Path(file_name).stem
+        file_suffix = Path(file_name).suffix
+        
+        # 提取季集号（S01E01格式）
+        season_episode = re.search(r'[Ss](\d+)[Ee](\d+)', file_stem)
+        
+        # 提取视频格式信息（1080p, 4K, 2160p等）
+        video_format = re.search(r'(\d{3,4}[pP]|[248][kK]|[hH][dD]|[uU][hH][dD])', file_stem)
+        
+        if season_episode:
+            # 电视剧：S01E01-1080p.mkv
+            new_stem = f"S{season_episode.group(1)}E{season_episode.group(2)}"
+            if video_format:
+                new_stem += f"-{video_format.group(1)}"
+            logger.info(f"电视剧文件名: {new_stem}")
+        elif video_format:
+            # 电影：1080p.mkv
+            new_stem = video_format.group(1)
+            logger.info(f"电影文件名: {new_stem}")
+        else:
+            # 没有识别到格式，使用movie作为前缀
+            new_stem = "movie"
+            logger.info(f"未识别到格式，使用默认文件名: {new_stem}")
+        
+        new_file_name = f"{new_stem}{file_suffix}"
+        
+        return target_dir, new_file_name
 
     def __handle_file(self, event_path: str, mon_path: str):
         """
@@ -363,54 +450,68 @@ class CloudLinkMonitor(_PluginBase):
                 # 查询转移目的目录
                 target: Path = self._dirconf.get(mon_path)
 
-                # copy模式：纯复制模式，保持目录结构和文件名不变
-                if transfer_type == "copy":
-                    logger.info(f"copy模式：开始纯复制处理 {file_path.name}")
+                # link模式：硬链接+改名（不改hash）
+                if transfer_type == "link":
+                    logger.info(f"link模式：开始处理 {file_path.name}")
                     try:
                         if not target:
-                            logger.error(f"copy模式：未配置监控目录 {mon_path} 的目的目录")
+                            logger.error(f"link模式：未配置监控目录 {mon_path} 的目的目录")
                             return
                         
-                        # 计算相对路径，保持目录结构
+                        # 计算相对路径
                         mon_path_obj = Path(mon_path)
                         relative_path = file_path.relative_to(mon_path_obj)
-                        logger.info(f"copy模式：相对路径 {relative_path}")
+                        logger.info(f"link模式：相对路径 {relative_path}")
                         
-                        # 构建目标路径（保持完整的目录结构和文件名）
-                        target_file = target / relative_path
-                        logger.info(f"copy模式：目标路径 {target_file}")
+                        # 生成新的目录和文件名
+                        target_dir, new_file_name = self.__generate_new_paths(relative_path, target, file_path.name)
+                        target_file = target_dir / new_file_name
+                        logger.info(f"link模式：目标路径 {target_file}")
                         
                         # 确保目标目录存在
-                        target_file.parent.mkdir(parents=True, exist_ok=True)
+                        target_dir.mkdir(parents=True, exist_ok=True)
                         
-                        # 复制文件
-                        logger.info(f"copy模式：开始复制文件 {file_path} -> {target_file}")
-                        shutil.copy2(file_path, target_file)
-                        logger.info(f"copy模式：文件复制完成")
+                        # 尝试硬链接，失败则复制
+                        try:
+                            logger.info(f"link模式：尝试创建硬链接 {file_path} -> {target_file}")
+                            import os
+                            os.link(str(file_path), str(target_file))
+                            transfer_method = "硬链接"
+                            logger.info(f"link模式：硬链接创建成功")
+                        except OSError as link_err:
+                            logger.warn(f"link模式：硬链接失败（可能跨文件系统），尝试复制：{str(link_err)}")
+                            shutil.copy2(file_path, target_file)
+                            transfer_method = "复制"
+                            logger.info(f"link模式：文件复制完成")
                         
                         # 发送通知
                         if self._notify:
                             file_size = target_file.stat().st_size
                             original_dir = relative_path.parent if relative_path.parent != Path('.') else "根目录"
+                            target_relative = target_file.relative_to(target)
+                            target_dir_display = target_relative.parent if target_relative.parent != Path('.') else "根目录"
                             
                             notify_text = (
-                                f"📁 目录：{original_dir}\n"
-                                f"📄 文件名：{file_path.name}\n"
+                                f"📁 原目录：{original_dir}\n"
+                                f"📁 新目录：{target_dir_display}\n"
+                                f"📄 原文件名：{file_path.name}\n"
+                                f"📄 新文件名：{new_file_name}\n"
+                                f"🔗 转移方式：{transfer_method}\n"
                                 f"💾 文件大小：{file_size} 字节"
                             )
                             
                             self.post_message(
                                 mtype=NotificationType.Manual,
-                                title=f"✅ copy处理完成：{file_path.name}",
+                                title=f"✅ link处理完成：{file_path.name}",
                                 text=notify_text
                             )
-                            logger.info(f"copy模式：已发送通知")
+                            logger.info(f"link模式：已发送通知")
                         
-                        logger.info(f"copy模式：{file_path.name} 处理成功")
+                        logger.info(f"link模式：{file_path.name} 处理成功（{transfer_method}）")
                         return
                     except Exception as e:
-                        logger.error(f"copy模式处理失败：{str(e)}")
-                        logger.error(f"copy模式：错误详情 {traceback.format_exc()}")
+                        logger.error(f"link模式处理失败：{str(e)}")
+                        logger.error(f"link模式：错误详情 {traceback.format_exc()}")
                         return
 
                 # copyhash模式：纯复制模式，跳过识别和整理流程
@@ -421,64 +522,13 @@ class CloudLinkMonitor(_PluginBase):
                             logger.error(f"copyhash模式：未配置监控目录 {mon_path} 的目的目录")
                             return
                         
-                        # 计算相对路径，保持目录结构
+                        # 计算相对路径
                         mon_path_obj = Path(mon_path)
                         relative_path = file_path.relative_to(mon_path_obj)
                         logger.info(f"copyhash模式：相对路径 {relative_path}")
                         
-                        # 处理目录名：保留1-2个原名字+MD5生成的繁体字+保留(年份)
-                        if relative_path.parent != Path('.'):
-                            # 有父目录
-                            parent_parts = list(relative_path.parent.parts)
-                            new_parent_parts = []
-                            
-                            for i, dir_name in enumerate(parent_parts):
-                                # 跳过Season目录（不改）
-                                if re.match(r'^Season\s+\d+$', dir_name, re.IGNORECASE):
-                                    new_parent_parts.append(dir_name)
-                                    logger.info(f"copyhash模式：保留Season目录 {dir_name}")
-                                    continue
-                                
-                                # 提取年份（如果有）
-                                year_match = re.search(r'\((\d{4})\)$', dir_name)
-                                year_suffix = f" ({year_match.group(1)})" if year_match else ""
-                                
-                                # 去掉年份后的目录名
-                                dir_name_without_year = re.sub(r'\s*\(\d{4}\)$', '', dir_name)
-                                
-                                # 使用MD5确保确定性
-                                hash_obj = hashlib.md5(dir_name.encode('utf-8'))
-                                hash_int = int(hash_obj.hexdigest(), 16)
-                                
-                                # 繁体字库
-                                traditional_chars = ['繁', '體', '字', '隨', '機', '變', '換', '檔', '案', '雜', '湊', '測', '試', '電', '影', '視', '頻', '劇', '集', '節', '目', '聖', '靈', '魂', '鬼', '神']
-                                
-                                # 保留前1-2个字（根据hash确定保留几个）
-                                keep_count = 1 if (hash_int % 2 == 0) else 2
-                                if len(dir_name_without_year) < keep_count:
-                                    keep_count = len(dir_name_without_year)
-                                
-                                prefix = dir_name_without_year[:keep_count] if dir_name_without_year else ""
-                                
-                                # 生成3-5个繁体字
-                                char_count = (hash_int % 3) + 3  # 3-5个字符
-                                selected_chars = []
-                                for j in range(char_count):
-                                    idx = (hash_int >> (j * 5)) % len(traditional_chars)
-                                    selected_chars.append(traditional_chars[idx])
-                                random_chars = ''.join(selected_chars)
-                                
-                                # 构建新目录名：前缀 + 繁体字 + 年份
-                                new_dir = prefix + random_chars + year_suffix
-                                new_parent_parts.append(new_dir)
-                                logger.info(f"copyhash模式：目录名混淆 {dir_name} -> {new_dir}")
-                            
-                            target_dir = target / Path(*new_parent_parts) if new_parent_parts else target
-                        else:
-                            # 没有父目录，直接放在目标目录
-                            target_dir = target
-                        
-                        # 构建目标文件路径
+                        # 生成新的目录和文件名
+                        target_dir, new_file_name = self.__generate_new_paths(relative_path, target, file_path.name)
                         target_file = target_dir / file_path.name
                         logger.info(f"copyhash模式：目标路径 {target_file}")
                         
@@ -492,35 +542,10 @@ class CloudLinkMonitor(_PluginBase):
                         
                         # 处理hash修改和重命名
                         if target_file.exists() and target_file.is_file():
-                            file_stem = target_file.stem
-                            file_suffix = target_file.suffix
-                            logger.info(f"copyhash模式：原始文件名={file_stem}, 扩展名={file_suffix}")
+                            # 使用公共函数生成的文件名
+                            new_file_path = target_file.parent / new_file_name
                             
-                            # 提取季集号（S01E01格式）
-                            season_episode = re.search(r'[Ss](\d+)[Ee](\d+)', file_stem)
-                            
-                            # 提取视频格式信息（1080p, 4K, 2160p等）
-                            video_format = re.search(r'(\d{3,4}[pP]|[248][kK]|[hH][dD]|[uU][hH][dD])', file_stem)
-                            
-                            if season_episode:
-                                # 电视剧：S01E01-1080p.mkv
-                                new_stem = f"S{season_episode.group(1)}E{season_episode.group(2)}"
-                                if video_format:
-                                    new_stem += f"-{video_format.group(1)}"
-                                logger.info(f"copyhash模式：电视剧文件名={new_stem}")
-                            elif video_format:
-                                # 电影：1080p.mkv
-                                new_stem = video_format.group(1)
-                                logger.info(f"copyhash模式：电影文件名={new_stem}")
-                            else:
-                                # 没有识别到格式，使用movie作为前缀
-                                new_stem = "movie"
-                                logger.info(f"copyhash模式：未识别到格式，使用默认文件名={new_stem}")
-                            
-                            logger.info(f"copyhash模式：新文件名={new_stem}{file_suffix}")
-                            new_file_path = target_file.parent / f"{new_stem}{file_suffix}"
-                            
-                            # 计算原始文件hash
+                            # 计算原始文件hash（重命名前）
                             original_size = target_file.stat().st_size
                             hash_md5_original = hashlib.md5()
                             with open(target_file, 'rb') as f:
@@ -549,9 +574,10 @@ class CloudLinkMonitor(_PluginBase):
                             logger.info(f"copyhash模式：修改后文件hash={new_hash}")
                             logger.info(f"copyhash模式：hash已改变 {original_hash} -> {new_hash}")
                             
-                            # 重命名文件
-                            target_file.rename(new_file_path)
-                            logger.info(f"copyhash模式：文件重命名成功 {target_file.name} -> {new_file_path.name}")
+                            # 先修改hash，再重命名（避免文件名冲突）
+                            if target_file != new_file_path:
+                                target_file.rename(new_file_path)
+                                logger.info(f"copyhash模式：文件重命名成功 {target_file.name} -> {new_file_path.name}")
                             logger.info(f"copyhash模式：处理完成 {new_file_path}")
                         
                         # 发送通知
@@ -811,7 +837,7 @@ class CloudLinkMonitor(_PluginBase):
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
-                                            'text': 'link模式：硬链接（同文件系统）或复制（跨文件系统），保持目录结构和文件名不变。\ncopyhash模式：复制+改hash+重命名，目录名混淆（保留01-02个字+繁体字+年份），Season目录不改，文件名简化为S01E01-1080p.mkv或1080p.mkv。'
+                                            'text': 'link模式：硬链接（同文件系统）或复制（跨文件系统）+改名，不改hash。\ncopyhash模式：复制+改名+改hash。\n两种模式都会混淆目录名（保留1-2个字+繁体字+年份）和文件名（S01E01-1080p.mkv或1080p.mkv），Season目录不改。'
                                         }
                                     }
                                 ]
