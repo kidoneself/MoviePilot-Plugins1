@@ -65,7 +65,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.0.1"
+    plugin_version = "3.0.2"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -139,14 +139,8 @@ class CloudLinkMonitor(_PluginBase):
                 if not mon_path:
                     continue
 
-                # 自定义覆盖方式
-                _overwrite_mode = 'never'
-                if mon_path.count("@") == 1:
-                    _overwrite_mode = mon_path.split("@")[1]
-                    mon_path = mon_path.split("@")[0]
-
-                # 自定义转移方式
-                _transfer_type = self._transfer_type
+                # 自定义转移方式（仅支持copyhash）
+                _transfer_type = "copyhash"
                 if mon_path.count("#") == 1:
                     _transfer_type = mon_path.split("#")[1]
                     mon_path = mon_path.split("#")[0]
@@ -172,7 +166,6 @@ class CloudLinkMonitor(_PluginBase):
 
                 # 转移方式
                 self._transferconf[mon_path] = _transfer_type
-                self._overwrite_mode[mon_path] = _overwrite_mode
 
                 # 启用目录监控
                 if self._enabled:
@@ -526,192 +519,11 @@ class CloudLinkMonitor(_PluginBase):
                         logger.error(f"copyhash模式处理失败：{str(e)}")
                         logger.error(f"copyhash模式：错误详情 {traceback.format_exc()}")
                         return
-
-                # 查找这个文件项
-                file_item = self.storagechain.get_file_item(storage="local", path=file_path)
-                if not file_item:
-                    logger.warn(f"{event_path.name} 未找到对应的文件")
-                    return
-                # 识别媒体信息
-                mediainfo: MediaInfo = self.chain.recognize_media(meta=file_meta)
-                if not mediainfo:
-                    logger.warn(f'未识别到媒体信息，标题：{file_meta.name}')
-                    # 新增转移成功历史记录
-                    his = self.transferhis.add_fail(
-                        fileitem=file_item,
-                        mode=transfer_type,
-                        meta=file_meta
-                    )
-                    if self._notify:
-                        self.post_message(
-                            mtype=NotificationType.Manual,
-                            title=f"{file_path.name} 未识别到媒体信息，无法入库！\n"
-                                  f"回复：```\n/redo {his.id} [tmdbid]|[类型]\n``` 手动识别转移。"
-                        )
-                    return
-
-                # 如果未开启新增已入库媒体是否跟随TMDB信息变化则根据tmdbid查询之前的title
-                if not settings.SCRAP_FOLLOW_TMDB:
-                    transfer_history = self.transferhis.get_by_type_tmdbid(tmdbid=mediainfo.tmdb_id,
-                                                                           mtype=mediainfo.type.value)
-                    if transfer_history:
-                        mediainfo.title = transfer_history.title
-                logger.info(f"{file_path.name} 识别为：{mediainfo.type.value} {mediainfo.title_year}")
-
-                # 获取集数据
-                if mediainfo.type == MediaType.TV:
-                    episodes_info = self.tmdbchain.tmdb_episodes(tmdbid=mediainfo.tmdb_id,
-                                                                 season=1 if file_meta.begin_season is None else file_meta.begin_season)
-                else:
-                    episodes_info = None
-
-                # 查询转移目的目录
-                target_dir = DirectoryHelper().get_dir(mediainfo, src_path=Path(mon_path))
-                if not target_dir or not target_dir.library_path or not target_dir.download_path.startswith(mon_path):
-                    target_dir = TransferDirectoryConf()
-                    target_dir.library_path = target
-                    target_dir.transfer_type = transfer_type
-                    target_dir.scraping = self._scrape
-                    target_dir.renaming = True
-                    target_dir.notify = False
-                    target_dir.overwrite_mode = self._overwrite_mode.get(mon_path) or 'never'
-                    target_dir.library_storage = "local"
-                    target_dir.library_category_folder = self._category
-                else:
-                    target_dir.transfer_type = transfer_type
-                    target_dir.scraping = self._scrape
-
-                if not target_dir.library_path:
-                    logger.error(f"未配置监控目录 {mon_path} 的目的目录")
-                    return
-
-                # 转移文件
-                transferinfo: TransferInfo = self.chain.transfer(fileitem=file_item,
-                                                                 meta=file_meta,
-                                                                 mediainfo=mediainfo,
-                                                                 target_directory=target_dir,
-                                                                 episodes_info=episodes_info)
-
-                if not transferinfo:
-                    logger.error("文件转移模块运行失败")
-                    return
-
-                if not transferinfo.success:
-                    # 转移失败
-                    logger.warn(f"{file_path.name} 入库失败：{transferinfo.message}")
-
-                    if self._history:
-                        # 新增转移失败历史记录
-                        self.transferhis.add_fail(
-                            fileitem=file_item,
-                            mode=transfer_type,
-                            meta=file_meta,
-                            mediainfo=mediainfo,
-                            transferinfo=transferinfo
-                        )
-                    if self._notify:
-                        self.post_message(
-                            mtype=NotificationType.Manual,
-                            title=f"{mediainfo.title_year}{file_meta.season_episode} 入库失败！",
-                            text=f"原因：{transferinfo.message or '未知'}",
-                            image=mediainfo.get_message_image()
-                        )
-                    return
-
-                if self._history:
-                    # 新增转移成功历史记录
-                    self.transferhis.add_success(
-                        fileitem=file_item,
-                        mode=transfer_type,
-                        meta=file_meta,
-                        mediainfo=mediainfo,
-                        transferinfo=transferinfo
-                    )
-
-                # 刮削
-                if self._scrape:
-                    self.mediaChain.scrape_metadata(fileitem=transferinfo.target_diritem,
-                                                    meta=file_meta,
-                                                    mediainfo=mediainfo)
-                """
-                {
-                    "title_year season": {
-                        "files": [
-                            {
-                                "path":,
-                                "mediainfo":,
-                                "file_meta":,
-                                "transferinfo":
-                            }
-                        ],
-                        "time": "2023-08-24 23:23:23.332"
-                    }
-                }
-                """
-                if self._notify:
-                    # 发送消息汇总
-                    media_list = self._medias.get(mediainfo.title_year + " " + file_meta.season) or {}
-                    if media_list:
-                        media_files = media_list.get("files") or []
-                        if media_files:
-                            file_exists = False
-                            for file in media_files:
-                                if str(file_path) == file.get("path"):
-                                    file_exists = True
-                                    break
-                            if not file_exists:
-                                media_files.append({
-                                    "path": str(file_path),
-                                    "mediainfo": mediainfo,
-                                    "file_meta": file_meta,
-                                    "transferinfo": transferinfo
-                                })
-                        else:
-                            media_files = [
-                                {
-                                    "path": str(file_path),
-                                    "mediainfo": mediainfo,
-                                    "file_meta": file_meta,
-                                    "transferinfo": transferinfo
-                                }
-                            ]
-                        media_list = {
-                            "files": media_files,
-                            "time": datetime.datetime.now()
-                        }
-                    else:
-                        media_list = {
-                            "files": [
-                                {
-                                    "path": str(file_path),
-                                    "mediainfo": mediainfo,
-                                    "file_meta": file_meta,
-                                    "transferinfo": transferinfo
-                                }
-                            ],
-                            "time": datetime.datetime.now()
-                        }
-                    self._medias[mediainfo.title_year + " " + file_meta.season] = media_list
-
-                if self._refresh:
-                    # 广播事件
-                    self.eventmanager.send_event(EventType.TransferComplete, {
-                        'meta': file_meta,
-                        'mediainfo': mediainfo,
-                        'transferinfo': transferinfo
-                    })
-
-                # 移动模式删除空目录
-                if transfer_type == "move":
-                    for file_dir in file_path.parents:
-                        if len(str(file_dir)) <= len(str(Path(mon_path))):
-                            # 重要，删除到监控目录为止
-                            break
-                        files = SystemUtils.list_files(file_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT)
-                        if not files:
-                            logger.warn(f"移动模式，删除空目录：{file_dir}")
-                            shutil.rmtree(file_dir, ignore_errors=True)
-
+                
+                # copyhash是唯一支持的转移方式，不应该执行到这里
+                logger.error(f"不支持的转移方式：{transfer_type}，仅支持copyhash")
+                return
+        
         except Exception as e:
             logger.error("目录监控发生错误：%s - %s" % (str(e), traceback.format_exc()))
 
