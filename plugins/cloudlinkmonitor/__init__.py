@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime, timedelta
 import re
 import shutil
 import threading
@@ -60,7 +60,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "2.4.6"
+    plugin_version = "2.4.7"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -233,8 +233,8 @@ class CloudLinkMonitor(_PluginBase):
                 logger.info("云盘实时监控服务启动，立即运行一次")
                 self._scheduler.add_job(name="云盘实时监控",
                                         func=self.sync_all, trigger='date',
-                                        run_date=datetime.datetime.now(
-                                            tz=pytz.timezone(settings.TZ)) + datetime.timedelta(seconds=3)
+                                        run_date=datetime.now(
+                                            tz=pytz.timezone(settings.TZ)) + timedelta(seconds=3)
                                         )
                 # 关闭一次性开关
                 self._onlyonce = False
@@ -533,7 +533,7 @@ class CloudLinkMonitor(_PluginBase):
                             ]
                         media_list = {
                             "files": media_files,
-                            "time": datetime.datetime.now()
+                            "time": datetime.now()
                         }
                     else:
                         media_list = {
@@ -545,7 +545,7 @@ class CloudLinkMonitor(_PluginBase):
                                     "transferinfo": transferinfo
                                 }
                             ],
-                            "time": datetime.datetime.now()
+                            "time": datetime.now()
                         }
                     self._medias[mediainfo.title_year + " " + file_meta.season] = media_list
 
@@ -603,7 +603,7 @@ class CloudLinkMonitor(_PluginBase):
             file_meta = media_files[0].get("file_meta")
             mediainfo = media_files[0].get("mediainfo")
             # 判断剧集最后更新时间距现在是已超过10秒或者电影，发送消息
-            if (datetime.datetime.now() - last_update_time).total_seconds() > int(self._interval) \
+            if (datetime.now() - last_update_time).total_seconds() > int(self._interval) \
                     or mediainfo.type == MediaType.MOVIE:
                 # 发送通知
                 if self._notify:
