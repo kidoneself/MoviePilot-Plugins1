@@ -70,7 +70,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.4.3"
+    plugin_version = "3.5.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -249,19 +249,28 @@ class CloudLinkMonitor(_PluginBase):
     @eventmanager.register(EventType.PluginAction)
     def remote_sync(self, event: Event):
         """
-        远程全量同步
+        远程命令处理
         """
         if event:
             event_data = event.event_data
-            if not event_data or event_data.get("action") != "cloud_link_sync":
+            if not event_data:
                 return
-            self.post_message(channel=event.event_data.get("channel"),
-                              title="开始同步云盘实时监控目录 ...",
-                              userid=event.event_data.get("user"))
-        self.sync_all()
-        if event:
-            self.post_message(channel=event.event_data.get("channel"),
-                              title="云盘实时监控目录同步完成！", userid=event.event_data.get("user"))
+            
+            action = event_data.get("action")
+            channel = event_data.get("channel")
+            user = event_data.get("user")
+            
+            # 全量同步命令
+            if action == "cloud_link_sync":
+                self.post_message(channel=channel, title="开始同步云盘实时监控目录 ...", userid=user)
+                self.sync_all()
+                self.post_message(channel=channel, title="云盘实时监控目录同步完成！", userid=user)
+            
+            # 同步检查命令
+            elif action == "sync_check":
+                self.post_message(channel=channel, title="开始检查同步状态 ...", userid=user)
+                self.sync_check(channel=channel, user=user)
+                self.post_message(channel=channel, title="同步状态检查完成！", userid=user)
 
     def sync_all(self):
         """
@@ -277,6 +286,101 @@ class CloudLinkMonitor(_PluginBase):
             for file_path in list_files:
                 logger.info(f"开始处理文件 {file_path} ...")
                 self.__handle_file(event_path=str(file_path), mon_path=mon_path)
+    
+    def sync_check(self, channel=None, user=None):
+        """
+        检查同步状态，对比源目录和目标目录
+        """
+        logger.info("开始检查同步状态 ...")
+        
+        # 遍历所有监控目录
+        for mon_path, target_path in self._dirconf.items():
+            if not target_path:
+                continue
+            
+            mon_path_obj = Path(mon_path)
+            if not mon_path_obj.exists():
+                continue
+            
+            # 扫描源目录，按一级子目录分组（媒体文件夹）
+            media_folders = {}
+            for item in mon_path_obj.iterdir():
+                if item.is_dir():
+                    # 统计该文件夹下的媒体文件
+                    files = SystemUtils.list_files(item, settings.RMT_MEDIAEXT)
+                    if files:
+                        media_folders[item.name] = {
+                            'path': str(item),
+                            'files': [f.name for f in files]
+                        }
+            
+            # 对每个媒体文件夹发送通知
+            for folder_name, folder_info in media_folders.items():
+                source_files = folder_info['files']
+                source_count = len(source_files)
+                
+                # 检查目标目录是否存在对应文件夹
+                target_folders = []
+                target_count = 0
+                target_files_list = []
+                
+                # 遍历目标目录查找可能的匹配
+                if target_path.exists():
+                    for target_item in target_path.rglob('*'):
+                        if target_item.is_dir():
+                            target_files = SystemUtils.list_files(target_item, settings.RMT_MEDIAEXT)
+                            if target_files:
+                                target_folders.append({
+                                    'name': target_item.name,
+                                    'relative': str(target_item.relative_to(target_path)),
+                                    'files': [f.name for f in target_files]
+                                })
+                
+                # 尝试匹配目标文件夹（通过文件数量或模糊匹配）
+                matched_target = None
+                for tf in target_folders:
+                    # 简单匹配：文件数量相同
+                    if len(tf['files']) == source_count:
+                        matched_target = tf
+                        break
+                
+                if matched_target:
+                    target_count = len(matched_target['files'])
+                    target_files_list = matched_target['files'][:10]  # 最多显示10个
+                    target_info = f"📁 {matched_target['relative']}/\n"
+                    for f in target_files_list:
+                        target_info += f"  ∙ {f}\n"
+                    if target_count > 10:
+                        target_info += f"  ... 共{target_count}个文件\n"
+                    status = f"✅ 源{source_count}个 = 目标{target_count}个"
+                else:
+                    target_info = "❌ 未找到或不存在\n"
+                    status = f"⚠️ 源{source_count}个 ≠ 目标0个"
+                
+                # 构建通知内容
+                source_info = f"📁 源：{folder_info['path']}/\n"
+                source_files_display = source_files[:10]  # 最多显示10个
+                for f in source_files_display:
+                    source_info += f"  ∙ {f}\n"
+                if source_count > 10:
+                    source_info += f"  ... 共{source_count}个文件\n"
+                
+                message = (
+                    f"📂 {folder_name}\n\n"
+                    f"{source_info}\n"
+                    f"{target_info}\n"
+                    f"{status}"
+                )
+                
+                # 发送通知
+                self.post_message(
+                    channel=channel,
+                    title=f"📊 {folder_name}",
+                    text=message,
+                    userid=user
+                )
+                
+        logger.info("同步状态检查完成")
         logger.info("全量同步云盘实时监控目录完成！")
 
     def event_handler(self, event, mon_path: str, text: str, event_path: str):
@@ -797,15 +901,26 @@ class CloudLinkMonitor(_PluginBase):
         定义远程控制命令
         :return: 命令关键字、事件、描述、附带数据
         """
-        return [{
-            "cmd": "/cloud_link_sync",
-            "event": EventType.PluginAction,
-            "desc": "云盘实时监控同步",
-            "category": "",
-            "data": {
-                "action": "cloud_link_sync"
+        return [
+            {
+                "cmd": "/cloud_link_sync",
+                "event": EventType.PluginAction,
+                "desc": "云盘实时监控同步",
+                "category": "",
+                "data": {
+                    "action": "cloud_link_sync"
+                }
+            },
+            {
+                "cmd": "/sync_check",
+                "event": EventType.PluginAction,
+                "desc": "检查同步状态",
+                "category": "",
+                "data": {
+                    "action": "sync_check"
+                }
             }
-        }]
+        ]
 
     def get_api(self) -> List[Dict[str, Any]]:
         return [{
