@@ -925,17 +925,8 @@ class CloudLinkMonitor(_PluginBase):
             "enabled": False,
             "notify": False,
             "onlyonce": False,
-            "history": False,
-            "scrape": False,
-            "category": False,
-            "refresh": True,
-            "softlink": False,
-            "strm": False,
-            "mode": "fast",
-            "transfer_type": "filesoftlink",
             "monitor_dirs": "",
             "exclude_keywords": "",
-            "interval": 10,
             "cron": "",
             "size": 0
         }
