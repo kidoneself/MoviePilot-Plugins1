@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import hashlib
 import random
 import re
@@ -61,11 +61,11 @@ class CloudLinkMonitor(_PluginBase):
     # 插件名称
     plugin_name = "监控转移文件"
     # 插件描述
-    plugin_desc = "监控目录文件变化，支持硬链接和复制改Hash，自动混淆目录名和文件名。"
+    plugin_desc = "监控目录文件变化，支持硬链接和复制改Hash，自动混淆目录和文件名，批次汇总通知。"
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.2.1"
+    plugin_version = "3.3.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -101,6 +101,11 @@ class CloudLinkMonitor(_PluginBase):
     _transferconf: Dict[str, Optional[str]] = {}
     # 退出事件
     _event = threading.Event()
+    # 批次汇总相关
+    _batch_files = []  # 批次处理的文件列表
+    _last_process_time = None  # 最后处理时间
+    _summary_timer = None  # 汇总定时器
+    _batch_lock = threading.Lock()  # 批次数据锁
 
     def init_plugin(self, config: dict = None):
         self.transferhis = TransferHistoryOper()
@@ -285,6 +290,116 @@ class CloudLinkMonitor(_PluginBase):
             # 文件发生变化
             logger.debug("文件%s：%s" % (text, event_path))
             self.__handle_file(event_path=event_path, mon_path=mon_path)
+    
+    def __add_to_batch(self, file_info: dict):
+        """
+        添加文件到批次汇总
+        :param file_info: 文件处理信息
+        """
+        with self._batch_lock:
+            self._batch_files.append(file_info)
+            self._last_process_time = datetime.now()
+            
+            # 重置汇总定时器
+            if self._summary_timer:
+                self._summary_timer.cancel()
+            
+            # 30秒后检查是否发送汇总
+            self._summary_timer = threading.Timer(30.0, self.__check_and_send_summary)
+            self._summary_timer.daemon = True
+            self._summary_timer.start()
+    
+    def __check_and_send_summary(self):
+        """
+        检查并发送批次汇总通知
+        """
+        with self._batch_lock:
+            if not self._batch_files:
+                return
+            
+            # 检查是否30秒内无新文件
+            if self._last_process_time and (datetime.now() - self._last_process_time).total_seconds() >= 30:
+                self.__send_batch_summary()
+    
+    def __send_batch_summary(self):
+        """
+        发送批次汇总通知
+        """
+        if not self._batch_files:
+            return
+        
+        try:
+            # 统计信息
+            total_files = len(self._batch_files)
+            total_size = sum(f.get('size', 0) for f in self._batch_files)
+            
+            # 计算用时
+            start_time = self._batch_files[0].get('time')
+            end_time = self._batch_files[-1].get('time')
+            if start_time and end_time:
+                duration = (end_time - start_time).total_seconds()
+                duration_str = f"{int(duration // 60)}分{int(duration % 60)}秒" if duration >= 60 else f"{int(duration)}秒"
+            else:
+                duration_str = "未知"
+            
+            # 按目录分组统计
+            dir_stats = {}
+            for f in self._batch_files:
+                source_dir = f.get('source_dir', '未知')
+                target_dir = f.get('target_dir', '未知')
+                key = f"{source_dir}→{target_dir}"
+                
+                if key not in dir_stats:
+                    dir_stats[key] = {
+                        'source': source_dir,
+                        'target': target_dir,
+                        'count': 0,
+                        'size': 0
+                    }
+                dir_stats[key]['count'] += 1
+                dir_stats[key]['size'] += f.get('size', 0)
+            
+            # 构建目录汇总文本
+            dir_summary_lines = []
+            for stats in dir_stats.values():
+                size_gb = stats['size'] / (1024**3)
+                dir_summary_lines.append(
+                    f"  📂 {stats['source']} ({stats['count']}个 | {size_gb:.1f}GB)\n"
+                    f"  ↓\n"
+                    f"  📂 {stats['target']}\n"
+                )
+            dir_summary = "\n".join(dir_summary_lines)
+            
+            # 格式化总大小
+            if total_size >= 1024**3:
+                size_str = f"{total_size / (1024**3):.2f} GB"
+            elif total_size >= 1024**2:
+                size_str = f"{total_size / (1024**2):.2f} MB"
+            else:
+                size_str = f"{total_size / 1024:.2f} KB"
+            
+            # 发送通知
+            notify_text = (
+                f"📊 统计：{total_files} 个文件 | {size_str}\n"
+                f"⏱️ 用时：{duration_str}\n"
+                f"🔗 转移方式：{self._batch_files[0].get('method', '未知')}\n\n"
+                f"📂 目录汇总：\n{dir_summary}"
+            )
+            
+            self.post_message(
+                mtype=NotificationType.Manual,
+                title="✅ 批次处理完成！",
+                text=notify_text
+            )
+            
+            logger.info(f"批次汇总通知已发送：共处理 {total_files} 个文件")
+            
+        except Exception as e:
+            logger.error(f"发送批次汇总通知失败：{str(e)}")
+        finally:
+            # 清空批次列表
+            self._batch_files = []
+            self._last_process_time = None
     
     def __generate_new_paths(self, relative_path: Path, target: Path, file_name: str):
         """
@@ -484,28 +599,41 @@ class CloudLinkMonitor(_PluginBase):
                             transfer_method = "复制"
                             logger.info(f"link模式：文件复制完成")
                         
-                        # 发送通知
+                        # 发送简化通知
                         if self._notify:
                             file_size = target_file.stat().st_size
-                            original_dir = relative_path.parent if relative_path.parent != Path('.') else "根目录"
-                            target_relative = target_file.relative_to(target)
-                            target_dir_display = target_relative.parent if target_relative.parent != Path('.') else "根目录"
                             
-                            notify_text = (
-                                f"📁 原目录：{original_dir}\n"
-                                f"📁 新目录：{target_dir_display}\n"
-                                f"📄 原文件名：{file_path.name}\n"
-                                f"📄 新文件名：{new_file_name}\n"
-                                f"🔗 转移方式：{transfer_method}\n"
-                                f"💾 文件大小：{file_size} 字节"
-                            )
+                            # 格式化文件大小
+                            if file_size >= 1024**3:
+                                size_str = f"{file_size / (1024**3):.2f}GB"
+                            elif file_size >= 1024**2:
+                                size_str = f"{file_size / (1024**2):.2f}MB"
+                            else:
+                                size_str = f"{file_size / 1024:.2f}KB"
+                            
+                            notify_text = f"🔗 {transfer_method} | 💾 {size_str}"
                             
                             self.post_message(
                                 mtype=NotificationType.Manual,
-                                title=f"✅ link处理完成：{file_path.name}",
+                                title=f"✅ 转移：{new_file_name}",
                                 text=notify_text
                             )
-                            logger.info(f"link模式：已发送通知")
+                            logger.info(f"link模式：已发送简化通知")
+                        
+                        # 添加到批次汇总
+                        original_dir = relative_path.parent if relative_path.parent != Path('.') else "根目录"
+                        target_relative = target_file.relative_to(target)
+                        target_dir_display = target_relative.parent if target_relative.parent != Path('.') else "根目录"
+                        
+                        self.__add_to_batch({
+                            'time': datetime.now(),
+                            'source_dir': str(original_dir),
+                            'target_dir': str(target_dir_display),
+                            'source_file': file_path.name,
+                            'target_file': new_file_name,
+                            'size': file_size,
+                            'method': 'link'
+                        })
                         
                         logger.info(f"link模式：{file_path.name} 处理成功（{transfer_method}）")
                         return
@@ -580,29 +708,39 @@ class CloudLinkMonitor(_PluginBase):
                                 logger.info(f"copyhash模式：文件重命名成功 {target_file.name} -> {new_file_path.name}")
                             logger.info(f"copyhash模式：处理完成 {new_file_path}")
                         
-                        # 发送通知
+                        # 发送简化通知
                         if self._notify:
-                            # 构建通知内容
-                            original_dir = relative_path.parent if relative_path.parent != Path('.') else "根目录"
-                            target_relative = new_file_path.relative_to(target)
-                            target_dir_display = target_relative.parent if target_relative.parent != Path('.') else "根目录"
+                            # 格式化文件大小
+                            if new_size >= 1024**3:
+                                size_str = f"{new_size / (1024**3):.2f}GB"
+                            elif new_size >= 1024**2:
+                                size_str = f"{new_size / (1024**2):.2f}MB"
+                            else:
+                                size_str = f"{new_size / 1024:.2f}KB"
                             
-                            notify_text = (
-                                f"📁 原目录：{original_dir}\n"
-                                f"📁 新目录：{target_dir_display}\n"
-                                f"📄 原文件名：{file_path.name}\n"
-                                f"📄 新文件名：{new_file_path.name}\n"
-                                f"🔐 原Hash：{original_hash[:16]}...\n"
-                                f"🔐 新Hash：{new_hash[:16]}...\n"
-                                f"💾 文件大小：{original_size} → {new_size} 字节"
-                            )
+                            notify_text = f"📝 复制+改Hash | 💾 {size_str}"
                             
                             self.post_message(
                                 mtype=NotificationType.Manual,
-                                title=f"✅ copyhash处理完成：{file_path.name}",
+                                title=f"✅ 转移：{new_file_path.name}",
                                 text=notify_text
                             )
-                            logger.info(f"copyhash模式：已发送通知")
+                            logger.info(f"copyhash模式：已发送简化通知")
+                        
+                        # 添加到批次汇总
+                        original_dir = relative_path.parent if relative_path.parent != Path('.') else "根目录"
+                        target_relative = new_file_path.relative_to(target)
+                        target_dir_display = target_relative.parent if target_relative.parent != Path('.') else "根目录"
+                        
+                        self.__add_to_batch({
+                            'time': datetime.now(),
+                            'source_dir': str(original_dir),
+                            'target_dir': str(target_dir_display),
+                            'source_file': file_path.name,
+                            'target_file': new_file_path.name,
+                            'size': new_size,
+                            'method': 'copyhash'
+                        })
                         
                         logger.info(f"copyhash模式：{file_path.name} 处理成功")
                         return
