@@ -4,11 +4,12 @@
     "name": "监控转移文件",
     "description": "监控目录文件变化，纯复制模式转移文件，保持目录结构并修改hash。",
     "labels": "云盘,工具",
-    "version": "3.0.0",
+    "version": "3.0.1",
     "icon": "Linkease_A.png",
     "author": "thsrite",
     "level": 1,
     "history": {
+      "v3.0.1": "修复配置界面显示问题",
       "v3.0.0": "copyhash纯复制模式，保持目录结构，修改文件hash和文件名",
       "v1.0": "监控云盘目录文件变化，按原文件名软连接"
     }
