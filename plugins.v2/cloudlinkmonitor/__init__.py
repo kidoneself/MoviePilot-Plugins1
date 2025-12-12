@@ -70,7 +70,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.5.0"
+    plugin_version = "3.5.1"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -346,12 +346,9 @@ class CloudLinkMonitor(_PluginBase):
                 
                 if matched_target:
                     target_count = len(matched_target['files'])
-                    target_files_list = matched_target['files'][:10]  # 最多显示10个
-                    target_info = f"📁 {matched_target['relative']}/\n"
-                    for f in target_files_list:
+                    target_info = f"📁 目标：{matched_target['relative']}/\n"
+                    for f in matched_target['files']:
                         target_info += f"  ∙ {f}\n"
-                    if target_count > 10:
-                        target_info += f"  ... 共{target_count}个文件\n"
                     status = f"✅ 源{source_count}个 = 目标{target_count}个"
                 else:
                     target_info = "❌ 未找到或不存在\n"
@@ -359,11 +356,8 @@ class CloudLinkMonitor(_PluginBase):
                 
                 # 构建通知内容
                 source_info = f"📁 源：{folder_info['path']}/\n"
-                source_files_display = source_files[:10]  # 最多显示10个
-                for f in source_files_display:
+                for f in source_files:
                     source_info += f"  ∙ {f}\n"
-                if source_count > 10:
-                    source_info += f"  ... 共{source_count}个文件\n"
                 
                 message = (
                     f"📂 {folder_name}\n\n"
