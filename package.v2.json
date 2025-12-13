@@ -2,13 +2,14 @@
   
   "CloudLinkMonitor": {
     "name": "监控转移文件",
-    "description": "监控目录文件变化，支持硬链接(link)和复制改Hash(copyhash)两种转移方式，拼音混淆剧名，WebDAV自动同步网盘。",
+    "description": "监控目录文件变化，支持硬链接(link)和复制改Hash(copyhash)两种转移方式，拼音混淆剧名，WebDAV自动同步网盘，TaoSync多网盘同步。",
     "labels": "云盘,工具",
-    "version": "3.6.0",
+    "version": "3.7.0",
     "icon": "Linkease_A.png",
     "author": "thsrite",
     "level": 1,
     "history": {
+      "v3.7.0": "重大更新：集成 TaoSync 多网盘同步，批次完成后自动同步到多个网盘，支持路径配置和智能分组（剧集/电影）",
       "v3.6.0": "重大更新：新增 WebDAV 自动同步功能，批次完成后自动上传到网盘，支持独立任务监控和历史记录",
       "v3.5.1": "优化/sync_check：显示完整文件列表，不省略任何文件",
       "v3.5.0": "新增功能：添加/sync_check命令，检查源目录和目标目录同步状态，每个媒体文件夹发送独立通知",
