@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import hashlib
 import random
 import re
+import requests
 import shutil
 import threading
 import traceback
@@ -111,6 +112,16 @@ class CloudLinkMonitor(_PluginBase):
     _last_process_time = None  # 最后处理时间
     _summary_timer = None  # 汇总定时器
     _batch_lock = threading.Lock()  # 批次数据锁
+    # WebDAV 同步相关
+    _enable_webdav = False  # 是否启用 WebDAV 同步
+    _webdav_url = ""  # WebDAV 地址
+    _webdav_username = ""  # WebDAV 用户名
+    _webdav_password = ""  # WebDAV 密码
+    _webdav_path = ""  # WebDAV 目标路径
+    _webdav_notify = False  # WebDAV 上传通知
+    _upload_history = []  # 上传历史记录（最多保留100条）
+    _upload_queue = []  # 待上传队列
+    _webdav_lock = threading.Lock()  # WebDAV 操作锁
 
     def init_plugin(self, config: dict = None):
         self.transferhis = TransferHistoryOper()
@@ -134,6 +145,13 @@ class CloudLinkMonitor(_PluginBase):
             self._exclude_keywords = config.get("exclude_keywords") or ""
             self._cron = config.get("cron")
             self._size = config.get("size") or 0
+            # WebDAV 配置
+            self._enable_webdav = config.get("enable_webdav") or False
+            self._webdav_url = config.get("webdav_url") or ""
+            self._webdav_username = config.get("webdav_username") or ""
+            self._webdav_password = config.get("webdav_password") or ""
+            self._webdav_path = config.get("webdav_path") or ""
+            self._webdav_notify = config.get("webdav_notify") or False
 
         # 停止现有任务
         self.stop_service()
@@ -271,6 +289,32 @@ class CloudLinkMonitor(_PluginBase):
                 self.post_message(channel=channel, title="开始检查同步状态 ...", userid=user)
                 self.sync_check(channel=channel, user=user)
                 self.post_message(channel=channel, title="同步状态检查完成！", userid=user)
+            
+            # WebDAV 上传记录查询
+            elif action == "webdav_status":
+                with self._webdav_lock:
+                    if not self._upload_history:
+                        self.post_message(channel=channel, title="📋 WebDAV 上传记录", text="暂无上传记录", userid=user)
+                        return
+                    
+                    # 获取最近20条记录
+                    recent_records = self._upload_history[:20]
+                    
+                    # 统计信息
+                    success_count = sum(1 for r in self._upload_history if '✅' in r.get('status', ''))
+                    failed_count = sum(1 for r in self._upload_history if '❌' in r.get('status', ''))
+                    
+                    # 构建消息
+                    message = f"📊 统计信息\n━━━━━━━━━━━━\n"
+                    message += f"✅ 成功：{success_count} 个\n"
+                    message += f"❌ 失败：{failed_count} 个\n\n"
+                    message += f"📋 最近 {len(recent_records)} 条记录\n━━━━━━━━━━━━\n"
+                    
+                    for record in recent_records:
+                        message += f"{record.get('status', '❓')} {record.get('filename', '未知')}\n"
+                        message += f"   💾 {record.get('size', '-')} | ⚡ {record.get('speed', '-')}\n"
+                    
+                    self.post_message(channel=channel, title="📋 WebDAV 上传记录", text=message, userid=user)
 
     def sync_all(self):
         """
@@ -498,12 +542,199 @@ class CloudLinkMonitor(_PluginBase):
             
             logger.info(f"批次汇总通知已发送：共处理 {total_files} 个文件")
             
+            # 触发 WebDAV 同步（在通知后、清空前）
+            if self._enable_webdav:
+                self.__trigger_webdav_sync()
+            
         except Exception as e:
             logger.error(f"发送批次汇总通知失败：{str(e)}")
         finally:
             # 清空批次列表
             self._batch_files = []
             self._last_process_time = None
+    
+    def __trigger_webdav_sync(self):
+        """
+        触发 WebDAV 同步，异步上传批次中的文件
+        """
+        if not self._batch_files:
+            return
+        
+        logger.info(f"开始 WebDAV 同步，共 {len(self._batch_files)} 个文件")
+        
+        # 异步上传每个文件
+        for file_info in self._batch_files:
+            # 获取文件信息
+            target_file = file_info.get('target_file')
+            target_dir = file_info.get('target_dir')
+            
+            # 这里需要重新构建完整的目标文件路径
+            # 从 _dirconf 中找到对应的目标目录
+            for mon_path, target_path in self._dirconf.items():
+                if target_path:
+                    # 构建完整路径
+                    full_target_path = target_path / target_dir / target_file
+                    if full_target_path.exists():
+                        # 启动异步上传线程
+                        upload_thread = threading.Thread(
+                            target=self.__upload_file_to_webdav,
+                            args=(full_target_path, target_dir, target_file),
+                            daemon=True
+                        )
+                        upload_thread.start()
+                        break
+    
+    def __upload_file_to_webdav(self, local_file: Path, relative_dir: str, filename: str):
+        """
+        上传单个文件到 WebDAV
+        :param local_file: 本地文件完整路径
+        :param relative_dir: 相对目录
+        :param filename: 文件名
+        """
+        start_time = datetime.now()
+        
+        try:
+            # 构建 WebDAV 远程路径
+            remote_path = f"{self._webdav_path.rstrip('/')}/{relative_dir}/{filename}".replace('//', '/')
+            webdav_url = f"{self._webdav_url.rstrip('/')}/{remote_path.lstrip('/')}".replace('//', '/')
+            
+            logger.info(f"开始上传: {filename} -> {webdav_url}")
+            
+            # 创建远程目录
+            self.__create_webdav_directory(f"{self._webdav_path.rstrip('/')}/{relative_dir}".replace('//', '/'))
+            
+            # 上传文件
+            with open(local_file, 'rb') as f:
+                response = requests.put(
+                    webdav_url,
+                    data=f,
+                    auth=(self._webdav_username, self._webdav_password),
+                    timeout=3600  # 1小时超时
+                )
+            
+            # 计算上传用时和速度
+            elapsed = (datetime.now() - start_time).total_seconds()
+            file_size = local_file.stat().st_size
+            speed = file_size / elapsed if elapsed > 0 else 0
+            
+            # 格式化大小和速度
+            size_str = self.__format_size(file_size)
+            speed_str = self.__format_size(speed) + "/s"
+            
+            if response.status_code in [200, 201, 204]:
+                logger.info(f"上传成功: {filename} ({size_str}, {speed_str})")
+                
+                # 记录到历史
+                with self._webdav_lock:
+                    self._upload_history.insert(0, {
+                        'filename': filename,
+                        'size': size_str,
+                        'status': '✅ 成功',
+                        'time': f"{int(elapsed)}秒前" if elapsed < 60 else f"{int(elapsed/60)}分钟前",
+                        'speed': speed_str,
+                        'timestamp': datetime.now()
+                    })
+                    # 只保留最近100条
+                    if len(self._upload_history) > 100:
+                        self._upload_history = self._upload_history[:100]
+                
+                # 发送通知
+                if self._webdav_notify:
+                    self.post_message(
+                        mtype=NotificationType.Manual,
+                        title=f"✅ WebDAV 上传成功",
+                        text=f"📁 {filename}\n💾 {size_str} | ⚡ {speed_str} | ⏱️ {int(elapsed)}秒"
+                    )
+            else:
+                logger.error(f"上传失败: {filename}, HTTP {response.status_code}, {response.text}")
+                
+                # 记录失败
+                with self._webdav_lock:
+                    self._upload_history.insert(0, {
+                        'filename': filename,
+                        'size': size_str,
+                        'status': f'❌ 失败({response.status_code})',
+                        'time': '刚刚',
+                        'speed': '-',
+                        'timestamp': datetime.now()
+                    })
+                    if len(self._upload_history) > 100:
+                        self._upload_history = self._upload_history[:100]
+                
+                # 发送失败通知
+                if self._webdav_notify:
+                    self.post_message(
+                        mtype=NotificationType.Manual,
+                        title=f"❌ WebDAV 上传失败",
+                        text=f"📁 {filename}\nHTTP {response.status_code}"
+                    )
+        
+        except Exception as e:
+            logger.error(f"上传异常: {filename}, {str(e)}")
+            logger.error(traceback.format_exc())
+            
+            # 记录异常
+            with self._webdav_lock:
+                self._upload_history.insert(0, {
+                    'filename': filename,
+                    'size': '-',
+                    'status': f'❌ 异常',
+                    'time': '刚刚',
+                    'speed': '-',
+                    'timestamp': datetime.now()
+                })
+                if len(self._upload_history) > 100:
+                    self._upload_history = self._upload_history[:100]
+    
+    def __create_webdav_directory(self, remote_dir: str):
+        """
+        创建 WebDAV 远程目录（递归创建）
+        :param remote_dir: 远程目录路径
+        """
+        try:
+            # 分解路径，逐级创建
+            parts = remote_dir.strip('/').split('/')
+            current_path = ''
+            
+            for part in parts:
+                if not part:
+                    continue
+                current_path += '/' + part
+                dir_url = f"{self._webdav_url.rstrip('/')}{current_path}"
+                
+                # 尝试创建目录（MKCOL 方法）
+                try:
+                    response = requests.request(
+                        'MKCOL',
+                        dir_url,
+                        auth=(self._webdav_username, self._webdav_password),
+                        timeout=30
+                    )
+                    # 201 创建成功，405 已存在，都算正常
+                    if response.status_code not in [201, 405]:
+                        logger.debug(f"创建目录响应: {dir_url}, HTTP {response.status_code}")
+                except Exception as e:
+                    # 目录可能已存在，忽略错误
+                    pass
+        
+        except Exception as e:
+            logger.warning(f"创建 WebDAV 目录失败: {remote_dir}, {str(e)}")
+    
+    @staticmethod
+    def __format_size(size_bytes: float) -> str:
+        """
+        格式化文件大小
+        :param size_bytes: 字节数
+        :return: 格式化后的大小字符串
+        """
+        if size_bytes >= 1024**3:
+            return f"{size_bytes / (1024**3):.2f}GB"
+        elif size_bytes >= 1024**2:
+            return f"{size_bytes / (1024**2):.2f}MB"
+        elif size_bytes >= 1024:
+            return f"{size_bytes / 1024:.2f}KB"
+        else:
+            return f"{size_bytes:.0f}B"
     
     def __obfuscate_name(self, name: str) -> str:
         """
@@ -913,6 +1144,15 @@ class CloudLinkMonitor(_PluginBase):
                 "data": {
                     "action": "sync_check"
                 }
+            },
+            {
+                "cmd": "/webdav_status",
+                "event": EventType.PluginAction,
+                "desc": "查看 WebDAV 上传记录",
+                "category": "",
+                "data": {
+                    "action": "webdav_status"
+                }
             }
         ]
 
@@ -1121,6 +1361,143 @@ class CloudLinkMonitor(_PluginBase):
                             }
                         ]
                     },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VAlert',
+                                        'props': {
+                                            'type': 'success',
+                                            'variant': 'tonal',
+                                            'text': '📡 WebDAV 同步功能：批次文件处理完成后，自动上传到 WebDAV 网盘。'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'enable_webdav',
+                                            'label': '启用 WebDAV 同步',
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'webdav_notify',
+                                            'label': 'WebDAV 上传通知',
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
+                                            'model': 'webdav_url',
+                                            'label': 'WebDAV 地址',
+                                            'placeholder': 'http://10.10.10.17:5245/dav/'
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
+                                            'model': 'webdav_path',
+                                            'label': 'WebDAV 目标路径',
+                                            'placeholder': '/网盘备份'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
+                                            'model': 'webdav_username',
+                                            'label': 'WebDAV 用户名',
+                                            'placeholder': 'admin'
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
+                                            'model': 'webdav_password',
+                                            'label': 'WebDAV 密码',
+                                            'type': 'password',
+                                            'placeholder': '******'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
                 ]
             }
         ], {
@@ -1131,11 +1508,203 @@ class CloudLinkMonitor(_PluginBase):
             "monitor_dirs": "",
             "exclude_keywords": "",
             "cron": "0 0 * * *",
-            "size": 0
+            "size": 0,
+            "enable_webdav": False,
+            "webdav_url": "",
+            "webdav_username": "",
+            "webdav_password": "",
+            "webdav_path": "",
+            "webdav_notify": False
         }
 
     def get_page(self) -> List[dict]:
-        pass
+        """
+        插件详情页面，显示 WebDAV 上传历史
+        """
+        if not self._enable_webdav:
+            return [
+                {
+                    'component': 'div',
+                    'text': 'WebDAV 同步功能未启用',
+                    'props': {
+                        'class': 'text-center text-grey'
+                    }
+                }
+            ]
+        
+        with self._webdav_lock:
+            # 统计信息
+            total_count = len(self._upload_history)
+            success_count = sum(1 for r in self._upload_history if '✅' in r.get('status', ''))
+            failed_count = sum(1 for r in self._upload_history if '❌' in r.get('status', ''))
+            
+            # 准备表格数据
+            table_items = []
+            for record in self._upload_history[:50]:  # 只显示最近50条
+                table_items.append({
+                    'filename': record.get('filename', '未知'),
+                    'size': record.get('size', '-'),
+                    'status': record.get('status', '❓'),
+                    'speed': record.get('speed', '-'),
+                    'time': record.get('time', '-')
+                })
+        
+        return [
+            {
+                'component': 'VRow',
+                'content': [
+                    {
+                        'component': 'VCol',
+                        'props': {
+                            'cols': 12,
+                            'md': 4
+                        },
+                        'content': [
+                            {
+                                'component': 'VCard',
+                                'props': {
+                                    'variant': 'tonal',
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VCardText',
+                                        'props': {
+                                            'class': 'text-center'
+                                        },
+                                        'content': [
+                                            {
+                                                'component': 'div',
+                                                'props': {
+                                                    'class': 'text-h3 text-success'
+                                                },
+                                                'text': str(success_count)
+                                            },
+                                            {
+                                                'component': 'div',
+                                                'text': '✅ 成功上传'
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VCol',
+                        'props': {
+                            'cols': 12,
+                            'md': 4
+                        },
+                        'content': [
+                            {
+                                'component': 'VCard',
+                                'props': {
+                                    'variant': 'tonal',
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VCardText',
+                                        'props': {
+                                            'class': 'text-center'
+                                        },
+                                        'content': [
+                                            {
+                                                'component': 'div',
+                                                'props': {
+                                                    'class': 'text-h3 text-error'
+                                                },
+                                                'text': str(failed_count)
+                                            },
+                                            {
+                                                'component': 'div',
+                                                'text': '❌ 上传失败'
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VCol',
+                        'props': {
+                            'cols': 12,
+                            'md': 4
+                        },
+                        'content': [
+                            {
+                                'component': 'VCard',
+                                'props': {
+                                    'variant': 'tonal',
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VCardText',
+                                        'props': {
+                                            'class': 'text-center'
+                                        },
+                                        'content': [
+                                            {
+                                                'component': 'div',
+                                                'props': {
+                                                    'class': 'text-h3'
+                                                },
+                                                'text': str(total_count)
+                                            },
+                                            {
+                                                'component': 'div',
+                                                'text': '📊 总记录数'
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                'component': 'VRow',
+                'content': [
+                    {
+                        'component': 'VCol',
+                        'props': {
+                            'cols': 12
+                        },
+                        'content': [
+                            {
+                                'component': 'VCard',
+                                'content': [
+                                    {
+                                        'component': 'VCardTitle',
+                                        'text': '📋 上传历史记录（最近50条）'
+                                    },
+                                    {
+                                        'component': 'VCardText',
+                                        'content': [
+                                            {
+                                                'component': 'VTable',
+                                                'props': {
+                                                    'hover': True,
+                                                    'items': table_items,
+                                                    'headers': [
+                                                        {'title': '文件名', 'key': 'filename', 'align': 'start'},
+                                                        {'title': '大小', 'key': 'size', 'align': 'start'},
+                                                        {'title': '状态', 'key': 'status', 'align': 'center'},
+                                                        {'title': '速度', 'key': 'speed', 'align': 'start'},
+                                                        {'title': '时间', 'key': 'time', 'align': 'start'}
+                                                    ]
+                                                }
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
 
     def stop_service(self):
         """
