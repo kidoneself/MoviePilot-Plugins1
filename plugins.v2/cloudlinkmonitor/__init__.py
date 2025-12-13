@@ -67,11 +67,11 @@ class CloudLinkMonitor(_PluginBase):
     # 插件名称
     plugin_name = "监控转移文件"
     # 插件描述
-    plugin_desc = "监控目录文件变化，支持硬链接和复制改Hash，拼音混淆剧名（保留分类目录），批次汇总通知。"
+    plugin_desc = "监控目录文件变化，支持硬链接和复制改Hash，拼音混淆剧名（保留分类目录），批次汇总通知，WebDAV自动同步。"
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.5.1"
+    plugin_version = "3.6.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
