@@ -114,14 +114,20 @@ class CloudLinkMonitor(_PluginBase):
     _batch_lock = threading.Lock()  # 批次数据锁
     # WebDAV 同步相关
     _enable_webdav = False  # 是否启用 WebDAV 同步
-    _webdav_url = ""  # WebDAV 地址
-    _webdav_username = ""  # WebDAV 用户名
-    _webdav_password = ""  # WebDAV 密码
-    _webdav_path = ""  # WebDAV 目标路径
+    _webdav_configs = ""  # WebDAV 配置（多行文本）
+    _webdav_list = []  # 解析后的 WebDAV 配置列表
     _webdav_notify = False  # WebDAV 上传通知
     _upload_history = []  # 上传历史记录（最多保留100条）
     _upload_queue = []  # 待上传队列
     _webdav_lock = threading.Lock()  # WebDAV 操作锁
+    # TaoSync 同步相关
+    _enable_taosync = False  # 是否启用 TaoSync 同步
+    _taosync_url = ""  # TaoSync 地址
+    _taosync_username = ""  # TaoSync 用户名
+    _taosync_password = ""  # TaoSync 密码
+    _taosync_alist_id = 1  # Alist ID
+    _taosync_path_mappings = ""  # 路径映射配置（多行文本）
+    _taosync_mappings = []  # 解析后的路径映射列表
 
     def init_plugin(self, config: dict = None):
         self.transferhis = TransferHistoryOper()
@@ -147,11 +153,26 @@ class CloudLinkMonitor(_PluginBase):
             self._size = config.get("size") or 0
             # WebDAV 配置
             self._enable_webdav = config.get("enable_webdav") or False
-            self._webdav_url = config.get("webdav_url") or ""
-            self._webdav_username = config.get("webdav_username") or ""
-            self._webdav_password = config.get("webdav_password") or ""
-            self._webdav_path = config.get("webdav_path") or ""
+            self._webdav_configs = config.get("webdav_configs") or ""
             self._webdav_notify = config.get("webdav_notify") or False
+            
+            # 解析 WebDAV 配置
+            self._webdav_list = []
+            if self._enable_webdav and self._webdav_configs:
+                self.__parse_webdav_configs()
+            
+            # TaoSync 配置
+            self._enable_taosync = config.get("enable_taosync") or False
+            self._taosync_url = config.get("taosync_url") or ""
+            self._taosync_username = config.get("taosync_username") or "admin"
+            self._taosync_password = config.get("taosync_password") or ""
+            self._taosync_alist_id = config.get("taosync_alist_id") or 1
+            self._taosync_path_mappings = config.get("taosync_path_mappings") or ""
+            
+            # 解析 TaoSync 路径映射
+            self._taosync_mappings = []
+            if self._enable_taosync and self._taosync_path_mappings:
+                self.__parse_taosync_mappings()
 
         # 停止现有任务
         self.stop_service()
@@ -438,6 +459,78 @@ class CloudLinkMonitor(_PluginBase):
             logger.debug("文件%s：%s" % (text, event_path))
             self.__handle_file(event_path=event_path, mon_path=mon_path)
     
+    def __parse_webdav_configs(self):
+        """
+        解析 WebDAV 配置
+        格式：WebDAV地址|用户名|密码|本地路径前缀|远程路径前缀
+        """
+        self._webdav_list = []
+        
+        if not self._webdav_configs:
+            return
+        
+        lines = self._webdav_configs.strip().split('\n')
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            
+            parts = line.split('|')
+            if len(parts) != 5:
+                logger.warning(f"WebDAV 配置格式错误，跳过: {line}")
+                continue
+            
+            config = {
+                'url': parts[0].strip(),
+                'username': parts[1].strip(),
+                'password': parts[2].strip(),
+                'local_prefix': parts[3].strip(),
+                'remote_prefix': parts[4].strip()
+            }
+            
+            if config['url'] and config['username'] and config['password']:
+                self._webdav_list.append(config)
+                logger.info(f"已加载 WebDAV 配置: {config['url']} -> {config['remote_prefix']}")
+            else:
+                logger.warning(f"WebDAV 配置不完整，跳过: {line}")
+        
+        logger.info(f"共加载 {len(self._webdav_list)} 个 WebDAV 配置")
+    
+    def __parse_taosync_mappings(self):
+        """
+        解析 TaoSync 路径映射配置
+        格式：本地路径前缀|远程路径前缀
+        例如：网盘/剧集|UC/A-闲鱼影视/剧集
+        """
+        self._taosync_mappings = []
+        
+        if not self._taosync_path_mappings:
+            return
+        
+        lines = self._taosync_path_mappings.strip().split('\n')
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            
+            parts = line.split('|')
+            if len(parts) != 2:
+                logger.warning(f"TaoSync 路径映射格式错误，跳过: {line}")
+                continue
+            
+            mapping = {
+                'localPrefix': parts[0].strip(),
+                'remotePrefix': parts[1].strip()
+            }
+            
+            if mapping['localPrefix'] and mapping['remotePrefix']:
+                self._taosync_mappings.append(mapping)
+                logger.info(f"已加载 TaoSync 路径映射: {mapping['localPrefix']} -> {mapping['remotePrefix']}")
+            else:
+                logger.warning(f"TaoSync 路径映射不完整，跳过: {line}")
+        
+        logger.info(f"共加载 {len(self._taosync_mappings)} 个 TaoSync 路径映射")
+    
     def __add_to_batch(self, file_info: dict):
         """
         添加文件到批次汇总
@@ -550,6 +643,10 @@ class CloudLinkMonitor(_PluginBase):
             if self._enable_webdav:
                 self.__trigger_webdav_sync()
             
+            # 触发 TaoSync 同步
+            if self._enable_taosync:
+                self.__trigger_taosync_sync()
+            
         except Exception as e:
             logger.error(f"发送批次汇总通知失败：{str(e)}")
         finally:
@@ -559,60 +656,192 @@ class CloudLinkMonitor(_PluginBase):
     
     def __trigger_webdav_sync(self):
         """
-        触发 WebDAV 同步，异步上传批次中的文件
+        触发 WebDAV 同步，异步上传批次中的文件到所有配置的 WebDAV
         """
-        if not self._batch_files:
+        if not self._batch_files or not self._webdav_list:
             return
         
-        logger.info(f"开始 WebDAV 同步，共 {len(self._batch_files)} 个文件")
+        logger.info(f"开始 WebDAV 同步，共 {len(self._batch_files)} 个文件，{len(self._webdav_list)} 个目标")
         
-        # 异步上传每个文件
+        # 异步上传每个文件到所有 WebDAV
         for file_info in self._batch_files:
-            # 获取文件信息
             target_file = file_info.get('target_file')
             target_dir = file_info.get('target_dir')
             
-            # 这里需要重新构建完整的目标文件路径
-            # 从 _dirconf 中找到对应的目标目录
+            # 构建完整的本地文件路径
             for mon_path, target_path in self._dirconf.items():
                 if target_path:
-                    # 构建完整路径
                     full_target_path = target_path / target_dir / target_file
                     if full_target_path.exists():
-                        # 启动异步上传线程
-                        upload_thread = threading.Thread(
-                            target=self.__upload_file_to_webdav,
-                            args=(full_target_path, target_dir, target_file),
-                            daemon=True
-                        )
-                        upload_thread.start()
+                        # 构建相对路径（用于路径映射）
+                        relative_path = str(Path(target_dir) / target_file)
+                        
+                        # 上传到所有配置的 WebDAV
+                        for webdav_config in self._webdav_list:
+                            upload_thread = threading.Thread(
+                                target=self.__upload_file_to_webdav,
+                                args=(full_target_path, relative_path, webdav_config),
+                                daemon=True
+                            )
+                            upload_thread.start()
                         break
     
-    def __upload_file_to_webdav(self, local_file: Path, relative_dir: str, filename: str):
+    def __trigger_taosync_sync(self):
+        """
+        触发 TaoSync 同步，按 Season 目录分组并创建同步任务
+        """
+        if not self._batch_files or not self._taosync_mappings:
+            return
+        
+        try:
+            # 按 Season 目录分组文件
+            season_groups = {}
+            for file_info in self._batch_files:
+                target_file = file_info.get('target_file')
+                target_dir = file_info.get('target_dir')
+                
+                if not target_file or not target_dir:
+                    continue
+                
+                # 构建完整的本地文件路径
+                full_path = None
+                for mon_path, target_path in self._dirconf.items():
+                    if target_path:
+                        full_target_path = target_path / target_dir / target_file
+                        if full_target_path.exists():
+                            full_path = str(full_target_path)
+                            break
+                
+                if not full_path:
+                    continue
+                
+                # 提取 Season 目录（查找包含 "Season" 的父目录）
+                parts = Path(full_path).parts
+                season_dir = None
+                show_name = None
+                
+                for i, part in enumerate(parts):
+                    if 'Season' in part or 'season' in part:
+                        # Season 目录
+                        season_dir = '/'.join(parts[:i+1])
+                        # 剧名是 Season 的父目录
+                        if i > 0:
+                            show_name = parts[i-1]
+                        break
+                
+                if season_dir and show_name:
+                    if season_dir not in season_groups:
+                        season_groups[season_dir] = {
+                            'show_name': show_name,
+                            'season_path': season_dir,
+                            'files': []
+                        }
+                    season_groups[season_dir]['files'].append(file_info)
+            
+            if not season_groups:
+                logger.info("没有找到符合条件的 Season 目录，跳过 TaoSync 同步")
+                return
+            
+            logger.info(f"TaoSync 同步：共 {len(season_groups)} 个 Season 目录")
+            
+            # 为每个 Season 目录创建 TaoSync 任务
+            for group_info in season_groups.values():
+                self.__create_taosync_task(
+                    season_path=group_info['season_path'],
+                    show_name=group_info['show_name']
+                )
+        
+        except Exception as e:
+            logger.error(f"触发 TaoSync 同步失败：{str(e)}")
+            logger.error(traceback.format_exc())
+    
+    def __create_taosync_task(self, season_path: str, show_name: str):
+        """
+        创建 TaoSync 同步任务
+        :param season_path: Season 目录完整路径
+        :param show_name: 剧名
+        """
+        try:
+            # 转换为 alist 路径（假设 /data/media 映射到 /local/media）
+            alist_path = season_path.replace('/data/media', '/local/media')
+            
+            # 登录 TaoSync
+            login_url = f"{self._taosync_url}/svr/noAuth/login"
+            login_data = {
+                'userName': self._taosync_username,
+                'passwd': self._taosync_password
+            }
+            
+            session = requests.Session()
+            login_resp = session.post(login_url, json=login_data, timeout=10)
+            if login_resp.status_code != 200 or login_resp.json().get('code') != 200:
+                logger.error(f"TaoSync 登录失败：{login_resp.text}")
+                return
+            
+            # 调用同步 API（需要一个文件路径，用 dummy.mkv）
+            sync_url = f"{self._taosync_url}/svr/sync/file"
+            sync_data = {
+                'filePath': f"{alist_path}/dummy.mkv",
+                'alistId': self._taosync_alist_id,
+                'pathMappings': self._taosync_mappings,
+                'method': 0,  # 仅新增
+                'remark': show_name
+            }
+            
+            sync_resp = session.post(sync_url, json=sync_data, timeout=30)
+            if sync_resp.status_code == 200 and sync_resp.json().get('code') == 200:
+                job_id = sync_resp.json().get('data', {}).get('jobId')
+                logger.info(f"TaoSync 任务创建成功：{show_name}，Job ID: {job_id}")
+            else:
+                logger.error(f"TaoSync 任务创建失败：{sync_resp.text}")
+        
+        except Exception as e:
+            logger.error(f"创建 TaoSync 任务失败：{str(e)}")
+            logger.error(traceback.format_exc())
+    
+    def __upload_file_to_webdav(self, local_file: Path, relative_path: str, webdav_config: dict):
         """
         上传单个文件到 WebDAV
         :param local_file: 本地文件完整路径
-        :param relative_dir: 相对目录
-        :param filename: 文件名
+        :param relative_path: 相对路径（包含目录和文件名）
+        :param webdav_config: WebDAV 配置字典
         """
         start_time = datetime.now()
         
         try:
-            # 构建 WebDAV 远程路径
-            remote_path = f"{self._webdav_path.rstrip('/')}/{relative_dir}/{filename}".replace('//', '/')
-            webdav_url = f"{self._webdav_url.rstrip('/')}/{remote_path.lstrip('/')}".replace('//', '/')
+            # 获取配置
+            webdav_url = webdav_config['url']
+            username = webdav_config['username']
+            password = webdav_config['password']
+            local_prefix = webdav_config['local_prefix']
+            remote_prefix = webdav_config['remote_prefix']
             
-            logger.info(f"开始上传: {filename} -> {webdav_url}")
+            # 路径映射：将本地路径前缀替换为远程路径前缀
+            if local_prefix and relative_path.startswith(local_prefix):
+                # 移除本地前缀
+                mapped_path = relative_path[len(local_prefix):].lstrip('/')
+                # 添加远程前缀
+                remote_path = f"{remote_prefix.rstrip('/')}/{mapped_path}".replace('//', '/')
+            else:
+                # 没有匹配的前缀，直接使用远程前缀
+                remote_path = f"{remote_prefix.rstrip('/')}/{relative_path}".replace('//', '/')
+            
+            # 构建完整 WebDAV URL
+            full_url = f"{webdav_url.rstrip('/')}/{remote_path.lstrip('/')}".replace('//', '/')
+            
+            filename = local_file.name
+            logger.info(f"开始上传: {filename} -> {full_url}")
             
             # 创建远程目录
-            self.__create_webdav_directory(f"{self._webdav_path.rstrip('/')}/{relative_dir}".replace('//', '/'))
+            remote_dir = '/'.join(remote_path.split('/')[:-1])
+            self.__create_webdav_directory(remote_dir, webdav_url, username, password)
             
             # 上传文件
             with open(local_file, 'rb') as f:
                 response = requests.put(
-                    webdav_url,
+                    full_url,
                     data=f,
-                    auth=(self._webdav_username, self._webdav_password),
+                    auth=(username, password),
                     timeout=3600  # 1小时超时
                 )
             
@@ -625,13 +854,17 @@ class CloudLinkMonitor(_PluginBase):
             size_str = self.__format_size(file_size)
             speed_str = self.__format_size(speed) + "/s"
             
+            # 提取目标名称（从 URL 或远程前缀）
+            target_name = remote_prefix.split('/')[0] if remote_prefix else webdav_url.split('//')[-1].split('/')[0]
+            
             if response.status_code in [200, 201, 204]:
-                logger.info(f"上传成功: {filename} ({size_str}, {speed_str})")
+                logger.info(f"上传成功: {filename} -> {target_name} ({size_str}, {speed_str})")
                 
                 # 记录到历史
                 with self._webdav_lock:
                     self._upload_history.insert(0, {
                         'filename': filename,
+                        'target': target_name,
                         'size': size_str,
                         'status': '✅ 成功',
                         'time': f"{int(elapsed)}秒前" if elapsed < 60 else f"{int(elapsed/60)}分钟前",
@@ -647,15 +880,16 @@ class CloudLinkMonitor(_PluginBase):
                     self.post_message(
                         mtype=NotificationType.Manual,
                         title=f"✅ WebDAV 上传成功",
-                        text=f"📁 {filename}\n💾 {size_str} | ⚡ {speed_str} | ⏱️ {int(elapsed)}秒"
+                        text=f"📁 {filename}\n🎯 {target_name}\n💾 {size_str} | ⚡ {speed_str} | ⏱️ {int(elapsed)}秒"
                     )
             else:
-                logger.error(f"上传失败: {filename}, HTTP {response.status_code}, {response.text}")
+                logger.error(f"上传失败: {filename} -> {target_name}, HTTP {response.status_code}")
                 
                 # 记录失败
                 with self._webdav_lock:
                     self._upload_history.insert(0, {
                         'filename': filename,
+                        'target': target_name,
                         'size': size_str,
                         'status': f'❌ 失败({response.status_code})',
                         'time': '刚刚',
@@ -670,17 +904,19 @@ class CloudLinkMonitor(_PluginBase):
                     self.post_message(
                         mtype=NotificationType.Manual,
                         title=f"❌ WebDAV 上传失败",
-                        text=f"📁 {filename}\nHTTP {response.status_code}"
+                        text=f"📁 {filename}\n🎯 {target_name}\nHTTP {response.status_code}"
                     )
         
         except Exception as e:
-            logger.error(f"上传异常: {filename}, {str(e)}")
+            target_name = webdav_config.get('remote_prefix', '').split('/')[0] if webdav_config.get('remote_prefix') else 'Unknown'
+            logger.error(f"上传异常: {local_file.name} -> {target_name}, {str(e)}")
             logger.error(traceback.format_exc())
             
             # 记录异常
             with self._webdav_lock:
                 self._upload_history.insert(0, {
-                    'filename': filename,
+                    'filename': local_file.name,
+                    'target': target_name,
                     'size': '-',
                     'status': f'❌ 异常',
                     'time': '刚刚',
@@ -690,10 +926,13 @@ class CloudLinkMonitor(_PluginBase):
                 if len(self._upload_history) > 100:
                     self._upload_history = self._upload_history[:100]
     
-    def __create_webdav_directory(self, remote_dir: str):
+    def __create_webdav_directory(self, remote_dir: str, webdav_url: str, username: str, password: str):
         """
         创建 WebDAV 远程目录（递归创建）
         :param remote_dir: 远程目录路径
+        :param webdav_url: WebDAV 服务器地址
+        :param username: 用户名
+        :param password: 密码
         """
         try:
             # 分解路径，逐级创建
@@ -704,14 +943,14 @@ class CloudLinkMonitor(_PluginBase):
                 if not part:
                     continue
                 current_path += '/' + part
-                dir_url = f"{self._webdav_url.rstrip('/')}{current_path}"
+                dir_url = f"{webdav_url.rstrip('/')}{current_path}"
                 
                 # 尝试创建目录（MKCOL 方法）
                 try:
                     response = requests.request(
                         'MKCOL',
                         dir_url,
-                        auth=(self._webdav_username, self._webdav_password),
+                        auth=(username, password),
                         timeout=30
                     )
                     # 201 创建成功，405 已存在，都算正常
@@ -1671,6 +1910,149 @@ class CloudLinkMonitor(_PluginBase):
                             }
                         ]
                     },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VAlert',
+                                        'props': {
+                                            'type': 'info',
+                                            'variant': 'tonal',
+                                            'text': 'TaoSync 同步配置：批次完成后自动同步到多个网盘'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'enable_taosync',
+                                            'label': '启用 TaoSync 同步',
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
+                                            'model': 'taosync_url',
+                                            'label': 'TaoSync 地址',
+                                            'placeholder': 'http://10.10.10.17:8024'
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
+                                            'model': 'taosync_alist_id',
+                                            'label': 'Alist ID',
+                                            'placeholder': '1'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
+                                            'model': 'taosync_username',
+                                            'label': 'TaoSync 用户名',
+                                            'placeholder': 'admin'
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
+                                            'model': 'taosync_password',
+                                            'label': 'TaoSync 密码',
+                                            'type': 'password',
+                                            'placeholder': '******'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextarea',
+                                        'props': {
+                                            'model': 'taosync_path_mappings',
+                                            'label': 'TaoSync 路径映射',
+                                            'rows': 3,
+                                            'placeholder': '每一行一个映射，格式：本地路径前缀|远程路径前缀\n例如：\n网盘/剧集|UC/A-闲鱼影视/剧集\n网盘/剧集|baidu/剧集\n网盘/剧集|kuake/剧集'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
                 ]
             }
         ], {
@@ -1687,7 +2069,13 @@ class CloudLinkMonitor(_PluginBase):
             "webdav_username": "",
             "webdav_password": "",
             "webdav_path": "",
-            "webdav_notify": False
+            "webdav_notify": False,
+            "enable_taosync": False,
+            "taosync_url": "",
+            "taosync_username": "admin",
+            "taosync_password": "",
+            "taosync_alist_id": 1,
+            "taosync_path_mappings": ""
         }
 
     def get_page(self) -> List[dict]:
