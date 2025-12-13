@@ -315,6 +315,10 @@ class CloudLinkMonitor(_PluginBase):
                         message += f"   💾 {record.get('size', '-')} | ⚡ {record.get('speed', '-')}\n"
                     
                     self.post_message(channel=channel, title="📋 WebDAV 上传记录", text=message, userid=user)
+            
+            # WebDAV 连接测试
+            elif action == "webdav_test":
+                self.__test_webdav_connection(channel=channel, user=user)
 
     def sync_all(self):
         """
@@ -736,6 +740,94 @@ class CloudLinkMonitor(_PluginBase):
         else:
             return f"{size_bytes:.0f}B"
     
+    def __test_webdav_connection(self, channel=None, user=None):
+        """
+        测试 WebDAV 连接
+        """
+        if not self._enable_webdav:
+            self.post_message(channel=channel, title="⚠️ WebDAV 测试", text="WebDAV 同步功能未启用", userid=user)
+            return
+        
+        if not self._webdav_url or not self._webdav_username or not self._webdav_password:
+            self.post_message(
+                channel=channel, 
+                title="⚠️ WebDAV 测试", 
+                text="请先配置 WebDAV 地址、用户名和密码", 
+                userid=user
+            )
+            return
+        
+        try:
+            # 测试目标目录（创建测试目录）
+            test_dir = f"{self._webdav_path.rstrip('/')}/.moviepilot_test"
+            test_url = f"{self._webdav_url.rstrip('/')}/{test_dir.lstrip('/')}".replace('//', '/')
+            
+            logger.info(f"测试 WebDAV 连接: {test_url}")
+            
+            # 尝试创建测试目录
+            response = requests.request(
+                'MKCOL',
+                test_url,
+                auth=(self._webdav_username, self._webdav_password),
+                timeout=10
+            )
+            
+            # 201 创建成功，405 已存在
+            if response.status_code in [201, 405]:
+                # 删除测试目录
+                try:
+                    requests.delete(
+                        test_url,
+                        auth=(self._webdav_username, self._webdav_password),
+                        timeout=10
+                    )
+                except:
+                    pass
+                
+                message = f"✅ 连接成功！\n\n"
+                message += f"📡 WebDAV 地址\n{self._webdav_url}\n\n"
+                message += f"📁 目标路径\n{self._webdav_path}\n\n"
+                message += f"👤 用户名\n{self._webdav_username}\n\n"
+                message += f"💡 提示\n文件将上传到: {self._webdav_url.rstrip('/')}{self._webdav_path}"
+                
+                self.post_message(channel=channel, title="✅ WebDAV 连接测试", text=message, userid=user)
+                logger.info("WebDAV 连接测试成功")
+            else:
+                message = f"❌ 连接失败\n\n"
+                message += f"HTTP 状态码: {response.status_code}\n"
+                message += f"响应内容: {response.text[:200]}"
+                
+                self.post_message(channel=channel, title="❌ WebDAV 连接测试", text=message, userid=user)
+                logger.error(f"WebDAV 连接测试失败: HTTP {response.status_code}")
+        
+        except requests.exceptions.Timeout:
+            self.post_message(
+                channel=channel, 
+                title="❌ WebDAV 连接测试", 
+                text="连接超时，请检查网络和 WebDAV 地址是否正确", 
+                userid=user
+            )
+            logger.error("WebDAV 连接超时")
+        
+        except requests.exceptions.ConnectionError as e:
+            self.post_message(
+                channel=channel, 
+                title="❌ WebDAV 连接测试", 
+                text=f"连接错误，无法访问 WebDAV 服务器\n\n{str(e)}", 
+                userid=user
+            )
+            logger.error(f"WebDAV 连接错误: {str(e)}")
+        
+        except Exception as e:
+            self.post_message(
+                channel=channel, 
+                title="❌ WebDAV 连接测试", 
+                text=f"测试异常: {str(e)}", 
+                userid=user
+            )
+            logger.error(f"WebDAV 测试异常: {str(e)}")
+            logger.error(traceback.format_exc())
+    
     def __obfuscate_name(self, name: str) -> str:
         """
         混淆剧名：中文+拼音+特殊字符
@@ -1153,6 +1245,15 @@ class CloudLinkMonitor(_PluginBase):
                 "data": {
                     "action": "webdav_status"
                 }
+            },
+            {
+                "cmd": "/webdav_test",
+                "event": EventType.PluginAction,
+                "desc": "测试 WebDAV 连接",
+                "category": "",
+                "data": {
+                    "action": "webdav_test"
+                }
             }
         ]
 
@@ -1375,7 +1476,7 @@ class CloudLinkMonitor(_PluginBase):
                                         'props': {
                                             'type': 'success',
                                             'variant': 'tonal',
-                                            'text': '📡 WebDAV 同步功能：批次文件处理完成后，自动上传到 WebDAV 网盘。'
+                                            'text': '📡 WebDAV 同步功能：批次文件处理完成后，自动上传到 WebDAV 网盘。\n💡 配置完成后，使用 /webdav_test 命令测试连接。'
                                         }
                                     }
                                 ]
