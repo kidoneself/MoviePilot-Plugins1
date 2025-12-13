@@ -1258,13 +1258,22 @@ class CloudLinkMonitor(_PluginBase):
         ]
 
     def get_api(self) -> List[Dict[str, Any]]:
-        return [{
-            "path": "/cloud_link_sync",
-            "endpoint": self.sync,
-            "methods": ["GET"],
-            "summary": "云盘实时监控同步",
-            "description": "云盘实时监控同步",
-        }]
+        return [
+            {
+                "path": "/cloud_link_sync",
+                "endpoint": self.sync,
+                "methods": ["GET"],
+                "summary": "云盘实时监控同步",
+                "description": "云盘实时监控同步",
+            },
+            {
+                "path": "/test_webdav",
+                "endpoint": self.test_webdav_api,
+                "methods": ["GET"],
+                "summary": "测试 WebDAV 连接",
+                "description": "测试 WebDAV 连接配置是否正确",
+            }
+        ]
 
     def get_service(self) -> List[Dict[str, Any]]:
         """
@@ -1293,6 +1302,69 @@ class CloudLinkMonitor(_PluginBase):
         """
         self.sync_all()
         return schemas.Response(success=True)
+    
+    def test_webdav_api(self) -> schemas.Response:
+        """
+        API 测试 WebDAV 连接
+        """
+        if not self._enable_webdav:
+            return schemas.Response(success=False, message="WebDAV 同步功能未启用")
+        
+        if not self._webdav_url or not self._webdav_username or not self._webdav_password:
+            return schemas.Response(success=False, message="请先配置 WebDAV 地址、用户名和密码")
+        
+        try:
+            # 测试目标目录
+            test_dir = f"{self._webdav_path.rstrip('/')}/.moviepilot_test"
+            test_url = f"{self._webdav_url.rstrip('/')}/{test_dir.lstrip('/')}".replace('//', '/')
+            
+            logger.info(f"API 测试 WebDAV 连接: {test_url}")
+            
+            # 尝试创建测试目录
+            response = requests.request(
+                'MKCOL',
+                test_url,
+                auth=(self._webdav_username, self._webdav_password),
+                timeout=10
+            )
+            
+            # 201 创建成功，405 已存在
+            if response.status_code in [201, 405]:
+                # 删除测试目录
+                try:
+                    requests.delete(
+                        test_url,
+                        auth=(self._webdav_username, self._webdav_password),
+                        timeout=10
+                    )
+                except:
+                    pass
+                
+                message = f"✅ 连接成功！\n\n"
+                message += f"📡 WebDAV 地址: {self._webdav_url}\n"
+                message += f"📁 目标路径: {self._webdav_path}\n"
+                message += f"👤 用户名: {self._webdav_username}\n\n"
+                message += f"💡 文件将上传到:\n{self._webdav_url.rstrip('/')}{self._webdav_path}"
+                
+                logger.info("WebDAV 连接测试成功")
+                return schemas.Response(success=True, message=message)
+            else:
+                message = f"❌ 连接失败\nHTTP {response.status_code}: {response.text[:200]}"
+                logger.error(f"WebDAV 连接测试失败: HTTP {response.status_code}")
+                return schemas.Response(success=False, message=message)
+        
+        except requests.exceptions.Timeout:
+            logger.error("WebDAV 连接超时")
+            return schemas.Response(success=False, message="连接超时，请检查网络和 WebDAV 地址")
+        
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"WebDAV 连接错误: {str(e)}")
+            return schemas.Response(success=False, message=f"连接错误，无法访问 WebDAV 服务器")
+        
+        except Exception as e:
+            logger.error(f"WebDAV 测试异常: {str(e)}")
+            logger.error(traceback.format_exc())
+            return schemas.Response(success=False, message=f"测试异常: {str(e)}")
 
     def get_form(self) -> Tuple[List[dict], Dict[str, Any]]:
         return [
@@ -1651,6 +1723,96 @@ class CloudLinkMonitor(_PluginBase):
                 })
         
         return [
+            {
+                'component': 'VRow',
+                'content': [
+                    {
+                        'component': 'VCol',
+                        'props': {
+                            'cols': 12
+                        },
+                        'content': [
+                            {
+                                'component': 'VCard',
+                                'props': {
+                                    'variant': 'tonal',
+                                    'color': 'primary'
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VCardTitle',
+                                        'text': '📡 WebDAV 配置信息'
+                                    },
+                                    {
+                                        'component': 'VCardText',
+                                        'content': [
+                                            {
+                                                'component': 'VRow',
+                                                'content': [
+                                                    {
+                                                        'component': 'VCol',
+                                                        'props': {
+                                                            'cols': 12,
+                                                            'md': 6
+                                                        },
+                                                        'content': [
+                                                            {
+                                                                'component': 'div',
+                                                                'props': {
+                                                                    'class': 'mb-2'
+                                                                },
+                                                                'text': f"🌐 WebDAV 地址: {self._webdav_url or '未配置'}"
+                                                            },
+                                                            {
+                                                                'component': 'div',
+                                                                'props': {
+                                                                    'class': 'mb-2'
+                                                                },
+                                                                'text': f"📁 目标路径: {self._webdav_path or '未配置'}"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        'component': 'VCol',
+                                                        'props': {
+                                                            'cols': 12,
+                                                            'md': 6
+                                                        },
+                                                        'content': [
+                                                            {
+                                                                'component': 'div',
+                                                                'props': {
+                                                                    'class': 'mb-2'
+                                                                },
+                                                                'text': f"👤 用户名: {self._webdav_username or '未配置'}"
+                                                            },
+                                                            {
+                                                                'component': 'div',
+                                                                'content': [
+                                                                    {
+                                                                        'component': 'VBtn',
+                                                                        'props': {
+                                                                            'color': 'success',
+                                                                            'variant': 'elevated',
+                                                                            'size': 'small',
+                                                                            'onClick': f"window.open('/api/plugins/CloudLinkMonitor/test_webdav', '_self')"
+                                                                        },
+                                                                        'text': '🔧 测试连接'
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
             {
                 'component': 'VRow',
                 'content': [
