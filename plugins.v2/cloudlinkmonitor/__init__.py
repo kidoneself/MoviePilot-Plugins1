@@ -67,7 +67,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "5.3.1"
+    plugin_version = "5.3.2"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -1099,6 +1099,9 @@ class CloudLinkMonitor(_PluginBase):
                     self._processed_files.add(event_path)
                     self.save_data("processed_files", list(self._processed_files))
                     
+                    # 收集目标目录名称
+                    target_names = [target.name for target in target_list]
+                    
                     # 添加到今天处理的文件列表
                     self._today_processed.append({
                         "file": file_path.name,
@@ -1106,7 +1109,8 @@ class CloudLinkMonitor(_PluginBase):
                         "size": file_size,
                         "time": datetime.now().strftime("%H:%M:%S"),
                         "date": datetime.now().strftime("%Y-%m-%d"),
-                        "targets": len(target_list)
+                        "targets": len(target_list),
+                        "target_names": target_names  # 添加目标目录名称列表
                     })
                     self.save_data("today_processed", self._today_processed)
                     
@@ -1593,6 +1597,16 @@ class CloudLinkMonitor(_PluginBase):
             file_size = format_size(item.get('size', 0))
             file_time = item.get('time', '')
             targets = item.get('targets', 0)
+            target_names = item.get('target_names', [])
+            
+            # 构建目标目录显示（最多显示3个，超过则省略）
+            if target_names:
+                if len(target_names) <= 3:
+                    target_str = ', '.join(target_names)
+                else:
+                    target_str = ', '.join(target_names[:3]) + f' 等{len(target_names)}个'
+            else:
+                target_str = f'{targets}个目标'
             
             today_items.append({
                 'component': 'VListItem',
@@ -1606,7 +1620,7 @@ class CloudLinkMonitor(_PluginBase):
                     },
                     {
                         'component': 'VListItemSubtitle',
-                        'text': f"💾 {file_size}  |  ⏰ {file_time}  |  🎯 {targets}个目标"
+                        'text': f"💾 {file_size}  |  ⏰ {file_time}\n🎯 {target_str}"
                     }
                 ]
             })
