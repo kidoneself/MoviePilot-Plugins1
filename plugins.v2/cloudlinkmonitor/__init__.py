@@ -67,7 +67,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "5.0.0"
+    plugin_version = "5.1.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -111,6 +111,14 @@ class CloudLinkMonitor(_PluginBase):
     _taosync_username = ""  # TaoSync 用户名
     _taosync_password = ""  # TaoSync 密码
     _taosync_job_ids = ""  # TaoSync Job IDs（要触发的任务ID，多个用逗号分隔）
+    _last_taosync_trigger = None  # 最后触发 TaoSync 的时间
+    # 会话统计
+    _session_files = 0  # 本次会话处理的文件数
+    _session_size = 0  # 本次会话处理的总大小
+    _session_success = 0  # 成功数
+    _session_failed = 0  # 失败数
+    _session_start_time = None  # 会话开始时间
+    _recent_files = []  # 最近处理的文件（最多10个）
 
     def init_plugin(self, config: dict = None):
         self.transferhis = TransferHistoryOper()
@@ -122,6 +130,15 @@ class CloudLinkMonitor(_PluginBase):
         self.filetransfer = FileManagerModule()
         # 清空配置
         self._dirconf = {}
+        
+        # 初始化会话统计
+        if self._session_start_time is None:
+            self._session_start_time = datetime.now()
+        self._session_files = 0
+        self._session_size = 0
+        self._session_success = 0
+        self._session_failed = 0
+        self._recent_files = []
 
         # 读取配置
         if config:
@@ -694,6 +711,10 @@ class CloudLinkMonitor(_PluginBase):
                     logger.error(f"TaoSync Job {job_id} 触发异常：{str(e)}")
             
             logger.info(f"TaoSync 任务触发完成：成功 {success_count}/{len(job_ids)}")
+            
+            # 记录触发时间
+            if success_count > 0:
+                self._last_taosync_trigger = datetime.now()
         
         except Exception as e:
             logger.error(f"触发 TaoSync 同步失败：{str(e)}")
@@ -957,6 +978,29 @@ class CloudLinkMonitor(_PluginBase):
                         continue
                 
                 logger.info(f"{file_path.name} 处理完成，成功 {success_count}/{len(target_list)} 个目标")
+                
+                # 更新会话统计
+                self._session_files += 1
+                self._session_size += file_size
+                if success_count == len(target_list):
+                    self._session_success += 1
+                elif success_count > 0:
+                    self._session_success += 1  # 部分成功也算成功
+                else:
+                    self._session_failed += 1
+                
+                # 添加到最近处理记录
+                self._recent_files.insert(0, {
+                    'name': new_file_name,
+                    'size': file_size,
+                    'time': datetime.now(),
+                    'success': success_count,
+                    'total': len(target_list)
+                })
+                # 只保留最近10个
+                if len(self._recent_files) > 10:
+                    self._recent_files = self._recent_files[:10]
+                
                 return
         
         except Exception as e:
@@ -1327,9 +1371,165 @@ class CloudLinkMonitor(_PluginBase):
 
     def get_page(self) -> List[dict]:
         """
-        插件详情页面
+        插件详情页面 - 混合仪表盘
         """
-        return []
+        # 计算运行时长
+        if self._session_start_time:
+            runtime = datetime.now() - self._session_start_time
+            runtime_str = f"{int(runtime.total_seconds() // 3600)}时{int((runtime.total_seconds() % 3600) // 60)}分"
+        else:
+            runtime_str = "未知"
+        
+        # 格式化总大小
+        if self._session_size >= 1024**3:
+            size_str = f"{self._session_size / (1024**3):.2f}GB"
+        elif self._session_size >= 1024**2:
+            size_str = f"{self._session_size / (1024**2):.2f}MB"
+        else:
+            size_str = f"{self._session_size / 1024:.2f}KB"
+        
+        # 统计目标数量
+        target_count = 0
+        for targets in self._dirconf.values():
+            target_count = max(target_count, len(targets) if targets else 0)
+        
+        # 监控目录数量
+        monitor_count = len(self._dirconf)
+        
+        # 运行状态
+        status_text = "🟢 运行中" if self._enabled else "⭕ 已停止"
+        
+        # TaoSync 状态
+        if self._enable_taosync:
+            taosync_status = f"✅ 已启用  |  Job: {self._taosync_job_ids or '未配置'}"
+            if self._last_taosync_trigger:
+                time_diff = (datetime.now() - self._last_taosync_trigger).total_seconds()
+                if time_diff < 60:
+                    trigger_str = f"{int(time_diff)}秒前"
+                elif time_diff < 3600:
+                    trigger_str = f"{int(time_diff // 60)}分钟前"
+                else:
+                    trigger_str = f"{int(time_diff // 3600)}小时前"
+                taosync_trigger = f"📡 最后触发：{trigger_str}"
+            else:
+                taosync_trigger = "📡 尚未触发"
+        else:
+            taosync_status = "⭕ 未启用"
+            taosync_trigger = ""
+        
+        # 构建最近处理记录
+        recent_items = []
+        for f in self._recent_files[:5]:  # 只显示最近5个
+            time_diff = (datetime.now() - f['time']).total_seconds()
+            if time_diff < 60:
+                time_str = f"{int(time_diff)}秒前"
+            elif time_diff < 3600:
+                time_str = f"{int(time_diff // 60)}分钟前"
+            else:
+                time_str = f"{int(time_diff // 3600)}小时前"
+            
+            size_gb = f['size'] / (1024**3)
+            status_icon = "✅" if f['success'] == f['total'] else "⚠️"
+            recent_items.append(
+                f"  • {f['name']} ({size_gb:.1f}GB) - {time_str} {status_icon}"
+            )
+        
+        recent_text = "\n".join(recent_items) if recent_items else "  暂无处理记录"
+        
+        return [
+            {
+                'component': 'VRow',
+                'content': [
+                    {
+                        'component': 'VCol',
+                        'props': {'cols': 12},
+                        'content': [
+                            {
+                                'component': 'VCard',
+                                'props': {'variant': 'tonal'},
+                                'content': [
+                                    {
+                                        'component': 'VCardTitle',
+                                        'text': '📊 CloudLink Monitor 状态'
+                                    },
+                                    {
+                                        'component': 'VCardText',
+                                        'text': f"{status_text}  |  监控 {monitor_count} 个目录\n🔗 硬链接模式  |  一对多（{target_count}目标）\n⏰ 运行时长：{runtime_str}"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                'component': 'VRow',
+                'content': [
+                    {
+                        'component': 'VCol',
+                        'props': {'cols': 12, 'md': 6},
+                        'content': [
+                            {
+                                'component': 'VCard',
+                                'content': [
+                                    {
+                                        'component': 'VCardTitle',
+                                        'text': '📈 本次会话统计'
+                                    },
+                                    {
+                                        'component': 'VCardText',
+                                        'text': f"📦 {self._session_files}个文件  |  💾 {size_str}  |  ⏱️ {runtime_str}\n✅ 成功：{self._session_success}  |  ❌ 失败：{self._session_failed}"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VCol',
+                        'props': {'cols': 12, 'md': 6},
+                        'content': [
+                            {
+                                'component': 'VCard',
+                                'content': [
+                                    {
+                                        'component': 'VCardTitle',
+                                        'text': '🎯 TaoSync 状态'
+                                    },
+                                    {
+                                        'component': 'VCardText',
+                                        'text': f"{taosync_status}\n{taosync_trigger}"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                'component': 'VRow',
+                'content': [
+                    {
+                        'component': 'VCol',
+                        'props': {'cols': 12},
+                        'content': [
+                            {
+                                'component': 'VCard',
+                                'content': [
+                                    {
+                                        'component': 'VCardTitle',
+                                        'text': '📺 最近处理'
+                                    },
+                                    {
+                                        'component': 'VCardText',
+                                        'text': recent_text
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
 
     def stop_service(self):
         """
