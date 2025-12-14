@@ -71,7 +71,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.8.0"
+    plugin_version = "3.9.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -100,8 +100,8 @@ class CloudLinkMonitor(_PluginBase):
     _size = 0
     _monitor_dirs = ""
     _exclude_keywords = ""
-    # 存储源目录与目的目录关系
-    _dirconf: Dict[str, Optional[Path]] = {}
+    # 存储源目录与目的目录关系（一对多）
+    _dirconf: Dict[str, List[Path]] = {}
     # 退出事件
     _event = threading.Event()
     # 批次汇总相关
@@ -182,14 +182,20 @@ class CloudLinkMonitor(_PluginBase):
                 else:
                     paths = mon_path.split(":")
 
-                # 目的目录
                 target_path = None
                 if len(paths) > 1:
                     mon_path = paths[0]
                     target_path = Path(paths[1])
-                    self._dirconf[mon_path] = target_path
+                    # 支持一对多：如果源目录已存在，追加目标；否则创建新列表
+                    if mon_path in self._dirconf:
+                        if target_path not in self._dirconf[mon_path]:
+                            self._dirconf[mon_path].append(target_path)
+                    else:
+                        self._dirconf[mon_path] = [target_path]
                 else:
-                    self._dirconf[mon_path] = None
+                    # 没有目标目录的情况
+                    if mon_path not in self._dirconf:
+                        self._dirconf[mon_path] = []
 
                 # 启用目录监控
                 if self._enabled:
@@ -865,84 +871,103 @@ class CloudLinkMonitor(_PluginBase):
                     logger.info(f"{file_path} 文件大小小于监控文件大小，不处理")
                     return
 
-                # 查询转移目的目录
-                target: Path = self._dirconf.get(mon_path)
+                # 查询转移目的目录列表（支持一对多）
+                target_list: List[Path] = self._dirconf.get(mon_path, [])
 
                 # 硬链接转移
-                logger.info(f"开始处理 {file_path.name}")
-                try:
-                    if not target:
-                        logger.error(f"未配置监控目录 {mon_path} 的目的目录")
-                        return
-                    
-                    # 计算相对路径
-                    mon_path_obj = Path(mon_path)
-                    relative_path = file_path.relative_to(mon_path_obj)
-                    logger.info(f"相对路径 {relative_path}")
-                    
-                    # 生成新的目录和文件名
-                    target_dir, new_file_name = self.__generate_new_paths(relative_path, target, file_path.name)
-                    target_file = target_dir / new_file_name
-                    logger.info(f"目标路径 {target_file}")
-                    
-                    # 确保目标目录存在
-                    target_dir.mkdir(parents=True, exist_ok=True)
-                    
-                    # 尝试硬链接，失败则复制
+                logger.info(f"开始处理 {file_path.name}，共 {len(target_list)} 个目标")
+                if not target_list:
+                    logger.error(f"未配置监控目录 {mon_path} 的目的目录")
+                    return
+                
+                # 计算相对路径（所有目标共用）
+                mon_path_obj = Path(mon_path)
+                relative_path = file_path.relative_to(mon_path_obj)
+                logger.info(f"相对路径 {relative_path}")
+                
+                # 遍历所有目标目录
+                success_count = 0
+                for idx, target in enumerate(target_list, 1):
                     try:
-                        logger.info(f"尝试创建硬链接 {file_path} -> {target_file}")
-                        import os
-                        os.link(str(file_path), str(target_file))
-                        transfer_method = "硬链接"
-                        logger.info(f"硬链接创建成功")
-                    except OSError as link_err:
-                        logger.warn(f"硬链接失败（可能跨文件系统），尝试复制：{str(link_err)}")
-                        shutil.copy2(file_path, target_file)
-                        transfer_method = "复制"
-                        logger.info(f"文件复制完成")
-                    
-                    # 发送简化通知
-                    if self._notify:
+                        logger.info(f"[{idx}/{len(target_list)}] 处理目标 {target}")
+                        
+                        # 生成新的目录和文件名
+                        target_dir, new_file_name = self.__generate_new_paths(relative_path, target, file_path.name)
+                        target_file = target_dir / new_file_name
+                        logger.info(f"目标路径 {target_file}")
+                        
+                        # 如果文件已存在且内容相同，跳过
+                        if target_file.exists():
+                            if target_file.samefile(file_path):
+                                logger.info(f"目标文件已存在且为同一文件，跳过")
+                                success_count += 1
+                                continue
+                            else:
+                                logger.warn(f"目标文件已存在但不是同一文件，跳过")
+                                continue
+                        
+                        # 确保目标目录存在
+                        target_dir.mkdir(parents=True, exist_ok=True)
+                        
+                        # 尝试硬链接，失败则复制
+                        try:
+                            logger.info(f"尝试创建硬链接 {file_path} -> {target_file}")
+                            import os
+                            os.link(str(file_path), str(target_file))
+                            transfer_method = "硬链接"
+                            logger.info(f"硬链接创建成功")
+                        except OSError as link_err:
+                            logger.warn(f"硬链接失败（可能跨文件系统），尝试复制：{str(link_err)}")
+                            shutil.copy2(file_path, target_file)
+                            transfer_method = "复制"
+                            logger.info(f"文件复制完成")
+                        
+                        # 添加到批次汇总
+                        original_dir = relative_path.parent if relative_path.parent != Path('.') else "根目录"
+                        target_relative = target_file.relative_to(target)
+                        target_dir_display = target_relative.parent if target_relative.parent != Path('.') else "根目录"
+                        
                         file_size = target_file.stat().st_size
                         
-                        # 格式化文件大小
-                        if file_size >= 1024**3:
-                            size_str = f"{file_size / (1024**3):.2f}GB"
-                        elif file_size >= 1024**2:
-                            size_str = f"{file_size / (1024**2):.2f}MB"
-                        else:
-                            size_str = f"{file_size / 1024:.2f}KB"
+                        self.__add_to_batch({
+                            'time': datetime.now(),
+                            'source_dir': str(original_dir),
+                            'target_dir': f"{target.name}/{target_dir_display}",
+                            'source_file': file_path.name,
+                            'target_file': new_file_name,
+                            'size': file_size,
+                            'method': transfer_method
+                        })
                         
-                        notify_text = f"🔗 {transfer_method} | 💾 {size_str}"
+                        logger.info(f"[{idx}/{len(target_list)}] 处理成功（{transfer_method}）")
+                        success_count += 1
                         
-                        self.post_message(
-                            mtype=NotificationType.Manual,
-                            title=f"✅ 转移：{new_file_name}",
-                            text=notify_text
-                        )
-                        logger.info(f"已发送简化通知")
+                    except Exception as e:
+                        logger.error(f"[{idx}/{len(target_list)}] 处理失败：{str(e)}")
+                        logger.error(f"错误详情 {traceback.format_exc()}")
+                        continue
+                
+                # 发送汇总通知
+                if self._notify and success_count > 0:
+                    # 格式化文件大小
+                    if file_size >= 1024**3:
+                        size_str = f"{file_size / (1024**3):.2f}GB"
+                    elif file_size >= 1024**2:
+                        size_str = f"{file_size / (1024**2):.2f}MB"
+                    else:
+                        size_str = f"{file_size / 1024:.2f}KB"
                     
-                    # 添加到批次汇总
-                    original_dir = relative_path.parent if relative_path.parent != Path('.') else "根目录"
-                    target_relative = target_file.relative_to(target)
-                    target_dir_display = target_relative.parent if target_relative.parent != Path('.') else "根目录"
+                    notify_text = f"🔗 成功 {success_count}/{len(target_list)} 个目标 | 💾 {size_str}"
                     
-                    self.__add_to_batch({
-                        'time': datetime.now(),
-                        'source_dir': str(original_dir),
-                        'target_dir': str(target_dir_display),
-                        'source_file': file_path.name,
-                        'target_file': new_file_name,
-                        'size': file_size,
-                        'method': 'link'
-                    })
-                    
-                    logger.info(f"{file_path.name} 处理成功（{transfer_method}）")
-                    return
-                except Exception as e:
-                    logger.error(f"处理失败：{str(e)}")
-                    logger.error(f"错误详情 {traceback.format_exc()}")
-                    return
+                    self.post_message(
+                        mtype=NotificationType.Manual,
+                        title=f"✅ 转移：{new_file_name}",
+                        text=notify_text
+                    )
+                    logger.info(f"已发送简化通知")
+                
+                logger.info(f"{file_path.name} 处理完成，成功 {success_count}/{len(target_list)} 个目标")
+                return
         
         except Exception as e:
             logger.error("目录监控发生错误：%s - %s" % (str(e), traceback.format_exc()))
