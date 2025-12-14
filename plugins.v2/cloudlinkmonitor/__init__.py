@@ -67,7 +67,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "5.3.7"
+    plugin_version = "5.3.8"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
