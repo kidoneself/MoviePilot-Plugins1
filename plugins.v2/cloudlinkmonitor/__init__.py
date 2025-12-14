@@ -67,7 +67,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "5.3.4"
+    plugin_version = "5.3.5"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -336,6 +336,22 @@ class CloudLinkMonitor(_PluginBase):
                     self.post_message(channel=channel, title="开始触发TaoSync同步 ...", userid=user)
                     self.__trigger_taosync()
                     self.post_message(channel=channel, title="✅ TaoSync同步触发完成！", userid=user)
+            
+            # 清空已处理记录
+            elif action == "clear_processed":
+                old_count = len(self._processed_files)
+                today_count = len(self._today_processed)
+                self._processed_files.clear()
+                self._today_processed.clear()
+                self.save_data("processed_files", [])
+                self.save_data("today_processed", [])
+                self.post_message(
+                    channel=channel,
+                    title="✅ 已清空处理记录",
+                    text=f"已清空 {old_count} 个已处理文件记录\n已清空 {today_count} 个今天处理的文件记录\n\n现在可以重新测试同步了！",
+                    userid=user
+                )
+                logger.info(f"已清空处理记录：{old_count} 个文件")
             
 
     def sync_all(self):
@@ -1200,6 +1216,15 @@ class CloudLinkMonitor(_PluginBase):
                 "category": "",
                 "data": {
                     "action": "trigger_taosync"
+                }
+            },
+            {
+                "cmd": "/clear_processed",
+                "event": EventType.PluginAction,
+                "desc": "清空已处理记录",
+                "category": "",
+                "data": {
+                    "action": "clear_processed"
                 }
             }
         ]

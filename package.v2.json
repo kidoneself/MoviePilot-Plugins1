@@ -4,11 +4,12 @@
     "name": "监控转移文件",
     "description": "监控目录文件变化，硬链接转移，拼音混淆剧名，TaoSync多网盘同步。",
     "labels": "云盘,工具",
-    "version": "5.3.4",
+    "version": "5.3.5",
     "icon": "Linkease_A.png",
     "author": "thsrite",
     "level": 1,
     "history": {
+      "v5.3.5": "新增功能：新增/clear_processed命令，方便清空已处理记录进行测试",
       "v5.3.4": "Bug修复：批次通知图片改用jsDelivr CDN，国内访问更稳定",
       "v5.3.3": "界面优化：批次汇总通知添加图片，消息更美观醒目",
       "v5.3.2": "功能增强：详情页列表新增目标目录名称显示，更直观了解文件同步到了哪些网盘",
