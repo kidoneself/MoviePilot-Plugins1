@@ -67,7 +67,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "5.1.0"
+    plugin_version = "5.2.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -976,6 +976,26 @@ class CloudLinkMonitor(_PluginBase):
                         logger.error(f"[{idx}/{len(target_list)}] 处理失败：{str(e)}")
                         logger.error(f"错误详情 {traceback.format_exc()}")
                         continue
+                
+                # 写入转移历史（所有目标都成功后才写入，避免重复处理）
+                if success_count == len(target_list):
+                    try:
+                        # 获取文件项
+                        file_item = self.storagechain.get_file_item(storage="local", path=file_path)
+                        if file_item:
+                            # 简化的元数据
+                            file_meta = MetaInfoPath(file_path)
+                            # 写入历史记录（简化版，不需要完整的 mediainfo）
+                            self.transferhis.add_success(
+                                fileitem=file_item,
+                                mode="link",  # 硬链接模式
+                                meta=file_meta,
+                                mediainfo=None,  # 不识别媒体信息
+                                transferinfo=None  # 简化版，不需要完整信息
+                            )
+                            logger.info(f"已写入转移历史：{file_path.name}")
+                    except Exception as e:
+                        logger.debug(f"写入转移历史失败（不影响功能）：{str(e)}")
                 
                 logger.info(f"{file_path.name} 处理完成，成功 {success_count}/{len(target_list)} 个目标")
                 
