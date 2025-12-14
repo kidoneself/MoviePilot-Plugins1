@@ -67,7 +67,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "5.3.0"
+    plugin_version = "5.3.1"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -1579,24 +1579,37 @@ class CloudLinkMonitor(_PluginBase):
             taosync_status = "⭕ 未启用"
             taosync_trigger = ""
         
-        # 构建最近处理记录
-        recent_items = []
-        for f in self._recent_files[:5]:  # 只显示最近5个
-            time_diff = (datetime.now() - f['time']).total_seconds()
-            if time_diff < 60:
-                time_str = f"{int(time_diff)}秒前"
-            elif time_diff < 3600:
-                time_str = f"{int(time_diff // 60)}分钟前"
-            else:
-                time_str = f"{int(time_diff // 3600)}小时前"
-            
-            size_gb = f['size'] / (1024**3)
-            status_icon = "✅" if f['success'] == f['total'] else "⚠️"
-            recent_items.append(
-                f"  • {f['name']} ({size_gb:.1f}GB) - {time_str} {status_icon}"
-            )
+        # 构建今天处理的文件列表（使用 _today_processed）
+        def format_size(size_bytes):
+            for unit in ['B', 'KB', 'MB', 'GB']:
+                if size_bytes < 1024.0:
+                    return f"{size_bytes:.1f}{unit}"
+                size_bytes /= 1024.0
+            return f"{size_bytes:.1f}TB"
         
-        recent_text = "\n".join(recent_items) if recent_items else "  暂无处理记录"
+        today_items = []
+        for item in self._today_processed[-10:]:  # 显示最近10个
+            file_name = item.get('file', '')
+            file_size = format_size(item.get('size', 0))
+            file_time = item.get('time', '')
+            targets = item.get('targets', 0)
+            
+            today_items.append({
+                'component': 'VListItem',
+                'props': {
+                    'density': 'compact'
+                },
+                'content': [
+                    {
+                        'component': 'VListItemTitle',
+                        'text': file_name
+                    },
+                    {
+                        'component': 'VListItemSubtitle',
+                        'text': f"💾 {file_size}  |  ⏰ {file_time}  |  🎯 {targets}个目标"
+                    }
+                ]
+            })
         
         return [
             {
@@ -1679,11 +1692,25 @@ class CloudLinkMonitor(_PluginBase):
                                 'content': [
                                     {
                                         'component': 'VCardTitle',
-                                        'text': '📺 最近处理'
+                                        'text': f'📋 今天处理的文件（共 {len(self._today_processed)} 个）'
                                     },
                                     {
-                                        'component': 'VCardText',
-                                        'text': recent_text
+                                        'component': 'VList',
+                                        'props': {
+                                            'lines': 'two',
+                                            'density': 'compact'
+                                        },
+                                        'content': today_items if today_items else [
+                                            {
+                                                'component': 'VListItem',
+                                                'content': [
+                                                    {
+                                                        'component': 'VListItemTitle',
+                                                        'text': '暂无处理记录'
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
