@@ -67,7 +67,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "5.3.6"
+    plugin_version = "5.3.7"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -1555,10 +1555,10 @@ class CloudLinkMonitor(_PluginBase):
             "cron": "0 0 * * *",
             "size": 0,
             "enable_taosync": False,
-            "taosync_url": "",
+            "taosync_url": "http://10.10.10.17:8023",
             "taosync_username": "admin",
-            "taosync_password": "",
-            "taosync_job_ids": ""
+            "taosync_password": "a123456!@",
+            "taosync_job_ids": "1,2,3"
         }
 
     def get_page(self) -> List[dict]:
