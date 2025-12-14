@@ -67,11 +67,11 @@ class CloudLinkMonitor(_PluginBase):
     # 插件名称
     plugin_name = "监控转移文件"
     # 插件描述
-    plugin_desc = "监控目录文件变化，支持硬链接和复制改Hash，拼音混淆剧名（保留分类目录），批次汇总通知，WebDAV自动同步，TaoSync多网盘同步。"
+    plugin_desc = "监控目录文件变化，硬链接转移，拼音混淆剧名（保留分类目录），批次汇总通知，TaoSync多网盘同步。"
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.7.0"
+    plugin_version = "3.8.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -100,11 +100,8 @@ class CloudLinkMonitor(_PluginBase):
     _size = 0
     _monitor_dirs = ""
     _exclude_keywords = ""
-    _transfer_type = "link"
     # 存储源目录与目的目录关系
     _dirconf: Dict[str, Optional[Path]] = {}
-    # 存储源目录转移方式
-    _transferconf: Dict[str, Optional[str]] = {}
     # 退出事件
     _event = threading.Event()
     # 批次汇总相关
@@ -133,14 +130,12 @@ class CloudLinkMonitor(_PluginBase):
         self.filetransfer = FileManagerModule()
         # 清空配置
         self._dirconf = {}
-        self._transferconf = {}
 
         # 读取配置
         if config:
             self._enabled = config.get("enabled")
             self._notify = config.get("notify")
             self._onlyonce = config.get("onlyonce")
-            self._transfer_type = config.get("transfer_type") or "link"
             self._monitor_dirs = config.get("monitor_dirs") or ""
             self._exclude_keywords = config.get("exclude_keywords") or ""
             self._cron = config.get("cron")
@@ -177,12 +172,6 @@ class CloudLinkMonitor(_PluginBase):
                 if not mon_path:
                     continue
 
-                # 自定义转移方式（支持link和copyhash）
-                _transfer_type = self._transfer_type
-                if mon_path.count("#") == 1:
-                    _transfer_type = mon_path.split("#")[1]
-                    mon_path = mon_path.split("#")[0]
-
                 # 存储目的目录
                 if SystemUtils.is_windows():
                     if mon_path.count(":") > 1:
@@ -201,9 +190,6 @@ class CloudLinkMonitor(_PluginBase):
                     self._dirconf[mon_path] = target_path
                 else:
                     self._dirconf[mon_path] = None
-
-                # 转移方式
-                self._transferconf[mon_path] = _transfer_type
 
                 # 启用目录监控
                 if self._enabled:
@@ -265,7 +251,6 @@ class CloudLinkMonitor(_PluginBase):
             "enabled": self._enabled,
             "notify": self._notify,
             "onlyonce": self._onlyonce,
-            "transfer_type": self._transfer_type,
             "monitor_dirs": self._monitor_dirs,
             "exclude_keywords": self._exclude_keywords,
             "cron": self._cron,
@@ -822,15 +807,11 @@ class CloudLinkMonitor(_PluginBase):
                 return
             # 全程加锁
             with lock:
-                # 查询转移方式（提前获取，用于判断是否跳过历史检查）
-                transfer_type = self._transferconf.get(mon_path)
-                
-                # copyhash模式不检查历史记录，允许重复处理
-                if transfer_type != "copyhash":
-                    transfer_history = self.transferhis.get_by_src(event_path)
-                    if transfer_history:
-                        logger.info("文件已处理过：%s" % event_path)
-                        return
+                # 检查历史记录
+                transfer_history = self.transferhis.get_by_src(event_path)
+                if transfer_history:
+                    logger.info("文件已处理过：%s" % event_path)
+                    return
 
                 # 回收站及隐藏的文件不处理
                 if event_path.find('/@Recycle/') != -1 \
@@ -887,193 +868,80 @@ class CloudLinkMonitor(_PluginBase):
                 # 查询转移目的目录
                 target: Path = self._dirconf.get(mon_path)
 
-                # link模式：硬链接+改名（不改hash）
-                if transfer_type == "link":
-                    logger.info(f"link模式：开始处理 {file_path.name}")
-                    try:
-                        if not target:
-                            logger.error(f"link模式：未配置监控目录 {mon_path} 的目的目录")
-                            return
-                        
-                        # 计算相对路径
-                        mon_path_obj = Path(mon_path)
-                        relative_path = file_path.relative_to(mon_path_obj)
-                        logger.info(f"link模式：相对路径 {relative_path}")
-                        
-                        # 生成新的目录和文件名
-                        target_dir, new_file_name = self.__generate_new_paths(relative_path, target, file_path.name)
-                        target_file = target_dir / new_file_name
-                        logger.info(f"link模式：目标路径 {target_file}")
-                        
-                        # 确保目标目录存在
-                        target_dir.mkdir(parents=True, exist_ok=True)
-                        
-                        # 尝试硬链接，失败则复制
-                        try:
-                            logger.info(f"link模式：尝试创建硬链接 {file_path} -> {target_file}")
-                            import os
-                            os.link(str(file_path), str(target_file))
-                            transfer_method = "硬链接"
-                            logger.info(f"link模式：硬链接创建成功")
-                        except OSError as link_err:
-                            logger.warn(f"link模式：硬链接失败（可能跨文件系统），尝试复制：{str(link_err)}")
-                            shutil.copy2(file_path, target_file)
-                            transfer_method = "复制"
-                            logger.info(f"link模式：文件复制完成")
-                        
-                        # 发送简化通知
-                        if self._notify:
-                            file_size = target_file.stat().st_size
-                            
-                            # 格式化文件大小
-                            if file_size >= 1024**3:
-                                size_str = f"{file_size / (1024**3):.2f}GB"
-                            elif file_size >= 1024**2:
-                                size_str = f"{file_size / (1024**2):.2f}MB"
-                            else:
-                                size_str = f"{file_size / 1024:.2f}KB"
-                            
-                            notify_text = f"🔗 {transfer_method} | 💾 {size_str}"
-                            
-                            self.post_message(
-                                mtype=NotificationType.Manual,
-                                title=f"✅ 转移：{new_file_name}",
-                                text=notify_text
-                            )
-                            logger.info(f"link模式：已发送简化通知")
-                        
-                        # 添加到批次汇总
-                        original_dir = relative_path.parent if relative_path.parent != Path('.') else "根目录"
-                        target_relative = target_file.relative_to(target)
-                        target_dir_display = target_relative.parent if target_relative.parent != Path('.') else "根目录"
-                        
-                        self.__add_to_batch({
-                            'time': datetime.now(),
-                            'source_dir': str(original_dir),
-                            'target_dir': str(target_dir_display),
-                            'source_file': file_path.name,
-                            'target_file': new_file_name,
-                            'size': file_size,
-                            'method': 'link'
-                        })
-                        
-                        logger.info(f"link模式：{file_path.name} 处理成功（{transfer_method}）")
+                # 硬链接转移
+                logger.info(f"开始处理 {file_path.name}")
+                try:
+                    if not target:
+                        logger.error(f"未配置监控目录 {mon_path} 的目的目录")
                         return
-                    except Exception as e:
-                        logger.error(f"link模式处理失败：{str(e)}")
-                        logger.error(f"link模式：错误详情 {traceback.format_exc()}")
-                        return
-
-                # copyhash模式：纯复制模式，跳过识别和整理流程
-                elif transfer_type == "copyhash":
-                    logger.info(f"copyhash模式：开始纯复制处理 {file_path.name}")
+                    
+                    # 计算相对路径
+                    mon_path_obj = Path(mon_path)
+                    relative_path = file_path.relative_to(mon_path_obj)
+                    logger.info(f"相对路径 {relative_path}")
+                    
+                    # 生成新的目录和文件名
+                    target_dir, new_file_name = self.__generate_new_paths(relative_path, target, file_path.name)
+                    target_file = target_dir / new_file_name
+                    logger.info(f"目标路径 {target_file}")
+                    
+                    # 确保目标目录存在
+                    target_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    # 尝试硬链接，失败则复制
                     try:
-                        if not target:
-                            logger.error(f"copyhash模式：未配置监控目录 {mon_path} 的目的目录")
-                            return
-                        
-                        # 计算相对路径
-                        mon_path_obj = Path(mon_path)
-                        relative_path = file_path.relative_to(mon_path_obj)
-                        logger.info(f"copyhash模式：相对路径 {relative_path}")
-                        
-                        # 生成新的目录和文件名
-                        target_dir, new_file_name = self.__generate_new_paths(relative_path, target, file_path.name)
-                        target_file = target_dir / file_path.name
-                        logger.info(f"copyhash模式：目标路径 {target_file}")
-                        
-                        # 确保目标目录存在
-                        target_dir.mkdir(parents=True, exist_ok=True)
-                        
-                        # 复制文件
-                        logger.info(f"copyhash模式：开始复制文件 {file_path} -> {target_file}")
+                        logger.info(f"尝试创建硬链接 {file_path} -> {target_file}")
+                        import os
+                        os.link(str(file_path), str(target_file))
+                        transfer_method = "硬链接"
+                        logger.info(f"硬链接创建成功")
+                    except OSError as link_err:
+                        logger.warn(f"硬链接失败（可能跨文件系统），尝试复制：{str(link_err)}")
                         shutil.copy2(file_path, target_file)
-                        logger.info(f"copyhash模式：文件复制完成")
+                        transfer_method = "复制"
+                        logger.info(f"文件复制完成")
+                    
+                    # 发送简化通知
+                    if self._notify:
+                        file_size = target_file.stat().st_size
                         
-                        # 处理hash修改和重命名
-                        if target_file.exists() and target_file.is_file():
-                            # 使用公共函数生成的文件名
-                            new_file_path = target_file.parent / new_file_name
-                            
-                            # 计算原始文件hash（重命名前）
-                            original_size = target_file.stat().st_size
-                            hash_md5_original = hashlib.md5()
-                            with open(target_file, 'rb') as f:
-                                for chunk in iter(lambda: f.read(8192), b""):
-                                    hash_md5_original.update(chunk)
-                            original_hash = hash_md5_original.hexdigest()
-                            logger.info(f"copyhash模式：原始文件hash={original_hash}")
-                            
-                            # 在文件末尾追加随机空白字符改变hash
-                            whitespace_chars = [' ', '\t', '\n']
-                            random_count = random.randint(10, 30)
-                            random_whitespaces = ''.join(random.choices(whitespace_chars, k=random_count))
-                            logger.info(f"copyhash模式：准备在文件末尾添加{random_count}个随机空白字符")
-                            
-                            with open(target_file, 'ab') as f:
-                                f.write(random_whitespaces.encode('utf-8'))
-                            new_size = target_file.stat().st_size
-                            logger.info(f"copyhash模式：文件大小从{original_size}字节增加到{new_size}字节")
-                            
-                            # 计算修改后的文件hash
-                            hash_md5_new = hashlib.md5()
-                            with open(target_file, 'rb') as f:
-                                for chunk in iter(lambda: f.read(8192), b""):
-                                    hash_md5_new.update(chunk)
-                            new_hash = hash_md5_new.hexdigest()
-                            logger.info(f"copyhash模式：修改后文件hash={new_hash}")
-                            logger.info(f"copyhash模式：hash已改变 {original_hash} -> {new_hash}")
-                            
-                            # 先修改hash，再重命名（避免文件名冲突）
-                            if target_file != new_file_path:
-                                target_file.rename(new_file_path)
-                                logger.info(f"copyhash模式：文件重命名成功 {target_file.name} -> {new_file_path.name}")
-                            logger.info(f"copyhash模式：处理完成 {new_file_path}")
+                        # 格式化文件大小
+                        if file_size >= 1024**3:
+                            size_str = f"{file_size / (1024**3):.2f}GB"
+                        elif file_size >= 1024**2:
+                            size_str = f"{file_size / (1024**2):.2f}MB"
+                        else:
+                            size_str = f"{file_size / 1024:.2f}KB"
                         
-                        # 发送简化通知
-                        if self._notify:
-                            # 格式化文件大小
-                            if new_size >= 1024**3:
-                                size_str = f"{new_size / (1024**3):.2f}GB"
-                            elif new_size >= 1024**2:
-                                size_str = f"{new_size / (1024**2):.2f}MB"
-                            else:
-                                size_str = f"{new_size / 1024:.2f}KB"
-                            
-                            notify_text = f"📝 复制+改Hash | 💾 {size_str}"
-                            
-                            self.post_message(
-                                mtype=NotificationType.Manual,
-                                title=f"✅ 转移：{new_file_path.name}",
-                                text=notify_text
-                            )
-                            logger.info(f"copyhash模式：已发送简化通知")
+                        notify_text = f"🔗 {transfer_method} | 💾 {size_str}"
                         
-                        # 添加到批次汇总
-                        original_dir = relative_path.parent if relative_path.parent != Path('.') else "根目录"
-                        target_relative = new_file_path.relative_to(target)
-                        target_dir_display = target_relative.parent if target_relative.parent != Path('.') else "根目录"
-                        
-                        self.__add_to_batch({
-                            'time': datetime.now(),
-                            'source_dir': str(original_dir),
-                            'target_dir': str(target_dir_display),
-                            'source_file': file_path.name,
-                            'target_file': new_file_path.name,
-                            'size': new_size,
-                            'method': 'copyhash'
-                        })
-                        
-                        logger.info(f"copyhash模式：{file_path.name} 处理成功")
-                        return
-                    except Exception as e:
-                        logger.error(f"copyhash模式处理失败：{str(e)}")
-                        logger.error(f"copyhash模式：错误详情 {traceback.format_exc()}")
-                        return
-                
-                else:
-                    # 不支持的转移方式
-                    logger.error(f"不支持的转移方式：{transfer_type}，仅支持link和copyhash")
+                        self.post_message(
+                            mtype=NotificationType.Manual,
+                            title=f"✅ 转移：{new_file_name}",
+                            text=notify_text
+                        )
+                        logger.info(f"已发送简化通知")
+                    
+                    # 添加到批次汇总
+                    original_dir = relative_path.parent if relative_path.parent != Path('.') else "根目录"
+                    target_relative = target_file.relative_to(target)
+                    target_dir_display = target_relative.parent if target_relative.parent != Path('.') else "根目录"
+                    
+                    self.__add_to_batch({
+                        'time': datetime.now(),
+                        'source_dir': str(original_dir),
+                        'target_dir': str(target_dir_display),
+                        'source_file': file_path.name,
+                        'target_file': new_file_name,
+                        'size': file_size,
+                        'method': 'link'
+                    })
+                    
+                    logger.info(f"{file_path.name} 处理成功（{transfer_method}）")
+                    return
+                except Exception as e:
+                    logger.error(f"处理失败：{str(e)}")
+                    logger.error(f"错误详情 {traceback.format_exc()}")
                     return
         
         except Exception as e:
@@ -1221,27 +1089,7 @@ class CloudLinkMonitor(_PluginBase):
                                 'component': 'VCol',
                                 'props': {
                                     'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VSelect',
-                                        'props': {
-                                            'model': 'transfer_type',
-                                            'label': '转移方式',
-                                            'items': [
-                                                {'title': '硬链接', 'value': 'link'},
-                                                {'title': '复制改Hash', 'value': 'copyhash'}
-                                            ]
-                                        }
-                                    }
-                                ]
-                            },
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
+                                    'md': 6
                                 },
                                 'content': [
                                     {
@@ -1317,7 +1165,7 @@ class CloudLinkMonitor(_PluginBase):
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
-                                            'text': 'link模式：硬链接（同文件系统）或复制（跨文件系统）+改名，不改hash。\ncopyhash模式：复制+改名+改hash。\n两种模式都会混淆目录名（保留1-2个字+繁体字+年份）和文件名（S01E01-1080p.mkv或1080p.mkv），Season目录不改。'
+                                            'text': '硬链接转移（同文件系统）或复制（跨文件系统），混淆剧名（保留1-2个字+繁体字+年份）和文件名（S01E01-1080p.mkv或1080p.mkv），Season目录不改。'
                                         }
                                     }
                                 ]
@@ -1512,7 +1360,6 @@ class CloudLinkMonitor(_PluginBase):
             "enabled": False,
             "notify": False,
             "onlyonce": False,
-            "transfer_type": "link",
             "monitor_dirs": "",
             "exclude_keywords": "",
             "cron": "0 0 * * *",
