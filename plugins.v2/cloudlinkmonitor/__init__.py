@@ -67,7 +67,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "5.2.1"
+    plugin_version = "5.3.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -119,6 +119,8 @@ class CloudLinkMonitor(_PluginBase):
     _session_failed = 0  # 失败数
     _session_start_time = None  # 会话开始时间
     _recent_files = []  # 最近处理的文件（最多10个）
+    _processed_files = set()  # 已处理的源文件路径集合
+    _today_processed = []  # 今天处理的文件列表（带时间）
 
     def init_plugin(self, config: dict = None):
         self.transferhis = TransferHistoryOper()
@@ -139,6 +141,28 @@ class CloudLinkMonitor(_PluginBase):
         self._session_success = 0
         self._session_failed = 0
         self._recent_files = []
+        
+        # 恢复已处理文件列表
+        saved_processed = self.get_data("processed_files") or []
+        self._processed_files = set(saved_processed)
+        logger.info(f"恢复已处理文件记录：{len(self._processed_files)} 个文件")
+        
+        # 清理源文件已删除的记录（防止记录无限增长）
+        to_remove = [f for f in self._processed_files if not Path(f).exists()]
+        for f in to_remove:
+            self._processed_files.remove(f)
+        if to_remove:
+            logger.info(f"清理已删除文件的记录：{len(to_remove)} 个")
+            self.save_data("processed_files", list(self._processed_files))
+        
+        # 恢复今天处理的文件列表
+        saved_today = self.get_data("today_processed") or []
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        # 只保留今天的记录
+        self._today_processed = [
+            item for item in saved_today 
+            if item.get("date") == today_str
+        ]
 
         # 读取配置
         if config:
@@ -295,6 +319,24 @@ class CloudLinkMonitor(_PluginBase):
                 self.sync_check(channel=channel, user=user)
                 self.post_message(channel=channel, title="同步状态检查完成！", userid=user)
             
+            # 查看今天处理的文件
+            elif action == "today_processed":
+                self.show_today_processed(channel=channel, user=user)
+            
+            # 查看所有已处理记录
+            elif action == "processed_files":
+                self.show_processed_files(channel=channel, user=user)
+            
+            # 手动触发TaoSync同步
+            elif action == "trigger_taosync":
+                if not self._enable_taosync:
+                    self.post_message(channel=channel, title="❌ TaoSync未启用", 
+                                    text="请在插件设置中启用TaoSync功能", userid=user)
+                else:
+                    self.post_message(channel=channel, title="开始触发TaoSync同步 ...", userid=user)
+                    self.__trigger_taosync()
+                    self.post_message(channel=channel, title="✅ TaoSync同步触发完成！", userid=user)
+            
 
     def sync_all(self):
         """
@@ -310,6 +352,76 @@ class CloudLinkMonitor(_PluginBase):
             for file_path in list_files:
                 logger.info(f"开始处理文件 {file_path} ...")
                 self.__handle_file(event_path=str(file_path), mon_path=mon_path)
+    
+    def show_today_processed(self, channel=None, user=None):
+        """
+        显示今天处理的文件列表
+        """
+        if not self._today_processed:
+            self.post_message(
+                channel=channel,
+                title="📋 今天处理的文件",
+                text="今天还没有处理任何文件",
+                userid=user
+            )
+            return
+        
+        # 格式化文件大小
+        def format_size(size_bytes):
+            for unit in ['B', 'KB', 'MB', 'GB']:
+                if size_bytes < 1024.0:
+                    return f"{size_bytes:.1f}{unit}"
+                size_bytes /= 1024.0
+            return f"{size_bytes:.1f}TB"
+        
+        # 构建消息
+        lines = [f"📋 今天处理的文件（共 {len(self._today_processed)} 个）\n"]
+        for idx, item in enumerate(self._today_processed, 1):
+            file_name = item.get("file", "")
+            file_size = format_size(item.get("size", 0))
+            file_time = item.get("time", "")
+            targets = item.get("targets", 0)
+            lines.append(f"{idx}. {file_name}")
+            lines.append(f"   💾 {file_size} | ⏰ {file_time} | 🎯 {targets}个目标\n")
+        
+        self.post_message(
+            channel=channel,
+            title="📋 今天处理的文件",
+            text="\n".join(lines),
+            userid=user
+        )
+    
+    def show_processed_files(self, channel=None, user=None):
+        """
+        显示所有已处理文件记录
+        """
+        if not self._processed_files:
+            self.post_message(
+                channel=channel,
+                title="📝 已处理文件记录",
+                text="暂无已处理文件记录",
+                userid=user
+            )
+            return
+        
+        # 构建消息（只显示前50个，避免消息过长）
+        total = len(self._processed_files)
+        files_list = list(self._processed_files)[:50]
+        
+        lines = [f"📝 已处理文件记录（共 {total} 个文件）\n"]
+        if total > 50:
+            lines.append("⚠️ 仅显示前50个文件\n")
+        
+        for idx, file_path in enumerate(files_list, 1):
+            file_name = Path(file_path).name
+            lines.append(f"{idx}. {file_name}")
+        
+        self.post_message(
+            channel=channel,
+            title="📝 已处理文件记录",
+            text="\n".join(lines),
+            userid=user
+        )
     
     def sync_check(self, channel=None, user=None):
         """
@@ -848,10 +960,9 @@ class CloudLinkMonitor(_PluginBase):
                 return
             # 全程加锁
             with lock:
-                # 检查历史记录
-                transfer_history = self.transferhis.get_by_src(event_path)
-                if transfer_history:
-                    logger.info("文件已处理过：%s" % event_path)
+                # 检查已处理记录
+                if event_path in self._processed_files:
+                    logger.info(f"文件已处理过，跳过：{event_path}")
                     return
 
                 # 回收站及隐藏的文件不处理
@@ -982,30 +1093,24 @@ class CloudLinkMonitor(_PluginBase):
                         logger.error(f"错误详情 {traceback.format_exc()}")
                         continue
                 
-                # 写入转移历史（所有目标都成功后才写入，避免重复处理）
+                # 所有目标都成功后，记录已处理
                 if success_count == len(target_list):
-                    try:
-                        logger.info(f"准备写入转移历史：{file_path.name}")
-                        # 获取文件项
-                        file_item = self.storagechain.get_file_item(storage="local", path=file_path)
-                        if not file_item:
-                            logger.warn(f"无法获取文件项，跳过写入历史：{file_path}")
-                        else:
-                            logger.info(f"获取文件项成功，开始写入历史")
-                            # 简化的元数据
-                            file_meta = MetaInfoPath(file_path)
-                            # 写入历史记录（简化版，不需要完整的 mediainfo）
-                            self.transferhis.add_success(
-                                fileitem=file_item,
-                                mode="link",  # 硬链接模式
-                                meta=file_meta,
-                                mediainfo=None,  # 不识别媒体信息
-                                transferinfo=None  # 简化版，不需要完整信息
-                            )
-                            logger.info(f"✅ 已写入转移历史：{file_path.name}")
-                    except Exception as e:
-                        logger.error(f"❌ 写入转移历史失败：{str(e)}")
-                        logger.error(f"错误详情：{traceback.format_exc()}")
+                    # 添加到已处理集合
+                    self._processed_files.add(event_path)
+                    self.save_data("processed_files", list(self._processed_files))
+                    
+                    # 添加到今天处理的文件列表
+                    self._today_processed.append({
+                        "file": file_path.name,
+                        "path": event_path,
+                        "size": file_size,
+                        "time": datetime.now().strftime("%H:%M:%S"),
+                        "date": datetime.now().strftime("%Y-%m-%d"),
+                        "targets": len(target_list)
+                    })
+                    self.save_data("today_processed", self._today_processed)
+                    
+                    logger.info(f"✅ 已记录处理完成：{file_path.name}")
                 
                 logger.info(f"{file_path.name} 处理完成，成功 {success_count}/{len(target_list)} 个目标")
                 
@@ -1063,6 +1168,33 @@ class CloudLinkMonitor(_PluginBase):
                 "category": "",
                 "data": {
                     "action": "sync_check"
+                }
+            },
+            {
+                "cmd": "/today_processed",
+                "event": EventType.PluginAction,
+                "desc": "查看今天处理的文件",
+                "category": "",
+                "data": {
+                    "action": "today_processed"
+                }
+            },
+            {
+                "cmd": "/processed_files",
+                "event": EventType.PluginAction,
+                "desc": "查看所有已处理记录",
+                "category": "",
+                "data": {
+                    "action": "processed_files"
+                }
+            },
+            {
+                "cmd": "/trigger_taosync",
+                "event": EventType.PluginAction,
+                "desc": "手动触发TaoSync同步",
+                "category": "",
+                "data": {
+                    "action": "trigger_taosync"
                 }
             }
         ]
