@@ -1547,14 +1547,14 @@ class CloudLinkMonitor(_PluginBase):
                 ]
             }
         ], {
-            "enabled": False,
+            "enabled": True,
             "notify": False,  # 默认关闭实时通知，只保留批次汇总
             "onlyonce": False,
             "monitor_dirs": "",
             "exclude_keywords": "",
             "cron": "0 0 * * *",
             "size": 0,
-            "enable_taosync": False,
+            "enable_taosync": True,
             "taosync_url": "http://10.10.10.17:8023",
             "taosync_username": "admin",
             "taosync_password": "a123456!@",
