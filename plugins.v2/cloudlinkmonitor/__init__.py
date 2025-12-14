@@ -71,7 +71,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "4.0.0"
+    plugin_version = "4.1.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -114,7 +114,7 @@ class CloudLinkMonitor(_PluginBase):
     _taosync_url = ""  # TaoSync 地址
     _taosync_username = ""  # TaoSync 用户名
     _taosync_password = ""  # TaoSync 密码
-    _taosync_job_id = 0  # TaoSync Job ID（要触发的任务ID）
+    _taosync_job_ids = ""  # TaoSync Job IDs（要触发的任务ID，多个用逗号分隔）
 
     def init_plugin(self, config: dict = None):
         self.transferhis = TransferHistoryOper()
@@ -142,7 +142,7 @@ class CloudLinkMonitor(_PluginBase):
             self._taosync_url = config.get("taosync_url") or ""
             self._taosync_username = config.get("taosync_username") or "admin"
             self._taosync_password = config.get("taosync_password") or ""
-            self._taosync_job_id = config.get("taosync_job_id") or 0
+            self._taosync_job_ids = config.get("taosync_job_ids") or ""
 
         # 停止现有任务
         self.stop_service()
@@ -519,12 +519,18 @@ class CloudLinkMonitor(_PluginBase):
         """
         触发 TaoSync 任务执行（批次完成后）
         """
-        if not self._taosync_job_id:
-            logger.debug("未配置 TaoSync Job ID，跳过")
+        if not self._taosync_job_ids:
+            logger.debug("未配置 TaoSync Job IDs，跳过")
+            return
+        
+        # 解析 Job IDs（支持逗号分隔）
+        job_ids = [jid.strip() for jid in self._taosync_job_ids.split(',') if jid.strip()]
+        if not job_ids:
+            logger.debug("TaoSync Job IDs 为空，跳过")
             return
         
         try:
-            logger.info(f"批次完成，触发 TaoSync Job {self._taosync_job_id} 执行")
+            logger.info(f"批次完成，触发 TaoSync {len(job_ids)} 个任务执行")
             
             # 登录 TaoSync
             login_url = f"{self._taosync_url}/svr/noAuth/login"
@@ -539,18 +545,33 @@ class CloudLinkMonitor(_PluginBase):
                 logger.error(f"TaoSync 登录失败：{login_resp.text}")
                 return
             
-            # 触发任务执行
-            exec_url = f"{self._taosync_url}/svr/job"
-            exec_data = {
-                'id': self._taosync_job_id,
-                'pause': None
-            }
+            # 遍历所有 Job ID 并触发执行
+            success_count = 0
+            for job_id in job_ids:
+                try:
+                    # 转换为整数
+                    job_id_int = int(job_id)
+                    
+                    # 触发任务执行
+                    exec_url = f"{self._taosync_url}/svr/job"
+                    exec_data = {
+                        'id': job_id_int,
+                        'pause': None
+                    }
+                    
+                    exec_resp = session.put(exec_url, json=exec_data, timeout=10)
+                    if exec_resp.status_code == 200:
+                        logger.info(f"TaoSync Job {job_id} 触发成功")
+                        success_count += 1
+                    else:
+                        logger.error(f"TaoSync Job {job_id} 触发失败：{exec_resp.text}")
+                
+                except ValueError:
+                    logger.error(f"TaoSync Job ID 格式错误：{job_id}")
+                except Exception as e:
+                    logger.error(f"TaoSync Job {job_id} 触发异常：{str(e)}")
             
-            exec_resp = session.put(exec_url, json=exec_data, timeout=10)
-            if exec_resp.status_code == 200:
-                logger.info(f"TaoSync Job {self._taosync_job_id} 触发成功")
-            else:
-                logger.error(f"TaoSync Job {self._taosync_job_id} 触发失败：{exec_resp.text}")
+            logger.info(f"TaoSync 任务触发完成：成功 {success_count}/{len(job_ids)}")
         
         except Exception as e:
             logger.error(f"触发 TaoSync 同步失败：{str(e)}")
@@ -1175,10 +1196,9 @@ class CloudLinkMonitor(_PluginBase):
                                     {
                                         'component': 'VTextField',
                                         'props': {
-                                            'model': 'taosync_job_id',
-                                            'label': 'TaoSync Job ID',
-                                            'type': 'number',
-                                            'placeholder': '任务ID（如：3）'
+                                            'model': 'taosync_job_ids',
+                                            'label': 'TaoSync Job IDs',
+                                            'placeholder': '任务ID，多个用逗号分隔（如：3,5,7）'
                                         }
                                     }
                                 ]
@@ -1199,7 +1219,7 @@ class CloudLinkMonitor(_PluginBase):
             "taosync_url": "",
             "taosync_username": "admin",
             "taosync_password": "",
-            "taosync_job_id": 0
+            "taosync_job_ids": ""
         }
 
     def get_page(self) -> List[dict]:
