@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 import hashlib
-import random
 import re
 import requests
 import shutil
@@ -27,18 +26,15 @@ from app.chain.storage import StorageChain
 from app.chain.tmdb import TmdbChain
 from app.chain.transfer import TransferChain
 from app.core.config import settings
-from app.core.context import MediaInfo
 from app.core.event import eventmanager, Event
 from app.core.metainfo import MetaInfoPath
 from app.db.downloadhistory_oper import DownloadHistoryOper
 from app.db.transferhistory_oper import TransferHistoryOper
-from app.helper.directory import DirectoryHelper
 from app.log import logger
 from app.modules.filemanager import FileManagerModule
 from app.plugins import _PluginBase
-from app.schemas import NotificationType, TransferInfo, TransferDirectoryConf
-from app.schemas.types import EventType, MediaType, SystemConfigKey
-from app.utils.string import StringUtils
+from app.schemas import NotificationType
+from app.schemas.types import EventType, SystemConfigKey
 from app.utils.system import SystemUtils
 
 lock = threading.Lock()
@@ -71,7 +67,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "4.1.0"
+    plugin_version = "4.2.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -300,8 +296,8 @@ class CloudLinkMonitor(_PluginBase):
         logger.info("开始检查同步状态 ...")
         
         # 遍历所有监控目录
-        for mon_path, target_path in self._dirconf.items():
-            if not target_path:
+        for mon_path, target_list in self._dirconf.items():
+            if not target_list:
                 continue
             
             mon_path_obj = Path(mon_path)
@@ -325,13 +321,20 @@ class CloudLinkMonitor(_PluginBase):
                 source_files = folder_info['files']
                 source_count = len(source_files)
                 
-                # 检查目标目录是否存在对应文件夹
-                target_folders = []
-                target_count = 0
-                target_files_list = []
+                # 检查所有目标目录
+                all_target_info = []
                 
-                # 遍历目标目录查找可能的匹配
-                if target_path.exists():
+                for target_path in target_list:
+                    if not target_path.exists():
+                        all_target_info.append({
+                            'target_name': target_path.name,
+                            'status': '❌ 目标不存在',
+                            'count': 0
+                        })
+                        continue
+                    
+                    # 遍历目标目录查找可能的匹配
+                    target_folders = []
                     for target_item in target_path.rglob('*'):
                         if target_item.is_dir():
                             target_files = SystemUtils.list_files(target_item, settings.RMT_MEDIAEXT)
@@ -341,34 +344,45 @@ class CloudLinkMonitor(_PluginBase):
                                     'relative': str(target_item.relative_to(target_path)),
                                     'files': [f.name for f in target_files]
                                 })
-                
-                # 尝试匹配目标文件夹（通过文件数量或模糊匹配）
-                matched_target = None
-                for tf in target_folders:
-                    # 简单匹配：文件数量相同
-                    if len(tf['files']) == source_count:
-                        matched_target = tf
-                        break
-                
-                if matched_target:
-                    target_count = len(matched_target['files'])
-                    target_info = f"📁 目标：{matched_target['relative']}/\n"
-                    for f in matched_target['files']:
-                        target_info += f"  ∙ {f}\n"
-                    status = f"✅ 源{source_count}个 = 目标{target_count}个"
-                else:
-                    target_info = "❌ 未找到或不存在\n"
-                    status = f"⚠️ 源{source_count}个 ≠ 目标0个"
+                    
+                    # 尝试匹配目标文件夹
+                    matched_target = None
+                    for tf in target_folders:
+                        if len(tf['files']) == source_count:
+                            matched_target = tf
+                            break
+                    
+                    if matched_target:
+                        all_target_info.append({
+                            'target_name': target_path.name,
+                            'status': f"✅ {matched_target['relative']}",
+                            'count': len(matched_target['files'])
+                        })
+                    else:
+                        all_target_info.append({
+                            'target_name': target_path.name,
+                            'status': '❌ 未找到匹配',
+                            'count': 0
+                        })
                 
                 # 构建通知内容
                 source_info = f"📁 源：{folder_info['path']}/\n"
                 for f in source_files:
                     source_info += f"  ∙ {f}\n"
                 
+                # 汇总所有目标状态
+                target_summary = []
+                success_count = sum(1 for t in all_target_info if '✅' in t['status'])
+                for t in all_target_info:
+                    target_summary.append(f"  {t['target_name']}: {t['status']}")
+                
+                target_info = "\n".join(target_summary)
+                status = f"✅ 成功 {success_count}/{len(all_target_info)} 个目标 | 源{source_count}个文件"
+                
                 message = (
                     f"📂 {folder_name}\n\n"
                     f"{source_info}\n"
-                    f"{target_info}\n"
+                    f"📁 目标状态：\n{target_info}\n\n"
                     f"{status}"
                 )
                 
