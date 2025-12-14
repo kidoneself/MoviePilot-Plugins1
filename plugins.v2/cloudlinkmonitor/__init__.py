@@ -67,7 +67,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "4.2.0"
+    plugin_version = "5.0.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -442,15 +442,22 @@ class CloudLinkMonitor(_PluginBase):
     
     def __send_batch_summary(self):
         """
-        发送批次汇总通知
+        发送批次汇总通知（优化版：区分剧集和电影）
         """
         if not self._batch_files:
             return
         
         try:
+            # 去重：按源文件统计（避免一对多重复计数）
+            unique_files = {}
+            for f in self._batch_files:
+                source_file = f.get('source_file')
+                if source_file not in unique_files:
+                    unique_files[source_file] = f
+            
             # 统计信息
-            total_files = len(self._batch_files)
-            total_size = sum(f.get('size', 0) for f in self._batch_files)
+            total_files = len(unique_files)
+            total_size = sum(f.get('size', 0) for f in unique_files.values())
             
             # 计算用时
             start_time = self._batch_files[0].get('time')
@@ -461,34 +468,6 @@ class CloudLinkMonitor(_PluginBase):
             else:
                 duration_str = "未知"
             
-            # 按目录分组统计
-            dir_stats = {}
-            for f in self._batch_files:
-                source_dir = f.get('source_dir', '未知')
-                target_dir = f.get('target_dir', '未知')
-                key = f"{source_dir}→{target_dir}"
-                
-                if key not in dir_stats:
-                    dir_stats[key] = {
-                        'source': source_dir,
-                        'target': target_dir,
-                        'count': 0,
-                        'size': 0
-                    }
-                dir_stats[key]['count'] += 1
-                dir_stats[key]['size'] += f.get('size', 0)
-            
-            # 构建目录汇总文本
-            dir_summary_lines = []
-            for i, stats in enumerate(dir_stats.values(), 1):
-                size_gb = stats['size'] / (1024**3)
-                dir_summary_lines.append(
-                    f"  {i}. � {stats['source']} ({stats['count']}个 | {size_gb:.1f}GB)\n"
-                    f"     ⬇️  \n"
-                    f"     � {stats['target']}"
-                )
-            dir_summary = "\n\n".join(dir_summary_lines)
-            
             # 格式化总大小
             if total_size >= 1024**3:
                 size_str = f"{total_size / (1024**3):.2f} GB"
@@ -497,17 +476,101 @@ class CloudLinkMonitor(_PluginBase):
             else:
                 size_str = f"{total_size / 1024:.2f} KB"
             
+            # 统计目标数量
+            target_dirs = set()
+            for f in self._batch_files:
+                target_dir = f.get('target_dir', '')
+                if target_dir:
+                    # 提取第一级目录作为目标名
+                    target_name = target_dir.split('/')[0] if '/' in target_dir else target_dir
+                    target_dirs.add(target_name)
+            target_count = len(target_dirs)
+            
+            # 按剧集/电影分组
+            tv_shows = {}  # {show_name: {season: [episodes]}}
+            movies = []
+            
+            for f in unique_files.values():
+                source_file = f.get('source_file', '')
+                source_dir = f.get('source_dir', '')
+                file_size = f.get('size', 0)
+                
+                # 检查是否是剧集（包含Season或S\d+E\d+）
+                import re
+                episode_match = re.search(r'S(\d+)E(\d+)', source_file, re.IGNORECASE)
+                
+                if 'Season' in source_dir or episode_match:
+                    # 剧集
+                    # 从目录提取剧名
+                    parts = source_dir.split('/')
+                    show_name = None
+                    season_num = None
+                    
+                    for i, part in enumerate(parts):
+                        if 'Season' in part:
+                            season_match = re.search(r'Season\s*(\d+)', part, re.IGNORECASE)
+                            if season_match:
+                                season_num = int(season_match.group(1))
+                            if i > 0:
+                                show_name = parts[i-1]
+                            break
+                    
+                    if not show_name or not season_num:
+                        # 尝试从文件名提取
+                        if episode_match:
+                            season_num = int(episode_match.group(1))
+                            # 剧名为source_dir的最后一个目录
+                            show_name = parts[-1] if parts else "未知剧集"
+                    
+                    if show_name and season_num is not None:
+                        episode_num = int(episode_match.group(2)) if episode_match else 0
+                        
+                        if show_name not in tv_shows:
+                            tv_shows[show_name] = {}
+                        if season_num not in tv_shows[show_name]:
+                            tv_shows[show_name][season_num] = []
+                        
+                        if episode_num > 0:
+                            tv_shows[show_name][season_num].append(episode_num)
+                else:
+                    # 电影
+                    # 从source_dir提取电影名（通常是最后一个目录）
+                    parts = source_dir.split('/')
+                    movie_name = parts[-1] if parts else source_file.rsplit('.', 1)[0]
+                    movies.append({
+                        'name': movie_name,
+                        'size': file_size
+                    })
+            
+            # 构建通知内容
+            content_lines = []
+            
+            # 剧集部分
+            if tv_shows:
+                content_lines.append("� 剧集：")
+                for show_name, seasons in sorted(tv_shows.items()):
+                    for season_num in sorted(seasons.keys()):
+                        episodes = sorted(seasons[season_num])
+                        # 智能显示集数范围
+                        episode_str = self.__format_episodes(episodes)
+                        content_lines.append(f"  • {show_name} S{season_num:02d} ({episode_str})")
+            
+            # 电影部分
+            if movies:
+                if tv_shows:
+                    content_lines.append("")
+                content_lines.append("🎬 电影：")
+                for movie in movies:
+                    size_gb = movie['size'] / (1024**3)
+                    content_lines.append(f"  • {movie['name']} ({size_gb:.1f}GB)")
+            
+            content = "\n".join(content_lines)
+            
             # 发送通知
             notify_text = (
-                f"📊 本批次统计\n"
-                f"━━━━━━━━━━━━━━\n"
-                f"📦 文件数量：{total_files} 个\n"
-                f"💾 总大小：{size_str}\n"
-                f"⏱️ 耗时：{duration_str}\n"
-                f"🔗 方式：{self._batch_files[0].get('method', '未知')}\n\n"
-                f"📂 目录详情\n"
-                f"━━━━━━━━━━━━━━\n"
-                f"{dir_summary}"
+                f"� {total_files}个文件 | 💾 {size_str} | ⏱️ {duration_str}\n"
+                f"🔗 硬链接 → {target_count}个目标\n\n"
+                f"{content}"
             )
             
             self.post_message(
@@ -524,10 +587,55 @@ class CloudLinkMonitor(_PluginBase):
             
         except Exception as e:
             logger.error(f"发送批次汇总通知失败：{str(e)}")
+            logger.error(traceback.format_exc())
         finally:
             # 清空批次列表
             self._batch_files = []
             self._last_process_time = None
+    
+    def __format_episodes(self, episodes: list) -> str:
+        """
+        智能格式化集数范围
+        :param episodes: 集数列表 [1, 2, 3, 5, 6]
+        :return: "E01-E03, E05-E06" 或 "E01-E05"
+        """
+        if not episodes:
+            return ""
+        
+        episodes = sorted(set(episodes))  # 去重并排序
+        
+        # 如果只有一集
+        if len(episodes) == 1:
+            return f"E{episodes[0]:02d}"
+        
+        # 检查是否完全连续
+        if episodes[-1] - episodes[0] + 1 == len(episodes):
+            return f"E{episodes[0]:02d}-E{episodes[-1]:02d}"
+        
+        # 不连续，分段显示
+        ranges = []
+        start = episodes[0]
+        end = episodes[0]
+        
+        for i in range(1, len(episodes)):
+            if episodes[i] == end + 1:
+                end = episodes[i]
+            else:
+                # 结束当前范围
+                if start == end:
+                    ranges.append(f"E{start:02d}")
+                else:
+                    ranges.append(f"E{start:02d}-E{end:02d}")
+                start = episodes[i]
+                end = episodes[i]
+        
+        # 添加最后一个范围
+        if start == end:
+            ranges.append(f"E{start:02d}")
+        else:
+            ranges.append(f"E{start:02d}-E{end:02d}")
+        
+        return ", ".join(ranges)
     
     def __trigger_taosync_sync(self):
         """
@@ -847,25 +955,6 @@ class CloudLinkMonitor(_PluginBase):
                         logger.error(f"[{idx}/{len(target_list)}] 处理失败：{str(e)}")
                         logger.error(f"错误详情 {traceback.format_exc()}")
                         continue
-                
-                # 发送汇总通知
-                if self._notify and success_count > 0:
-                    # 格式化文件大小
-                    if file_size >= 1024**3:
-                        size_str = f"{file_size / (1024**3):.2f}GB"
-                    elif file_size >= 1024**2:
-                        size_str = f"{file_size / (1024**2):.2f}MB"
-                    else:
-                        size_str = f"{file_size / 1024:.2f}KB"
-                    
-                    notify_text = f"🔗 成功 {success_count}/{len(target_list)} 个目标 | 💾 {size_str}"
-                    
-                    self.post_message(
-                        mtype=NotificationType.Manual,
-                        title=f"✅ 转移：{new_file_name}",
-                        text=notify_text
-                    )
-                    logger.info(f"已发送简化通知")
                 
                 logger.info(f"{file_path.name} 处理完成，成功 {success_count}/{len(target_list)} 个目标")
                 return
@@ -1223,7 +1312,7 @@ class CloudLinkMonitor(_PluginBase):
             }
         ], {
             "enabled": False,
-            "notify": False,
+            "notify": False,  # 默认关闭实时通知，只保留批次汇总
             "onlyonce": False,
             "monitor_dirs": "",
             "exclude_keywords": "",
