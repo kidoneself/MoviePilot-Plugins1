@@ -67,7 +67,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "5.3.3"
+    plugin_version = "5.3.4"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -711,7 +711,7 @@ class CloudLinkMonitor(_PluginBase):
                 mtype=NotificationType.Manual,
                 title="✅ 批次处理完成！",
                 text=notify_text,
-                image="https://raw.githubusercontent.com/jxxghp/MoviePilot/main/public/logo.png"
+                image="https://cdn.jsdelivr.net/gh/jxxghp/MoviePilot@main/public/logo.png"
             )
             
             logger.info(f"批次汇总通知已发送：共处理 {total_files} 个文件")
