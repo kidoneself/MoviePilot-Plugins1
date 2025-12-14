@@ -67,7 +67,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "5.2.0"
+    plugin_version = "5.2.1"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -172,6 +172,11 @@ class CloudLinkMonitor(_PluginBase):
                 # 格式源目录:目的目录
                 if not mon_path:
                     continue
+                
+                # 兼容旧版本：过滤掉 # 后面的转移方式标记（如 #link）
+                if "#" in mon_path:
+                    mon_path = mon_path.split("#")[0]
+                    logger.debug(f"过滤旧版本配置标记，使用：{mon_path}")
 
                 # 存储目的目录
                 if SystemUtils.is_windows():
@@ -980,9 +985,13 @@ class CloudLinkMonitor(_PluginBase):
                 # 写入转移历史（所有目标都成功后才写入，避免重复处理）
                 if success_count == len(target_list):
                     try:
+                        logger.info(f"准备写入转移历史：{file_path.name}")
                         # 获取文件项
                         file_item = self.storagechain.get_file_item(storage="local", path=file_path)
-                        if file_item:
+                        if not file_item:
+                            logger.warn(f"无法获取文件项，跳过写入历史：{file_path}")
+                        else:
+                            logger.info(f"获取文件项成功，开始写入历史")
                             # 简化的元数据
                             file_meta = MetaInfoPath(file_path)
                             # 写入历史记录（简化版，不需要完整的 mediainfo）
@@ -993,9 +1002,10 @@ class CloudLinkMonitor(_PluginBase):
                                 mediainfo=None,  # 不识别媒体信息
                                 transferinfo=None  # 简化版，不需要完整信息
                             )
-                            logger.info(f"已写入转移历史：{file_path.name}")
+                            logger.info(f"✅ 已写入转移历史：{file_path.name}")
                     except Exception as e:
-                        logger.debug(f"写入转移历史失败（不影响功能）：{str(e)}")
+                        logger.error(f"❌ 写入转移历史失败：{str(e)}")
+                        logger.error(f"错误详情：{traceback.format_exc()}")
                 
                 logger.info(f"{file_path.name} 处理完成，成功 {success_count}/{len(target_list)} 个目标")
                 
