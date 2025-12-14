@@ -71,7 +71,7 @@ class CloudLinkMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "Linkease_A.png"
     # 插件版本
-    plugin_version = "3.9.0"
+    plugin_version = "4.0.0"
     # 插件作者
     plugin_author = "thsrite"
     # 作者主页
@@ -114,11 +114,7 @@ class CloudLinkMonitor(_PluginBase):
     _taosync_url = ""  # TaoSync 地址
     _taosync_username = ""  # TaoSync 用户名
     _taosync_password = ""  # TaoSync 密码
-    _taosync_alist_id = 1  # Alist ID
-    _taosync_local_prefix = ""  # 本地路径前缀
-    _taosync_alist_prefix = ""  # Alist 路径前缀
-    _taosync_path_mappings = ""  # 路径映射配置（多行文本）
-    _taosync_mappings = []  # 解析后的路径映射列表
+    _taosync_job_id = 0  # TaoSync Job ID（要触发的任务ID）
 
     def init_plugin(self, config: dict = None):
         self.transferhis = TransferHistoryOper()
@@ -146,15 +142,7 @@ class CloudLinkMonitor(_PluginBase):
             self._taosync_url = config.get("taosync_url") or ""
             self._taosync_username = config.get("taosync_username") or "admin"
             self._taosync_password = config.get("taosync_password") or ""
-            self._taosync_alist_id = config.get("taosync_alist_id") or 1
-            self._taosync_local_prefix = config.get("taosync_local_prefix") or "/data/media"
-            self._taosync_alist_prefix = config.get("taosync_alist_prefix") or "/local/media"
-            self._taosync_path_mappings = config.get("taosync_path_mappings") or ""
-            
-            # 解析 TaoSync 路径映射
-            self._taosync_mappings = []
-            if self._enable_taosync and self._taosync_path_mappings:
-                self.__parse_taosync_mappings()
+            self._taosync_job_id = config.get("taosync_job_id") or 0
 
         # 停止现有任务
         self.stop_service()
@@ -408,41 +396,6 @@ class CloudLinkMonitor(_PluginBase):
             logger.debug("文件%s：%s" % (text, event_path))
             self.__handle_file(event_path=event_path, mon_path=mon_path)
     
-    def __parse_taosync_mappings(self):
-        """
-        解析 TaoSync 路径映射配置
-        格式：本地路径前缀|远程路径前缀
-        例如：网盘/剧集|UC/A-闲鱼影视/剧集
-        """
-        self._taosync_mappings = []
-        
-        if not self._taosync_path_mappings:
-            return
-        
-        lines = self._taosync_path_mappings.strip().split('\n')
-        for line in lines:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            
-            parts = line.split('|')
-            if len(parts) != 2:
-                logger.warning(f"TaoSync 路径映射格式错误，跳过: {line}")
-                continue
-            
-            mapping = {
-                'localPrefix': parts[0].strip(),
-                'remotePrefix': parts[1].strip()
-            }
-            
-            if mapping['localPrefix'] and mapping['remotePrefix']:
-                self._taosync_mappings.append(mapping)
-                logger.info(f"已加载 TaoSync 路径映射: {mapping['localPrefix']} -> {mapping['remotePrefix']}")
-            else:
-                logger.warning(f"TaoSync 路径映射不完整，跳过: {line}")
-        
-        logger.info(f"共加载 {len(self._taosync_mappings)} 个 TaoSync 路径映射")
-    
     def __add_to_batch(self, file_info: dict):
         """
         添加文件到批次汇总
@@ -564,97 +517,14 @@ class CloudLinkMonitor(_PluginBase):
     
     def __trigger_taosync_sync(self):
         """
-        触发 TaoSync 同步，按 Season 目录分组并创建同步任务
+        触发 TaoSync 任务执行（批次完成后）
         """
-        if not self._batch_files or not self._taosync_mappings:
+        if not self._taosync_job_id:
+            logger.debug("未配置 TaoSync Job ID，跳过")
             return
         
         try:
-            # 按 Season 目录分组文件
-            season_groups = {}
-            for file_info in self._batch_files:
-                target_file = file_info.get('target_file')
-                target_dir = file_info.get('target_dir')
-                
-                if not target_file or not target_dir:
-                    continue
-                
-                # 构建完整的本地文件路径
-                full_path = None
-                for mon_path, target_path in self._dirconf.items():
-                    if target_path:
-                        full_target_path = target_path / target_dir / target_file
-                        if full_target_path.exists():
-                            full_path = str(full_target_path)
-                            break
-                
-                if not full_path:
-                    continue
-                
-                # 智能提取同步目录
-                parts = Path(full_path).parts
-                sync_dir = None
-                sync_name = None
-                
-                # 策略1：查找包含 "Season" 的目录
-                for i, part in enumerate(parts):
-                    if 'Season' in part or 'season' in part:
-                        # 找到 Season 目录，使用它作为同步目录
-                        sync_dir = '/'.join(parts[:i+1])
-                        # 剧名是 Season 的父目录
-                        if i > 0:
-                            sync_name = parts[i-1]
-                        break
-                
-                # 策略2：如果没有 Season，使用文件的祖父目录（通常是剧名或电影名）
-                if not sync_dir:
-                    # 文件路径示例：/data/media/网盘/剧集/剧名/S01E01.mkv
-                    # 或：/data/media/网盘/电影/电影名/电影.mkv
-                    file_path_obj = Path(full_path)
-                    # 父目录：剧名或电影名
-                    parent_dir = file_path_obj.parent
-                    # 祖父目录：分类目录（剧集/电影）
-                    grandparent_dir = parent_dir.parent
-                    
-                    # 使用父目录作为同步目录
-                    sync_dir = str(parent_dir)
-                    sync_name = parent_dir.name
-                
-                if sync_dir and sync_name:
-                    if sync_dir not in season_groups:
-                        season_groups[sync_dir] = {
-                            'show_name': sync_name,
-                            'season_path': sync_dir,
-                            'files': []
-                        }
-                    season_groups[sync_dir]['files'].append(file_info)
-            
-            if not season_groups:
-                logger.info("没有找到符合条件的 Season 目录，跳过 TaoSync 同步")
-                return
-            
-            logger.info(f"TaoSync 同步：共 {len(season_groups)} 个 Season 目录")
-            
-            # 为每个 Season 目录创建 TaoSync 任务
-            for group_info in season_groups.values():
-                self.__create_taosync_task(
-                    season_path=group_info['season_path'],
-                    show_name=group_info['show_name']
-                )
-        
-        except Exception as e:
-            logger.error(f"触发 TaoSync 同步失败：{str(e)}")
-            logger.error(traceback.format_exc())
-    
-    def __create_taosync_task(self, season_path: str, show_name: str):
-        """
-        创建 TaoSync 同步任务
-        :param season_path: Season 目录完整路径
-        :param show_name: 剧名
-        """
-        try:
-            # 转换为 alist 路径（使用配置的路径前缀）
-            alist_path = season_path.replace(self._taosync_local_prefix, self._taosync_alist_prefix)
+            logger.info(f"批次完成，触发 TaoSync Job {self._taosync_job_id} 执行")
             
             # 登录 TaoSync
             login_url = f"{self._taosync_url}/svr/noAuth/login"
@@ -669,25 +539,21 @@ class CloudLinkMonitor(_PluginBase):
                 logger.error(f"TaoSync 登录失败：{login_resp.text}")
                 return
             
-            # 调用同步 API（需要一个文件路径，用 dummy.mkv）
-            sync_url = f"{self._taosync_url}/svr/sync/file"
-            sync_data = {
-                'filePath': f"{alist_path}/dummy.mkv",
-                'alistId': self._taosync_alist_id,
-                'pathMappings': self._taosync_mappings,
-                'method': 0,  # 仅新增
-                'remark': show_name
+            # 触发任务执行
+            exec_url = f"{self._taosync_url}/svr/job"
+            exec_data = {
+                'id': self._taosync_job_id,
+                'pause': None
             }
             
-            sync_resp = session.post(sync_url, json=sync_data, timeout=30)
-            if sync_resp.status_code == 200 and sync_resp.json().get('code') == 200:
-                job_id = sync_resp.json().get('data', {}).get('jobId')
-                logger.info(f"TaoSync 任务创建成功：{show_name}，Job ID: {job_id}")
+            exec_resp = session.put(exec_url, json=exec_data, timeout=10)
+            if exec_resp.status_code == 200:
+                logger.info(f"TaoSync Job {self._taosync_job_id} 触发成功")
             else:
-                logger.error(f"TaoSync 任务创建失败：{sync_resp.text}")
+                logger.error(f"TaoSync Job {self._taosync_job_id} 触发失败：{exec_resp.text}")
         
         except Exception as e:
-            logger.error(f"创建 TaoSync 任务失败：{str(e)}")
+            logger.error(f"触发 TaoSync 同步失败：{str(e)}")
             logger.error(traceback.format_exc())
     
     def __obfuscate_name(self, name: str) -> str:
@@ -1211,7 +1077,7 @@ class CloudLinkMonitor(_PluginBase):
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
-                                            'text': 'TaoSync 同步配置：批次完成后自动同步到多个网盘'
+                                            'text': 'TaoSync 同步配置：批次完成后自动触发指定任务执行（需先在 TaoSync 中手动创建任务）'
                                         }
                                     }
                                 ]
@@ -1258,23 +1124,6 @@ class CloudLinkMonitor(_PluginBase):
                                         }
                                     }
                                 ]
-                            },
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 6
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VTextField',
-                                        'props': {
-                                            'model': 'taosync_alist_id',
-                                            'label': 'Alist ID',
-                                            'placeholder': '1'
-                                        }
-                                    }
-                                ]
                             }
                         ]
                     },
@@ -1285,7 +1134,7 @@ class CloudLinkMonitor(_PluginBase):
                                 'component': 'VCol',
                                 'props': {
                                     'cols': 12,
-                                    'md': 6
+                                    'md': 4
                                 },
                                 'content': [
                                     {
@@ -1302,7 +1151,7 @@ class CloudLinkMonitor(_PluginBase):
                                 'component': 'VCol',
                                 'props': {
                                     'cols': 12,
-                                    'md': 6
+                                    'md': 4
                                 },
                                 'content': [
                                     {
@@ -1315,64 +1164,21 @@ class CloudLinkMonitor(_PluginBase):
                                         }
                                     }
                                 ]
-                            }
-                        ]
-                    },
-                    {
-                        'component': 'VRow',
-                        'content': [
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 6
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VTextField',
-                                        'props': {
-                                            'model': 'taosync_local_prefix',
-                                            'label': '本地路径前缀',
-                                            'placeholder': '/data/media'
-                                        }
-                                    }
-                                ]
                             },
                             {
                                 'component': 'VCol',
                                 'props': {
                                     'cols': 12,
-                                    'md': 6
+                                    'md': 4
                                 },
                                 'content': [
                                     {
                                         'component': 'VTextField',
                                         'props': {
-                                            'model': 'taosync_alist_prefix',
-                                            'label': 'Alist 路径前缀',
-                                            'placeholder': '/local/media'
-                                        }
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        'component': 'VRow',
-                        'content': [
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VTextarea',
-                                        'props': {
-                                            'model': 'taosync_path_mappings',
-                                            'label': 'TaoSync 路径映射',
-                                            'rows': 3,
-                                            'placeholder': '每一行一个映射，格式：本地路径前缀|远程路径前缀\n例如：\n网盘/剧集|UC/A-闲鱼影视/剧集\n网盘/剧集|baidu/剧集\n网盘/剧集|kuake/剧集'
+                                            'model': 'taosync_job_id',
+                                            'label': 'TaoSync Job ID',
+                                            'type': 'number',
+                                            'placeholder': '任务ID（如：3）'
                                         }
                                     }
                                 ]
@@ -1393,10 +1199,7 @@ class CloudLinkMonitor(_PluginBase):
             "taosync_url": "",
             "taosync_username": "admin",
             "taosync_password": "",
-            "taosync_alist_id": 1,
-            "taosync_local_prefix": "/data/media",
-            "taosync_alist_prefix": "/local/media",
-            "taosync_path_mappings": ""
+            "taosync_job_id": 0
         }
 
     def get_page(self) -> List[dict]:
