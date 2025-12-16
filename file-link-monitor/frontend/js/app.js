@@ -334,7 +334,7 @@ function renderRecords(records) {
 }
 
 // 渲染分组记录
-function renderGroupedRecords(groups) {
+function renderGroupedRecords(groups, groupType) {
     const container = document.getElementById('recordsList');
     
     if (!groups || groups.length === 0) {
@@ -342,49 +342,99 @@ function renderGroupedRecords(groups) {
         return;
     }
     
-    let html = '';
-    groups.forEach(group => {
-        // 收集该分组的所有记录ID
-        const recordIds = group.records.map(r => r.id).join(',');
-        
-        html += `
-            <div class="record-group">
-                <div class="group-header">
-                    <div onclick="toggleGroup(this)">
+    // 按网盘统计的嵌套渲染
+    if (groupType === 'target_show') {
+        let html = '';
+        groups.forEach(target => {
+            html += `
+                <div class="record-group">
+                    <div class="group-header" onclick="toggleGroup(this)">
                         <span class="expand-icon">▼</span>
-                        <span class="group-name">📁 ${group.dir_name}</span>
-                        <span class="group-count">${group.count} 条记录</span>
+                        <strong>📁 ${target.dir_name}</strong>
+                        <span class="group-count">${target.count} 个文件</span>
                     </div>
-                    <button class="resync-group-btn" onclick="event.stopPropagation(); resyncGroup([${recordIds}])">
-                        🔄 重新同步分组
-                    </button>
-                </div>
-                <div class="group-content">
-        `;
-        
-        group.records.forEach(record => {
-            const statusClass = record.status === 'success' ? 'success' : 'failed';
-            const statusText = record.status === 'success' ? '✅' : '❌';
-            const fileName = record.source_file.split('/').pop();
-            const targetDir = record.target_file.split('/').slice(-2, -1)[0] || '目标';
-            const retryBtn = record.status === 'failed' 
-                ? `<button class="retry-btn-small" onclick="retryLink(${record.id})">🔄</button>` 
-                : '';
+                    <div class="group-content">
+            `;
+            
+            target.shows.forEach(show => {
+                html += `
+                    <div class="show-group">
+                        <div class="show-header" onclick="toggleGroup(this)">
+                            <span class="expand-icon">▼</span>
+                            <strong>🎬 ${show.show_name}</strong>
+                            <span class="show-stats">${show.count} 集 · ${formatSize(show.total_size)}</span>
+                        </div>
+                        <div class="group-content">
+                `;
+                
+                show.records.forEach(record => {
+                    const statusClass = record.status === 'success' ? 'success' : 'failed';
+                    const statusText = record.status === 'success' ? '✅' : '❌';
+                    const fileName = record.source_file.split('/').pop();
+                    
+                    html += `
+                        <div class="group-record-item ${statusClass}" style="padding: 8px 15px; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 16px;">${statusText}</span>
+                            <span style="flex: 1;">${fileName}</span>
+                            <span style="color: #999; font-size: 13px;">${formatSize(record.file_size)}</span>
+                        </div>
+                    `;
+                });
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
             
             html += `
-                <div class="group-record-item ${statusClass}">
-                    <div class="record-line">
-                        <span class="status-icon">${statusText}</span>
-                        <span class="file-name">${fileName}</span>
-                        <span class="arrow">→</span>
-                        <span class="target-name">${targetDir}</span>
-                        <span class="file-size">${formatSize(record.file_size)}</span>
-                        <span class="record-time">${record.created_at}</span>
-                        ${retryBtn}
                     </div>
                 </div>
             `;
         });
+        
+        container.innerHTML = html;
+        return;
+    }
+    
+    // 普通分组渲染
+    let html = '';
+    groups.forEach(group => {
+        const recordIds = group.records ? group.records.map(r => r.id).join(',') : '';
+        
+        html += `
+            <div class="record-group">
+                <div class="group-header" onclick="toggleGroup(this)">
+                    <span class="expand-icon">▼</span>
+                    <strong>📁 ${group.dir_name}</strong>
+                    <span class="group-count">${group.count} 条记录</span>
+                </div>
+                <div class="group-content">
+        `;
+        
+        if (group.records) {
+            group.records.forEach(record => {
+                const statusClass = record.status === 'success' ? 'success' : 'failed';
+                const statusText = record.status === 'success' ? '✅' : '❌';
+                const fileName = record.source_file.split('/').pop();
+                
+                html += `
+                    <div class="group-record-item ${statusClass}" style="padding: 10px 15px;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                            <span style="font-size: 16px;">${statusText}</span>
+                            <strong>${fileName}</strong>
+                            <span style="margin-left: auto; font-size: 13px; color: #999;">${formatSize(record.file_size)}</span>
+                        </div>
+                        <div style="font-size: 12px; color: #666; padding-left: 26px;">
+                            源: ${record.source_file}
+                        </div>
+                        <div style="font-size: 12px; color: #666; padding-left: 26px;">
+                            目标: ${record.target_file}
+                        </div>
+                    </div>
+                `;
+            });
+        }
         
         html += `
                 </div>
