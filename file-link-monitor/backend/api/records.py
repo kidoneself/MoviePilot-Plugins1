@@ -125,6 +125,73 @@ async def get_records(
                 "page": page,
                 "page_size": page_size
             }
+        elif group_by == "target_show":
+            # 按目标目录+剧集名分组统计
+            from collections import defaultdict
+            import re
+            
+            # 目标目录 -> 剧集名 -> 记录列表
+            target_shows = defaultdict(lambda: defaultdict(list))
+            
+            for record in records:
+                target_path = Path(record.target_file)
+                # 提取目标根目录（如 /media/网盘测试1）
+                target_base = str(target_path.parts[0:3] if len(target_path.parts) >= 3 else target_path.parts[0:2])
+                
+                # 尝试从路径中提取剧集名（包含年份的目录）
+                show_name = None
+                for part in target_path.parts:
+                    # 匹配包含年份的目录，如 "大生意人 (2025)"
+                    if re.search(r'\(\d{4}\)', part):
+                        show_name = part
+                        break
+                
+                if not show_name:
+                    show_name = "其他文件"
+                
+                target_shows[target_base][show_name].append(record)
+            
+            # 组装数据
+            grouped_data = []
+            for target_base, shows in target_shows.items():
+                target_records = []
+                for show_name, records_list in shows.items():
+                    # 统计集数和大小
+                    total_size = sum(r.file_size for r in records_list)
+                    count = len(records_list)
+                    
+                    target_records.append({
+                        "show_name": show_name,
+                        "count": count,
+                        "total_size": total_size,
+                        "records": [{
+                            "id": r.id,
+                            "source_file": r.source_file,
+                            "target_file": r.target_file,
+                            "file_size": r.file_size,
+                            "link_method": r.link_method,
+                            "status": r.status,
+                            "error_msg": r.error_msg,
+                            "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                        } for r in records_list]
+                    })
+                
+                grouped_data.append({
+                    "dir_name": Path(target_base).name if target_base else "未知目录",
+                    "target_base": target_base,
+                    "count": sum(len(r["records"]) for r in target_records),
+                    "shows": target_records
+                })
+            
+            return {
+                "success": True,
+                "grouped": True,
+                "group_type": "target_show",
+                "data": grouped_data,
+                "total": total,
+                "page": page,
+                "page_size": page_size
+            }
         
         # 不分组，返回原格式
         data = []

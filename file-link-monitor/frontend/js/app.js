@@ -267,7 +267,7 @@ async function loadRecords(page = 1) {
         
         if (result.success) {
             if (result.grouped) {
-                renderGroupedRecords(result.data);
+                renderGroupedRecords(result.data, result.group_type);
             } else {
                 renderRecords(result.data);
             }
