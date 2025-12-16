@@ -423,17 +423,12 @@ function renderGroupedRecords(groups, groupType) {
                 const fileName = record.source_file.split('/').pop();
                 
                 html += `
-                    <div class="group-record-item ${statusClass}" style="padding: 10px 15px;">
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
-                            <span style="font-size: 16px;">${statusText}</span>
-                            <strong>${fileName}</strong>
-                            <span style="margin-left: auto; font-size: 13px; color: #999;">${formatSize(record.file_size)}</span>
-                        </div>
-                        <div style="font-size: 12px; color: #666; padding-left: 26px;">
-                            源: ${record.source_file}
-                        </div>
-                        <div style="font-size: 12px; color: #666; padding-left: 26px;">
-                            目标: ${record.target_file}
+                    <div class="group-record-item ${statusClass}" style="padding: 8px 15px; border-bottom: 1px solid #f0f0f0;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 14px;">${statusText}</span>
+                            <span style="color: #999; font-size: 12px;">→</span>
+                            <span style="font-size: 13px;">${record.target_file.split('/').slice(-3, -1).join('/')}</span>
+                            <span style="margin-left: auto; font-size: 12px; color: #999;">${formatSize(record.file_size)}</span>
                         </div>
                     </div>
                 `;

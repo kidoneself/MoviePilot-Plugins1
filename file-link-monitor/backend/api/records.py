@@ -49,9 +49,10 @@ async def get_records(
         # 如果是分组模式，先获取所有记录再分组，最后对分组结果分页
         if group_by:
             # 获取所有记录（不分页）
-            records = query.order_by(desc(LinkRecord.created_at)).all()
+            # 按源文件路径排序（这样集数会自然排序）
+            records = query.order_by(LinkRecord.source_file.asc()).all()
         else:
-            # 不分组时，直接分页
+            # 不分组时，按创建时间倒序
             records = query.order_by(desc(LinkRecord.created_at))\
                           .offset((page - 1) * page_size)\
                           .limit(page_size)\
