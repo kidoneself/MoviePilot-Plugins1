@@ -156,7 +156,12 @@ class FolderObfuscator:
         return letter
     
     def _load_pinyin_map(self) -> dict:
-        """加载简化的拼音映射表（内置常用字）"""
+        """加载拼音映射表（3500个常用字）"""
+        from .pinyin_map import PINYIN_MAP
+        return PINYIN_MAP
+        
+    def _load_pinyin_map_old(self) -> dict:
+        """旧的内置映射表（备用）"""
         return {
             # 常见分类
             '国': 'guo', '产': 'chan', '剧': 'ju', '集': 'ji', '电': 'dian', '影': 'ying',
