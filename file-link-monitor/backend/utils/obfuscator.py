@@ -156,14 +156,23 @@ class FolderObfuscator:
         return letter
     
     def _load_pinyin_map(self) -> dict:
-        """加载简化的拼音映射表"""
-        try:
-            import sys
-            sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "plugins.v2" / "cloudlinkmonitor"))
-            from pinyin_map import PINYIN_MAP
-            return PINYIN_MAP
-        except:
-            return {}
+        """加载简化的拼音映射表（内置常用字）"""
+        return {
+            '国': 'guo', '产': 'chan', '剧': 'ju', '集': 'ji',
+            '大': 'da', '生': 'sheng', '意': 'yi', '人': 'ren',
+            '双': 'shuang', '轨': 'gui', '新': 'xin', '闻': 'wen',
+            '女': 'nv', '王': 'wang', '狙': 'ju', '击': 'ji',
+            '蝴': 'hu', '蝶': 'die', '老': 'lao', '男': 'nan',
+            '超': 'chao', '感': 'gan', '迷': 'mi', '宫': 'gong',
+            '长': 'chang', '安': 'an', '二': 'er', '十': 'shi',
+            '四': 'si', '计': 'ji', '风': 'feng', '与': 'yu',
+            '潮': 'chao', '电': 'dian', '影': 'ying', '视': 'shi',
+            '港': 'gang', '台': 'tai', '日': 'ri', '韩': 'han',
+            '美': 'mei', '英': 'ying', '法': 'fa', '德': 'de',
+            '欧': 'ou', '亚': 'ya', '洲': 'zhou', '部': 'bu',
+            '分': 'fen', '类': 'lei', '别': 'bie', '他': 'ta',
+            '其': 'qi', '种': 'zhong', '类': 'lei', '型': 'xing',
+        }
     
     def obfuscate_name_legacy(self, name: str) -> str:
         """
