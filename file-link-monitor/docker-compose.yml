@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  file-link-monitor:
+    build: .
+    container_name: file-link-monitor
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yaml:/app/config.yaml          # 配置文件
+      - ./data:/app/data                        # 数据库持久化
+      - /volume1/media:/media                   # 映射 NAS 媒体目录
+    environment:
+      - TZ=Asia/Shanghai
+      - CONFIG_PATH=/app/config.yaml
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

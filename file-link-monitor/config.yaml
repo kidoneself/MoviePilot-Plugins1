@@ -1,0 +1,40 @@
+# 文件监控硬链接系统配置
+
+# 监控配置
+monitors:
+  - source: /path/to/your/source
+    targets:
+      - path: /path/to/your/target1
+        name: "阿里云盘"
+      - path: /path/to/your/target2
+        name: "115网盘"
+    enabled: true
+    obfuscate_enabled: true   # 文件夹名混淆（拆字方案，固定算法）
+    exclude_patterns:
+      - "*.tmp"
+      - "*.part"
+      - ".DS_Store"
+
+# 服务器配置
+server:
+  host: 0.0.0.0
+  port: 8080
+  debug: false
+
+# 数据库配置
+database:
+  path: ./data/database.db
+
+# 通知配置
+notification:
+  enabled: true
+  serverchan_url: "https://13922.push.ft07.com/send/sctp13922twpjwr8sh4gr8bdeupbzjda.send"
+  serverchan_sendkey: "sctp13922twpjwr8sh4gr8bdeupbzjda"
+  
+# TaoSync配置
+taosync:
+  enabled: false
+  url: "http://10.10.10.17:8023"
+  username: "admin"
+  password: "a123456!@"
+  job_id: 1

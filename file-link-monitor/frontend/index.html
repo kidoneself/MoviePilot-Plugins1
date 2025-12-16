@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件监控硬链接系统</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-title">
+                <div class="logo">📁</div>
+                <div class="title-text">
+                    <h1>文件监控硬链接系统</h1>
+                    <p class="subtitle">File Link Monitor - 实时监控 · 自动硬链接 · 高效管理</p>
+                </div>
+            </div>
+            <div class="stats-cards" id="statsBar">
+                <div class="stat-card">
+                    <div class="stat-icon">📅</div>
+                    <div class="stat-content">
+                        <span class="stat-label">今日处理</span>
+                        <span class="stat-value" id="todayCount">-</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-content">
+                        <span class="stat-label">总记录</span>
+                        <span class="stat-value" id="totalCount">-</span>
+                    </div>
+                </div>
+                <div class="stat-card success">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-content">
+                        <span class="stat-label">成功</span>
+                        <span class="stat-value" id="successCount">-</span>
+                    </div>
+                </div>
+                <div class="stat-card failed">
+                    <div class="stat-icon">❌</div>
+                    <div class="stat-content">
+                        <span class="stat-label">失败</span>
+                        <span class="stat-value" id="failedCount">-</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💾</div>
+                    <div class="stat-content">
+                        <span class="stat-label">总大小</span>
+                        <span class="stat-value" id="totalSize">-</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="tree">📂 目录视图</button>
+            <button class="tab-btn" data-tab="records">📋 链接记录</button>
+            <button class="tab-btn" data-tab="config">⚙️ 配置</button>
+            <button class="sync-all-btn" onclick="syncAll()">🔄 全量同步</button>
+        </div>
+
+        <!-- 目录树视图 -->
+        <div class="tab-content active" id="tree-tab">
+            <div class="tree-container">
+                <div class="tree-panel">
+                    <div class="panel-header">
+                        <h3>源目录</h3>
+                        <button class="refresh-btn" onclick="refreshSourceTree()">🔄 刷新</button>
+                    </div>
+                    <div class="tree-view" id="sourceTree">
+                        <div class="loading">加载中...</div>
+                    </div>
+                </div>
+
+                <div class="tree-panel">
+                    <div class="panel-header">
+                        <h3>目标目录</h3>
+                        <select id="targetSelector" onchange="refreshTargetTree()">
+                            <option value="">选择目标目录</option>
+                        </select>
+                        <button class="refresh-btn" onclick="refreshTargetTree()">🔄 刷新</button>
+                    </div>
+                    <div class="tree-view" id="targetTree">
+                        <div class="loading">请选择目标目录</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 记录视图 -->
+        <div class="tab-content" id="records-tab">
+            <div class="records-toolbar">
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="searchInput" placeholder="搜索文件名..." onkeyup="searchRecords()">
+                </div>
+                <div class="filter-group">
+                    <select id="statusFilter" onchange="loadRecords()">
+                        <option value="">全部状态</option>
+                        <option value="success">✅ 成功</option>
+                        <option value="failed">❌ 失败</option>
+                    </select>
+                    <select id="groupByFilter" onchange="loadRecords()">
+                        <option value="">📋 列表视图</option>
+                        <option value="source_dir">📁 按目录分组</option>
+                    </select>
+                </div>
+                <button class="refresh-btn" onclick="loadRecords()">🔄 刷新</button>
+            </div>
+            <div class="records-list" id="recordsList">
+                <div class="loading">加载中...</div>
+            </div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+
+        <!-- 配置视图 -->
+        <div class="tab-content" id="config-tab">
+            <div class="config-panel">
+                <h3>监控配置</h3>
+                <div id="configContent">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
