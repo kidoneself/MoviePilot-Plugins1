@@ -114,7 +114,11 @@ class FileMonitorHandler(FileSystemEventHandler):
                 target_file = target_path / relative_path
                 
                 logger.info(f"创建链接: {file_path} -> {target_file}")
-                success, method, error = self.linker.create_hardlink(file_path, target_file)
+                success, method, error = self.linker.create_hardlink(
+                    file_path, target_file, 
+                    source_base=self.source_path, 
+                    target_base=target_path
+                )
                 
                 if success:
                     success_count += 1

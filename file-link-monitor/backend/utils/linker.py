@@ -21,13 +21,15 @@ class FileLinker:
         """
         self.obfuscator = FolderObfuscator(enabled=obfuscate_enabled)
 
-    def create_hardlink(self, source: Path, target: Path) -> Tuple[bool, str, str]:
+    def create_hardlink(self, source: Path, target: Path, source_base: Path = None, target_base: Path = None) -> Tuple[bool, str, str]:
         """
         创建硬链接，失败则降级为复制（支持文件夹名混淆）
         
         Args:
             source: 源文件路径
             target: 目标文件路径
+            source_base: 源目录基础路径（用于计算相对路径）
+            target_base: 目标目录基础路径（用于混淆）
             
         Returns:
             (是否成功, 使用的方法, 错误信息)
@@ -35,7 +37,7 @@ class FileLinker:
         try:
             # 应用文件夹名混淆
             if self.obfuscator.enabled:
-                target = self._apply_folder_obfuscation(source, target)
+                target = self._apply_folder_obfuscation(source, target, source_base, target_base)
             
             # 确保目标目录存在
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -62,63 +64,69 @@ class FileLinker:
             logger.error(error_msg)
             return False, None, error_msg
     
-    def _apply_folder_obfuscation(self, source: Path, target: Path) -> Path:
+    def _apply_folder_obfuscation(self, source: Path, target: Path, source_base: Path = None, target_base: Path = None) -> Path:
         """
         应用文件夹名混淆和文件名改名
         
         Args:
             source: 源文件路径
             target: 目标文件路径
+            source_base: 源目录基础路径
+            target_base: 目标目录基础路径
             
         Returns:
             混淆后的目标路径
         """
-        # 分离目标基础路径和相对路径
-        parts = list(target.parts)
-        
-        # 找到目标基础路径
-        base_idx = 0
-        for i, part in enumerate(parts):
-            if part.startswith('/') or (i > 0 and parts[i-1] == '/'):
-                base_idx = i + 1
-        
-        # 分离基础路径和相对路径部分
-        if base_idx < len(parts):
+        # 如果提供了基础路径，使用它们计算相对路径
+        if source_base and target_base:
+            try:
+                # 计算源文件相对于源目录的相对路径
+                relative_path = source.relative_to(source_base)
+                relative_parts = list(relative_path.parts[:-1])  # 不含文件名
+                file_name = relative_path.parts[-1]
+            except ValueError:
+                # 回退到旧逻辑
+                parts = list(target.parts)
+                base_idx = len(target_base.parts)
+                relative_parts = parts[base_idx:-1]
+                file_name = parts[-1]
+        else:
+            # 旧逻辑：从target.parts猜测
+            parts = list(target.parts)
+            base_idx = 0
+            for i, part in enumerate(parts):
+                if part.startswith('/') or (i > 0 and parts[i-1] == '/'):
+                    base_idx = i + 1
             base_parts = parts[:base_idx] if base_idx > 0 else []
-            relative_parts = parts[base_idx:-1]  # 不含文件名
+            relative_parts = parts[base_idx:-1]
             file_name = parts[-1]
+            target_base = Path(*base_parts) if base_parts else Path('/')
             
-            # 改名视频文件
-            new_file_name = self.obfuscator.rename_video_file(file_name)
-            logger.info(f"文件名改名: {file_name} -> {new_file_name}")
-            
-            if relative_parts:
-                # 构建目标基础路径
-                target_base = Path(*base_parts) if base_parts else Path('/')
-                
-                # 先检查是否存在旧混淆路径
-                legacy_dir, is_legacy = self.obfuscator.check_legacy_path(
-                    source, target_base, relative_parts
-                )
-                
-                if is_legacy:
-                    # 使用已存在的旧混淆路径
-                    result = legacy_dir / new_file_name
-                    logger.info(f"使用旧混淆路径: {'/'.join(legacy_dir.parts[len(target_base.parts):])}")
-                    return result
-                
-                # 没有旧路径，使用混淆逻辑处理
-                obfuscated_parts = self.obfuscator.obfuscate_folder_path(relative_parts)
-                obfuscated_dir = target_base / Path(*obfuscated_parts)
-                result = obfuscated_dir / new_file_name
-                logger.info(f"路径混淆: {'/'.join(relative_parts)} -> {'/'.join(obfuscated_parts)}")
-                return result
-            else:
-                # 没有相对路径，只改文件名
-                target_base = Path(*base_parts) if base_parts else Path('/')
-                return target_base / new_file_name
+        # 改名视频文件
+        new_file_name = self.obfuscator.rename_video_file(file_name)
+        logger.info(f"文件名改名: {file_name} -> {new_file_name}")
         
-        return target
+        if relative_parts:
+            # 先检查是否存在旧混淆路径
+            legacy_dir, is_legacy = self.obfuscator.check_legacy_path(
+                source, target_base, relative_parts
+            )
+            
+            if is_legacy:
+                # 使用已存在的旧混淆路径
+                result = legacy_dir / new_file_name
+                logger.info(f"使用旧混淆路径: {'/'.join(legacy_dir.parts[len(target_base.parts):])}")
+                return result
+            
+            # 没有旧路径，使用混淆逻辑处理
+            obfuscated_parts = self.obfuscator.obfuscate_folder_path(relative_parts)
+            obfuscated_dir = target_base / Path(*obfuscated_parts)
+            result = obfuscated_dir / new_file_name
+            logger.info(f"路径混淆: {'/'.join(relative_parts)} -> {'/'.join(obfuscated_parts)}")
+            return result
+        else:
+            # 没有相对路径，只改文件名
+            return target_base / new_file_name
     
     @staticmethod
     def get_relative_path(file_path: Path, base_path: Path) -> Path:
