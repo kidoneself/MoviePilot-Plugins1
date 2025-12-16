@@ -30,6 +30,8 @@ async def get_records(
 ):
     """获取硬链接记录"""
     try:
+        from pathlib import Path
+        
         query = db.query(LinkRecord)
         
         # 状态筛选
@@ -39,15 +41,19 @@ async def get_records(
         # 总数
         total = query.count()
         
-        # 分页
-        records = query.order_by(desc(LinkRecord.created_at))\
-                      .offset((page - 1) * page_size)\
-                      .limit(page_size)\
-                      .all()
+        # 如果是分组模式，先获取所有记录再分组，最后对分组结果分页
+        if group_by:
+            # 获取所有记录（不分页）
+            records = query.order_by(desc(LinkRecord.created_at)).all()
+        else:
+            # 不分组时，直接分页
+            records = query.order_by(desc(LinkRecord.created_at))\
+                          .offset((page - 1) * page_size)\
+                          .limit(page_size)\
+                          .all()
         
         # 按源目录分组
         if group_by == "source_dir":
-            from pathlib import Path
             from collections import defaultdict
             
             groups = defaultdict(list)
@@ -77,13 +83,19 @@ async def get_records(
                     "records": items
                 })
             
+            # 对分组结果分页
+            total_groups = len(grouped_data)
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            paginated_groups = grouped_data[start_idx:end_idx]
+            
             return {
                 "success": True,
-                "total": total,
+                "total": total_groups,
                 "page": page,
                 "page_size": page_size,
                 "grouped": True,
-                "data": grouped_data
+                "data": paginated_groups
             }
         elif group_by == "source_file":
             from collections import defaultdict
@@ -117,11 +129,17 @@ async def get_records(
                     "records": items
                 })
             
+            # 对分组结果分页
+            total_groups = len(grouped_data)
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            paginated_groups = grouped_data[start_idx:end_idx]
+            
             return {
                 "success": True,
                 "grouped": True,
-                "data": grouped_data,
-                "total": total,
+                "data": paginated_groups,
+                "total": total_groups,
                 "page": page,
                 "page_size": page_size
             }
@@ -183,12 +201,18 @@ async def get_records(
                     "shows": target_records
                 })
             
+            # 对网盘级别分页（一页显示几个网盘）
+            total_groups = len(grouped_data)
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            paginated_groups = grouped_data[start_idx:end_idx]
+            
             return {
                 "success": True,
                 "grouped": True,
                 "group_type": "target_show",
-                "data": grouped_data,
-                "total": total,
+                "data": paginated_groups,
+                "total": total_groups,
                 "page": page,
                 "page_size": page_size
             }
