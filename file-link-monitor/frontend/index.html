@@ -95,7 +95,8 @@
             <div class="records-toolbar">
                 <div class="search-box">
                     <span class="search-icon">🔍</span>
-                    <input type="text" id="searchInput" placeholder="搜索文件名..." onkeyup="searchRecords()">
+                    <input type="text" id="searchInput" placeholder="搜索剧名或文件名..." onkeypress="if(event.key==='Enter')loadRecords()">
+                    <button class="search-btn" onclick="loadRecords()" style="padding: 8px 16px; margin-left: 8px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 6px; cursor: pointer;">🔍 搜索</button>
                 </div>
                 <div class="filter-group">
                     <select id="statusFilter" onchange="loadRecords()">

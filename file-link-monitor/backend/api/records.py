@@ -26,6 +26,7 @@ async def get_records(
     page_size: int = 50,
     status: Optional[str] = None,
     group_by: Optional[str] = None,
+    search: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """获取硬链接记录"""
@@ -33,6 +34,10 @@ async def get_records(
         from pathlib import Path
         
         query = db.query(LinkRecord)
+        
+        # 搜索源文件路径
+        if search:
+            query = query.filter(LinkRecord.source_file.like(f'%{search}%'))
         
         # 状态筛选
         if status:

@@ -249,6 +249,7 @@ async function loadRecords(page = 1) {
     currentPage = page;
     const status = document.getElementById('statusFilter').value;
     const groupBy = document.getElementById('groupByFilter').value;
+    const search = document.getElementById('searchInput').value.trim();
     const container = document.getElementById('recordsList');
     
     container.innerHTML = '<div class="loading">加载中...</div>';
@@ -260,6 +261,9 @@ async function loadRecords(page = 1) {
         }
         if (groupBy) {
             url += `&group_by=${groupBy}`;
+        }
+        if (search) {
+            url += `&search=${encodeURIComponent(search)}`;
         }
         
         const response = await fetch(url);
@@ -494,19 +498,10 @@ function formatSize(bytes) {
     return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
 
-// 搜索记录
+// 搜索记录（已废弃，改用后端搜索）
 function searchRecords() {
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    const items = document.querySelectorAll('.record-item, .group-record-item');
-    
-    items.forEach(item => {
-        const text = item.textContent.toLowerCase();
-        if (text.includes(searchTerm)) {
-            item.style.display = '';
-        } else {
-            item.style.display = 'none';
-        }
-    });
+    // 直接调用loadRecords进行后端搜索
+    loadRecords(1);
 }
 
 // 全量同步
