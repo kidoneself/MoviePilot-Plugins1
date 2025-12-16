@@ -85,6 +85,46 @@ async def get_records(
                 "grouped": True,
                 "data": grouped_data
             }
+        elif group_by == "source_file":
+            from collections import defaultdict
+            
+            groups = defaultdict(list)
+            
+            for record in records:
+                # 按源文件完整路径分组
+                source_file = record.source_file
+                
+                groups[source_file].append({
+                    "id": record.id,
+                    "source_file": record.source_file,
+                    "target_file": record.target_file,
+                    "file_size": record.file_size,
+                    "link_method": record.link_method,
+                    "status": record.status,
+                    "error_msg": record.error_msg,
+                    "created_at": record.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                })
+            
+            # 转换为列表格式
+            grouped_data = []
+            for source_file, items in groups.items():
+                # 获取文件名作为显示名称
+                file_name = Path(source_file).name
+                grouped_data.append({
+                    "dir_name": file_name,  # 使用文件名作为组名
+                    "source_file": source_file,  # 完整路径
+                    "count": len(items),
+                    "records": items
+                })
+            
+            return {
+                "success": True,
+                "grouped": True,
+                "data": grouped_data,
+                "total": total,
+                "page": page,
+                "page_size": page_size
+            }
         
         # 不分组，返回原格式
         data = []
