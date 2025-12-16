@@ -276,6 +276,14 @@ async function loadRecords(page = 1) {
                 renderRecords(result.data);
             }
             renderPagination(result.total, result.page, result.page_size);
+            
+            // 如果有搜索词，显示批量删除按钮
+            const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+            if (search) {
+                batchDeleteBtn.style.display = 'inline-block';
+            } else {
+                batchDeleteBtn.style.display = 'none';
+            }
         } else {
             container.innerHTML = `<div class="loading">加载失败: ${result.message}</div>`;
         }
@@ -497,6 +505,38 @@ function formatSize(bytes) {
 function searchRecords() {
     // 直接调用loadRecords进行后端搜索
     loadRecords(1);
+}
+
+// 批量删除记录
+async function batchDeleteRecords() {
+    const search = document.getElementById('searchInput').value.trim();
+    
+    if (!search) {
+        alert('请先输入搜索条件');
+        return;
+    }
+    
+    if (!confirm(`确定要删除所有包含"${search}"的记录吗？\n删除后可以通过全量同步重新创建。`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/records/batch?search=${encodeURIComponent(search)}`, {
+            method: 'DELETE'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`✅ ${result.message}\n\n提示：可以点击"全量同步"重新同步这些文件`);
+            loadRecords();
+            loadStats();
+        } else {
+            alert(`❌ 删除失败: ${result.message}`);
+        }
+    } catch (error) {
+        console.error('批量删除失败:', error);
+        alert('❌ 删除失败，请查看控制台');
+    }
 }
 
 // 全量同步
