@@ -77,6 +77,12 @@ class FileMonitorHandler(FileSystemEventHandler):
             logger.warning(f"文件不存在: {file_path}")
             return
         
+        # 只处理视频文件
+        from backend.utils.obfuscator import FolderObfuscator
+        if not FolderObfuscator.is_video_file(file_path):
+            logger.debug(f"非视频文件，跳过: {file_path}")
+            return
+        
         # 检查是否应该排除
         if self.linker.should_exclude(file_path, self.exclude_patterns):
             logger.info(f"文件被排除: {file_path}")

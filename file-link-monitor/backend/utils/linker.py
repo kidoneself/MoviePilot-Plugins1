@@ -64,7 +64,7 @@ class FileLinker:
     
     def _apply_folder_obfuscation(self, source: Path, target: Path) -> Path:
         """
-        应用文件夹名混淆（完全照抄旧插件逻辑）
+        应用文件夹名混淆和文件名改名
         
         Args:
             source: 源文件路径
@@ -88,6 +88,10 @@ class FileLinker:
             relative_parts = parts[base_idx:-1]  # 不含文件名
             file_name = parts[-1]
             
+            # 改名视频文件
+            new_file_name = self.obfuscator.rename_video_file(file_name)
+            logger.info(f"文件名改名: {file_name} -> {new_file_name}")
+            
             if relative_parts:
                 # 构建目标基础路径
                 target_base = Path(*base_parts) if base_parts else Path('/')
@@ -99,16 +103,20 @@ class FileLinker:
                 
                 if is_legacy:
                     # 使用已存在的旧混淆路径
-                    result = legacy_dir / file_name
+                    result = legacy_dir / new_file_name
                     logger.info(f"使用旧混淆路径: {'/'.join(legacy_dir.parts[len(target_base.parts):])}")
                     return result
                 
                 # 没有旧路径，使用混淆逻辑处理
                 obfuscated_parts = self.obfuscator.obfuscate_folder_path(relative_parts)
                 obfuscated_dir = target_base / Path(*obfuscated_parts)
-                result = obfuscated_dir / file_name
+                result = obfuscated_dir / new_file_name
                 logger.info(f"路径混淆: {'/'.join(relative_parts)} -> {'/'.join(obfuscated_parts)}")
                 return result
+            else:
+                # 没有相对路径，只改文件名
+                target_base = Path(*base_parts) if base_parts else Path('/')
+                return target_base / new_file_name
         
         return target
     

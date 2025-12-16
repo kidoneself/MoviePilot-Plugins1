@@ -11,6 +11,12 @@ from pathlib import Path
 class FolderObfuscator:
     """文件夹名混淆器 - 汉字拆字方案"""
     
+    # 视频文件扩展名
+    VIDEO_EXTENSIONS = {
+        '.mkv', '.mp4', '.avi', '.rmvb', '.wmv', '.m2ts', '.iso',
+        '.ts', '.mp4', '.flv', '.mpeg', '.mpg', '.mov'
+    }
+    
     # 常用汉字拆字映射表（固定规则）
     CHAR_SPLIT_MAP = {
         # 常见影视剧用字
@@ -65,6 +71,47 @@ class FolderObfuscator:
         self.enabled = enabled
         # 加载拼音映射表（用于旧混淆算法）
         self.pinyin_map = self._load_pinyin_map()
+    
+    @staticmethod
+    def is_video_file(file_path) -> bool:
+        """判断是否为视频文件"""
+        from pathlib import Path
+        return Path(file_path).suffix.lower() in FolderObfuscator.VIDEO_EXTENSIONS
+    
+    @staticmethod
+    def rename_video_file(file_name: str) -> str:
+        """
+        重命名视频文件为简化格式
+        
+        Args:
+            file_name: 原始文件名
+            
+        Returns:
+            新文件名（S01E01-1080p.mkv 或 1080p.mkv）
+        """
+        from pathlib import Path
+        file_stem = Path(file_name).stem
+        file_suffix = Path(file_name).suffix
+        
+        # 提取季集号（S01E01格式）
+        season_episode = re.search(r'[Ss](\d+)[Ee](\d+)', file_stem)
+        
+        # 提取视频格式信息（1080p, 4K, 2160p等）
+        video_format = re.search(r'(\d{3,4}[pP]|[248][kK]|[hH][dD]|[uU][hH][dD])', file_stem)
+        
+        if season_episode:
+            # 电视剧：S01E01-1080p.mkv
+            new_stem = f"S{season_episode.group(1)}E{season_episode.group(2)}"
+            if video_format:
+                new_stem += f"-{video_format.group(1)}"
+        elif video_format:
+            # 电影：1080p.mkv
+            new_stem = video_format.group(1)
+        else:
+            # 没有识别到格式，使用movie作为前缀
+            new_stem = "movie"
+        
+        return f"{new_stem}{file_suffix}"
     
     def obfuscate_name(self, name: str, max_length: int = 20) -> str:
         """
@@ -314,7 +361,7 @@ class FolderObfuscator:
     
     def obfuscate_folder_path(self, relative_parts: list) -> list:
         """
-        混淆文件夹路径（完全照抄旧插件逻辑）
+        混淆文件夹路径（保留第一层分类目录和Season目录）
         
         Args:
             relative_parts: 相对路径的各部分（不含文件名）
@@ -328,17 +375,17 @@ class FolderObfuscator:
         new_parts = []
         
         for i, dir_name in enumerate(relative_parts):
+            # 保留第一层分类目录不变（剧集、电影、动漫等）
+            if i == 0:
+                new_parts.append(dir_name)
+                continue
+            
             # 保留Season目录不变
             if re.match(r'^Season\s+\d+$', dir_name, re.IGNORECASE):
                 new_parts.append(dir_name)
                 continue
             
-            # 保留第一层分类目录不变（剧集、电影等）
-            if i == 0:
-                new_parts.append(dir_name)
-                continue
-            
-            # 其他目录：混淆
+            # 其他目录：混淆（第二层及以后）
             obfuscated = self.obfuscate_name(dir_name)
             new_parts.append(obfuscated)
         
