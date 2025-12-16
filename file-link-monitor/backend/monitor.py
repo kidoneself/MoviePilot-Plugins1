@@ -303,6 +303,11 @@ class MonitorService:
                 # 递归扫描所有文件
                 for file_path in source.rglob('*'):
                     if file_path.is_file():
+                        # 只处理视频文件
+                        from backend.utils.obfuscator import FolderObfuscator
+                        if not FolderObfuscator.is_video_file(file_path):
+                            continue
+                        
                         # 检查是否排除
                         if linker.should_exclude(file_path, exclude):
                             continue
@@ -328,7 +333,11 @@ class MonitorService:
                                 continue
                             
                             logger.info(f"同步: {file_path} -> {target_file}")
-                            success, method, error = linker.create_hardlink(file_path, target_file)
+                            success, method, error = linker.create_hardlink(
+                                file_path, target_file,
+                                source_base=source,
+                                target_base=target
+                            )
                             
                             if success:
                                 success_count += 1
