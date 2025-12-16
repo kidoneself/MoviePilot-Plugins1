@@ -429,14 +429,17 @@ function renderGroupedRecords(groups, groupType) {
                 const statusClass = record.status === 'success' ? 'success' : 'failed';
                 const statusText = record.status === 'success' ? '✅' : '❌';
                 const fileName = record.source_file.split('/').pop();
+                const targetPath = record.target_file.split('/').slice(-3, -1).join('/');
                 
                 html += `
                     <div class="group-record-item ${statusClass}" style="padding: 8px 15px; border-bottom: 1px solid #f0f0f0;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
                             <span style="font-size: 14px;">${statusText}</span>
-                            <span style="color: #999; font-size: 12px;">→</span>
-                            <span style="font-size: 13px;">${record.target_file.split('/').slice(-3, -1).join('/')}</span>
-                            <span style="margin-left: auto; font-size: 12px; color: #999;">${formatSize(record.file_size)}</span>
+                            <strong style="font-size: 14px; flex: 1;">${fileName}</strong>
+                            <span style="font-size: 12px; color: #999;">${formatSize(record.file_size)}</span>
+                        </div>
+                        <div style="padding-left: 24px; font-size: 12px; color: #999;">
+                            → ${targetPath}
                         </div>
                     </div>
                 `;

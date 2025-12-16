@@ -61,15 +61,26 @@ async def get_records(
         # 按源目录分组
         if group_by == "source_dir":
             from collections import defaultdict
+            import re
             
             groups = defaultdict(list)
             
             for record in records:
-                # 获取源文件的父目录名称
+                # 获取源文件路径，尝试找到剧名目录（包含年份的目录）
                 source_path = Path(record.source_file)
-                parent_name = source_path.parent.name if source_path.parent.name else "根目录"
+                show_name = None
                 
-                groups[parent_name].append({
+                # 从路径中找包含年份的目录作为剧名
+                for part in source_path.parts:
+                    if re.search(r'\(\d{4}\)', part):
+                        show_name = part
+                        break
+                
+                # 如果没找到年份目录，用父目录名
+                if not show_name:
+                    show_name = source_path.parent.name if source_path.parent.name else "根目录"
+                
+                groups[show_name].append({
                     "id": record.id,
                     "source_file": record.source_file,
                     "target_file": record.target_file,
