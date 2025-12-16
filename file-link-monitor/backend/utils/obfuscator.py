@@ -158,20 +158,104 @@ class FolderObfuscator:
     def _load_pinyin_map(self) -> dict:
         """加载简化的拼音映射表（内置常用字）"""
         return {
-            '国': 'guo', '产': 'chan', '剧': 'ju', '集': 'ji',
-            '大': 'da', '生': 'sheng', '意': 'yi', '人': 'ren',
-            '双': 'shuang', '轨': 'gui', '新': 'xin', '闻': 'wen',
-            '女': 'nv', '王': 'wang', '狙': 'ju', '击': 'ji',
-            '蝴': 'hu', '蝶': 'die', '老': 'lao', '男': 'nan',
-            '超': 'chao', '感': 'gan', '迷': 'mi', '宫': 'gong',
-            '长': 'chang', '安': 'an', '二': 'er', '十': 'shi',
-            '四': 'si', '计': 'ji', '风': 'feng', '与': 'yu',
-            '潮': 'chao', '电': 'dian', '影': 'ying', '视': 'shi',
-            '港': 'gang', '台': 'tai', '日': 'ri', '韩': 'han',
-            '美': 'mei', '英': 'ying', '法': 'fa', '德': 'de',
-            '欧': 'ou', '亚': 'ya', '洲': 'zhou', '部': 'bu',
-            '分': 'fen', '类': 'lei', '别': 'bie', '他': 'ta',
-            '其': 'qi', '种': 'zhong', '类': 'lei', '型': 'xing',
+            # 常见分类
+            '国': 'guo', '产': 'chan', '剧': 'ju', '集': 'ji', '电': 'dian', '影': 'ying',
+            '视': 'shi', '频': 'pin', '综': 'zong', '艺': 'yi', '动': 'dong', '画': 'hua',
+            '纪': 'ji', '录': 'lu', '片': 'pian', '短': 'duan', '体': 'ti', '育': 'yu',
+            
+            # 地区
+            '港': 'gang', '台': 'tai', '日': 'ri', '韩': 'han', '美': 'mei', '英': 'ying',
+            '法': 'fa', '德': 'de', '欧': 'ou', '亚': 'ya', '洲': 'zhou', '内': 'nei',
+            '陆': 'lu', '地': 'di', '区': 'qu', '本': 'ben', '土': 'tu',
+            
+            # 数字
+            '一': 'yi', '二': 'er', '三': 'san', '四': 'si', '五': 'wu',
+            '六': 'liu', '七': 'qi', '八': 'ba', '九': 'jiu', '十': 'shi',
+            '百': 'bai', '千': 'qian', '万': 'wan',
+            
+            # 常用字
+            '大': 'da', '小': 'xiao', '中': 'zhong', '新': 'xin', '老': 'lao',
+            '好': 'hao', '坏': 'huai', '长': 'chang', '短': 'duan', '高': 'gao',
+            '低': 'di', '上': 'shang', '下': 'xia', '前': 'qian', '后': 'hou',
+            '左': 'zuo', '右': 'you', '东': 'dong', '南': 'nan', '西': 'xi',
+            '北': 'bei', '里': 'li', '外': 'wai', '内': 'nei',
+            
+            # 常见剧名用字
+            '生': 'sheng', '死': 'si', '活': 'huo', '命': 'ming', '人': 'ren',
+            '女': 'nv', '男': 'nan', '子': 'zi', '儿': 'er', '童': 'tong',
+            '王': 'wang', '后': 'hou', '妃': 'fei', '君': 'jun', '臣': 'chen',
+            '将': 'jiang', '军': 'jun', '兵': 'bing', '士': 'shi', '侠': 'xia',
+            '客': 'ke', '贼': 'zei', '盗': 'dao', '匪': 'fei',
+            
+            # 情感动作
+            '爱': 'ai', '恨': 'hen', '情': 'qing', '欲': 'yu', '望': 'wang',
+            '思': 'si', '念': 'nian', '想': 'xiang', '梦': 'meng', '幻': 'huan',
+            '喜': 'xi', '怒': 'nu', '哀': 'ai', '乐': 'le', '悲': 'bei',
+            '欢': 'huan', '笑': 'xiao', '哭': 'ku', '泪': 'lei',
+            
+            # 自然景物
+            '天': 'tian', '地': 'di', '山': 'shan', '水': 'shui', '火': 'huo',
+            '风': 'feng', '雨': 'yu', '雷': 'lei', '云': 'yun', '雪': 'xue',
+            '日': 'ri', '月': 'yue', '星': 'xing', '辰': 'chen', '光': 'guang',
+            '明': 'ming', '暗': 'an', '夜': 'ye', '晨': 'chen', '昏': 'hun',
+            '海': 'hai', '江': 'jiang', '河': 'he', '湖': 'hu', '溪': 'xi',
+            '树': 'shu', '林': 'lin', '森': 'sen', '花': 'hua', '草': 'cao',
+            
+            # 颜色
+            '红': 'hong', '黄': 'huang', '蓝': 'lan', '绿': 'lv', '青': 'qing',
+            '紫': 'zi', '白': 'bai', '黑': 'hei', '灰': 'hui', '金': 'jin',
+            '银': 'yin', '彩': 'cai', '色': 'se',
+            
+            # 动物
+            '龙': 'long', '凤': 'feng', '虎': 'hu', '狼': 'lang', '豹': 'bao',
+            '狮': 'shi', '鹰': 'ying', '熊': 'xiong', '鸟': 'niao', '马': 'ma',
+            '牛': 'niu', '羊': 'yang', '犬': 'quan', '猫': 'mao', '鼠': 'shu',
+            '猪': 'zhu', '鸡': 'ji', '鸭': 'ya', '鱼': 'yu', '虫': 'chong',
+            '蛇': 'she', '龟': 'gui', '鹿': 'lu', '象': 'xiang',
+            
+            # 武器战争
+            '剑': 'jian', '刀': 'dao', '枪': 'qiang', '炮': 'pao', '弓': 'gong',
+            '箭': 'jian', '盾': 'dun', '甲': 'jia', '战': 'zhan', '争': 'zheng',
+            '打': 'da', '杀': 'sha', '斗': 'dou', '伤': 'shang',
+            
+            # 方位时间
+            '春': 'chun', '夏': 'xia', '秋': 'qiu', '冬': 'dong', '年': 'nian',
+            '月': 'yue', '日': 'ri', '时': 'shi', '分': 'fen', '秒': 'miao',
+            '今': 'jin', '昨': 'zuo', '明': 'ming', '早': 'zao', '晚': 'wan',
+            '午': 'wu', '夕': 'xi', '朝': 'zhao', '暮': 'mu',
+            
+            # 特殊字
+            '的': 'de', '了': 'le', '在': 'zai', '是': 'shi', '我': 'wo',
+            '你': 'ni', '他': 'ta', '她': 'ta', '它': 'ta', '们': 'men',
+            '这': 'zhe', '那': 'na', '什': 'shen', '么': 'me', '吗': 'ma',
+            '呢': 'ne', '啊': 'a', '哦': 'o', '嗯': 'en', '吧': 'ba',
+            
+            # 其他常用
+            '家': 'jia', '国': 'guo', '城': 'cheng', '市': 'shi', '村': 'cun',
+            '镇': 'zhen', '县': 'xian', '省': 'sheng', '州': 'zhou', '都': 'du',
+            '京': 'jing', '沪': 'hu', '港': 'gang', '澳': 'ao', '台': 'tai',
+            '学': 'xue', '校': 'xiao', '院': 'yuan', '堂': 'tang', '馆': 'guan',
+            '店': 'dian', '厂': 'chang', '场': 'chang', '园': 'yuan', '宫': 'gong',
+            '府': 'fu', '室': 'shi', '厅': 'ting', '楼': 'lou', '塔': 'ta',
+            '门': 'men', '窗': 'chuang', '墙': 'qiang', '路': 'lu', '街': 'jie',
+            '道': 'dao', '桥': 'qiao', '河': 'he', '江': 'jiang',
+            '书': 'shu', '文': 'wen', '字': 'zi', '言': 'yan', '语': 'yu',
+            '话': 'hua', '说': 'shuo', '讲': 'jiang', '读': 'du', '写': 'xie',
+            '手': 'shou', '足': 'zu', '头': 'tou', '目': 'mu', '耳': 'er',
+            '口': 'kou', '鼻': 'bi', '身': 'shen', '心': 'xin', '脑': 'nao',
+            '血': 'xue', '肉': 'rou', '骨': 'gu', '皮': 'pi', '毛': 'mao',
+            
+            # 热门剧名
+            '双': 'shuang', '轨': 'gui', '意': 'yi', '狙': 'ju', '击': 'ji',
+            '蝴': 'hu', '蝶': 'die', '超': 'chao', '感': 'gan', '迷': 'mi',
+            '闻': 'wen', '计': 'ji', '潮': 'chao', '与': 'yu', '安': 'an',
+            '猎': 'lie', '冰': 'bing', '罪': 'zui', '庆': 'qing', '余': 'yu',
+            '琅': 'lang', '琊': 'ya', '榜': 'bang', '延': 'yan', '禧': 'xi',
+            '攻': 'gong', '略': 'lve', '传': 'chuan', '奇': 'qi', '志': 'zhi',
+            '怪': 'guai', '谈': 'tan', '诡': 'gui', '秘': 'mi', '密': 'mi',
+            '案': 'an', '破': 'po', '局': 'ju', '重': 'chong', '启': 'qi',
+            '复': 'fu', '仇': 'chou', '者': 'zhe', '联': 'lian', '盟': 'meng',
+            '终': 'zhong', '极': 'ji', '无': 'wu', '限': 'xian', '使': 'shi',
         }
     
     def obfuscate_name_legacy(self, name: str) -> str:
