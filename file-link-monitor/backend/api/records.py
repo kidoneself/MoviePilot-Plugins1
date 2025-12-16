@@ -395,32 +395,6 @@ async def retry_link(record_id: int, db: Session = Depends(get_db)):
         return {"success": False, "message": str(e)}
 
 
-@router.delete("/records/batch")
-async def batch_delete_records(search: str, db: Session = Depends(get_db)):
-    """批量删除记录（根据搜索条件）"""
-    try:
-        if not search:
-            return {"success": False, "message": "搜索条件不能为空"}
-        
-        # 查找所有匹配的记录
-        query = db.query(LinkRecord).filter(LinkRecord.source_file.like(f'%{search}%'))
-        count = query.count()
-        
-        if count == 0:
-            return {"success": False, "message": "未找到匹配的记录"}
-        
-        # 删除所有匹配的记录
-        query.delete(synchronize_session=False)
-        db.commit()
-        
-        logger.info(f"批量删除了 {count} 条记录（搜索词: {search}）")
-        return {"success": True, "message": f"已删除 {count} 条记录", "count": count}
-    except Exception as e:
-        logger.error(f"批量删除记录失败: {e}")
-        db.rollback()
-        return {"success": False, "message": str(e)}
-
-
 @router.post("/records/{record_id}/resync")
 async def resync_link(record_id: int, db: Session = Depends(get_db)):
     """重新同步（删除记录并重新创建硬链接）"""
