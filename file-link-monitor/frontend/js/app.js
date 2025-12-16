@@ -265,6 +265,9 @@ async function loadRecords(page = 1) {
         if (search) {
             url += `&search=${encodeURIComponent(search)}`;
         }
+        if (search) {
+            url += `&search=${encodeURIComponent(search)}`;
+        }
         
         const response = await fetch(url);
         const result = await response.json();
