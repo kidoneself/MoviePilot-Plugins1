@@ -27,7 +27,7 @@ class FileMonitorHandler(FileSystemEventHandler):
         self.exclude_patterns = exclude_patterns or []
         self.db_engine = db_engine
         self.obfuscate_enabled = obfuscate_enabled
-        self.linker = FileLinker(obfuscate_enabled=obfuscate_enabled)
+        self.linker = FileLinker(obfuscate_enabled=obfuscate_enabled, db_engine=db_engine)
         self.notifier = Notifier(config)
         self.template_files_path = Path(template_files_path) if template_files_path else None
         self.linked_dirs = set()  # 记录已经链接过模板文件的目录
@@ -328,7 +328,7 @@ class MonitorService:
             
             logger.info(f"🔄 开始全量同步: {source}, 混淆: {obfuscate}")
             
-            linker = FileLinker(obfuscate_enabled=obfuscate)
+            linker = FileLinker(obfuscate_enabled=obfuscate, db_engine=self.db_engine)
             session = get_session(self.db_engine)
             linked_dirs = set()  # 记录已链接模板文件的目录
             

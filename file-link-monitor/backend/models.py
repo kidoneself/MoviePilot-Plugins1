@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, create_engine
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, BigInteger, Index, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -31,6 +31,23 @@ class LinkRecord(Base):
     status = Column(String(20))  # success/failed
     error_msg = Column(Text)
     created_at = Column(DateTime, default=datetime.now)
+
+
+class CustomNameMapping(Base):
+    """自定义名称映射表"""
+    __tablename__ = "custom_name_mapping"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    original_name = Column(String(500), nullable=False, unique=True)  # 原名（唯一）
+    custom_name = Column(String(500), nullable=False)  # 自定义名称
+    enabled = Column(Boolean, default=True)  # 是否启用
+    note = Column(String(500))  # 备注说明
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    __table_args__ = (
+        Index('idx_original_name', 'original_name'),
+    )
 
 
 def init_database(db_path: str):

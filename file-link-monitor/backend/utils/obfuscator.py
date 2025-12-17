@@ -67,14 +67,16 @@ class FolderObfuscator:
         '港': '氵巷', '台': '台',
     }
     
-    def __init__(self, enabled: bool = False):
+    def __init__(self, enabled: bool = False, db_engine=None):
         """
         初始化混淆器
         
         Args:
             enabled: 是否启用混淆
+            db_engine: 数据库引擎（用于查询自定义映射）
         """
         self.enabled = enabled
+        self.db_engine = db_engine
         # 初始化同音字混淆器
         self.homophone_obfuscator = HomophoneObfuscator()
         # 加载拼音映射表（用于旧混淆算法备用）
@@ -145,9 +147,44 @@ class FolderObfuscator:
         
         return f"{new_stem}{file_suffix}"
     
+    def _get_custom_mapping(self, name: str) -> str:
+        """
+        从数据库查询自定义名称映射
+        
+        Args:
+            name: 原始名称
+            
+        Returns:
+            自定义名称（如果存在），否则返回None
+        """
+        if not self.db_engine:
+            return None
+        
+        try:
+            from backend.models import CustomNameMapping, get_session
+            session = get_session(self.db_engine)
+            
+            try:
+                # 查询启用的自定义映射
+                mapping = session.query(CustomNameMapping).filter(
+                    CustomNameMapping.original_name == name,
+                    CustomNameMapping.enabled == True
+                ).first()
+                
+                if mapping:
+                    return mapping.custom_name
+                return None
+            finally:
+                session.close()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"查询自定义映射失败: {e}")
+            return None
+    
     def obfuscate_name(self, name: str) -> str:
         """
-        混淆文件夹名 - 使用同音字替换
+        混淆文件夹名 - 优先使用自定义映射，否则使用同音字替换
         
         Args:
             name: 原始文件夹名
@@ -162,7 +199,15 @@ class FolderObfuscator:
         if name in self.category_folders:
             return name
         
-        # 所有剧名都混淆（去年份+同音字替换）
+        # 1. 优先检查自定义映射
+        custom_name = self._get_custom_mapping(name)
+        if custom_name:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"✓ 使用自定义映射: {name} -> {custom_name}")
+            return custom_name
+        
+        # 2. 使用同音字混淆（去年份+同音字替换）
         return self.homophone_obfuscator.obfuscate_with_year(name)
     
     def _obfuscate_single_char(self, char: str, position: int) -> str:

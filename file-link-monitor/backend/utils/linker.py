@@ -12,14 +12,15 @@ logger = logging.getLogger(__name__)
 class FileLinker:
     """文件硬链接工具类"""
     
-    def __init__(self, obfuscate_enabled: bool = False):
+    def __init__(self, obfuscate_enabled: bool = False, db_engine=None):
         """
         初始化硬链接工具
         
         Args:
             obfuscate_enabled: 是否启用文件夹名混淆
+            db_engine: 数据库引擎（用于查询自定义映射）
         """
-        self.obfuscator = FolderObfuscator(enabled=obfuscate_enabled)
+        self.obfuscator = FolderObfuscator(enabled=obfuscate_enabled, db_engine=db_engine)
 
     def create_hardlink(self, source: Path, target: Path, source_base: Path = None, target_base: Path = None) -> tuple:
         """
