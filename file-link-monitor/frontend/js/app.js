@@ -32,6 +32,10 @@ function initTabs() {
             if (tabName === 'records') {
                 loadRecords();
             }
+            // 切换到映射管理页时加载数据
+            if (tabName === 'mappings') {
+                loadMappings();
+            }
         });
     });
 }
@@ -661,4 +665,163 @@ async function resyncGroup(recordIds) {
     // 刷新记录和统计
     loadRecords(currentPage);
     loadStats();
+}
+
+// ==================== 映射管理功能 ====================
+
+// 加载映射列表
+async function loadMappings() {
+    try {
+        const response = await fetch(`${API_BASE}/mappings`);
+        const result = await response.json();
+        
+        if (result.success) {
+            renderMappings(result.data);
+        } else {
+            document.getElementById('mappingsList').innerHTML = `<div class="error">加载失败: ${result.message}</div>`;
+        }
+    } catch (error) {
+        console.error('加载映射失败:', error);
+        document.getElementById('mappingsList').innerHTML = '<div class="error">加载失败</div>';
+    }
+}
+
+// 渲染映射列表
+function renderMappings(mappings) {
+    const container = document.getElementById('mappingsList');
+    
+    if (mappings.length === 0) {
+        container.innerHTML = '<div class="empty">暂无映射规则，点击"添加映射"创建第一条</div>';
+        return;
+    }
+    
+    let html = '<table class="data-table"><thead><tr><th>原名称</th><th>自定义名称</th><th>状态</th><th>备注</th><th>操作</th></tr></thead><tbody>';
+    
+    mappings.forEach(m => {
+        const statusBadge = m.enabled ? '<span class="badge success">✓ 启用</span>' : '<span class="badge">× 禁用</span>';
+        html += `
+            <tr>
+                <td>${escapeHtml(m.original_name)}</td>
+                <td><strong>${escapeHtml(m.custom_name)}</strong></td>
+                <td>${statusBadge}</td>
+                <td>${escapeHtml(m.note || '-')}</td>
+                <td>
+                    <button class="btn-small" onclick="editMapping(${m.id})">编辑</button>
+                    <button class="btn-small btn-danger" onclick="deleteMapping(${m.id}, '${escapeHtml(m.original_name)}')">删除</button>
+                    <button class="btn-small" onclick="clearShowRecords('${escapeHtml(m.original_name)}')">清除记录</button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+// 显示添加映射对话框
+function showAddMappingDialog() {
+    const originalName = prompt('请输入原名称（例如：老舅 (2023)）：');
+    if (!originalName) return;
+    
+    const customName = prompt('请输入自定义名称：');
+    if (!customName) return;
+    
+    const note = prompt('备注（可选）：') || '';
+    
+    addMapping(originalName, customName, note);
+}
+
+// 添加映射
+async function addMapping(originalName, customName, note) {
+    try {
+        const response = await fetch(`${API_BASE}/mappings`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({original_name: originalName, custom_name: customName, note: note})
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ 映射添加成功！');
+            loadMappings();
+        } else {
+            alert('❌ 添加失败: ' + result.message);
+        }
+    } catch (error) {
+        console.error('添加映射失败:', error);
+        alert('❌ 添加失败');
+    }
+}
+
+// 编辑映射
+async function editMapping(id) {
+    const customName = prompt('请输入新的自定义名称：');
+    if (!customName) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/mappings/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({custom_name: customName})
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ 映射更新成功！');
+            loadMappings();
+        } else {
+            alert('❌ 更新失败: ' + result.message);
+        }
+    } catch (error) {
+        console.error('更新映射失败:', error);
+        alert('❌ 更新失败');
+    }
+}
+
+// 删除映射
+async function deleteMapping(id, name) {
+    if (!confirm(`确定要删除映射"${name}"吗？`)) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/mappings/${id}`, {method: 'DELETE'});
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ 映射删除成功！');
+            loadMappings();
+        } else {
+            alert('❌ 删除失败: ' + result.message);
+        }
+    } catch (error) {
+        console.error('删除映射失败:', error);
+        alert('❌ 删除失败');
+    }
+}
+
+// 清除指定剧集的记录
+async function clearShowRecords(showName) {
+    if (!confirm(`确定要清除"${showName}"的所有硬链接记录吗？\n\n清除后可以重新同步以使用新的映射名称。`)) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/records/by-show?show_name=${encodeURIComponent(showName)}`, {method: 'DELETE'});
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`✅ 成功清除 ${result.deleted_count} 条记录！\n\n现在可以重新同步以使用新名称。`);
+        } else {
+            alert('❌ 清除失败: ' + result.message);
+        }
+    } catch (error) {
+        console.error('清除记录失败:', error);
+        alert('❌ 清除失败');
+    }
+}
+
+// HTML转义
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }

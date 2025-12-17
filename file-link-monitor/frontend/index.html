@@ -56,8 +56,9 @@
         </header>
 
         <div class="tabs">
-            <button class="tab-btn active" data-tab="tree">📂 目录视图</button>
+            <button class="tab-btn active" data-tab="tree">🌲 目录树</button>
             <button class="tab-btn" data-tab="records">📋 链接记录</button>
+            <button class="tab-btn" data-tab="mappings">🔄 映射管理</button>
             <button class="tab-btn" data-tab="config">⚙️ 配置</button>
             <button class="sync-all-btn" onclick="syncAll()">🔄 全量同步</button>
         </div>
@@ -118,6 +119,17 @@
                 <div class="loading">加载中...</div>
             </div>
             <div class="pagination" id="pagination"></div>
+        </div>
+
+        <!-- 映射管理视图 -->
+        <div class="tab-content" id="mappings-tab">
+            <div class="panel-header">
+                <h3>自定义名称映射</h3>
+                <button class="btn-primary" onclick="showAddMappingDialog()">➕ 添加映射</button>
+            </div>
+            <div class="mappings-list" id="mappingsList">
+                <div class="loading">加载中...</div>
+            </div>
         </div>
 
         <!-- 配置视图 -->
