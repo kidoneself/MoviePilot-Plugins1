@@ -11,7 +11,7 @@ import uvicorn
 
 from backend.models import init_database
 from backend.monitor import MonitorService
-from backend.api import tree, records
+from backend.api import tree, records, export
 
 # 配置日志
 logging.basicConfig(
@@ -75,6 +75,7 @@ app = FastAPI(
 # 注册API路由
 app.include_router(tree.router, prefix="/api", tags=["目录树"])
 app.include_router(records.router, prefix="/api", tags=["记录"])
+app.include_router(export.router, prefix="/api", tags=["导出"])
 
 # 静态文件
 frontend_path = Path(__file__).parent.parent / "frontend"
