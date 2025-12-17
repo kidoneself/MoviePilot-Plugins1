@@ -21,9 +21,9 @@ class FileLinker:
         """
         self.obfuscator = FolderObfuscator(enabled=obfuscate_enabled)
 
-    def create_hardlink(self, source: Path, target: Path, source_base: Path = None, target_base: Path = None) -> Tuple[bool, str, str]:
+    def create_hardlink(self, source: Path, target: Path, source_base: Path = None, target_base: Path = None) -> tuple:
         """
-        创建硬链接，失败则降级为复制（支持文件夹名混淆）
+        创建硬链接，失败时尝试复制
         
         Args:
             source: 源文件路径
@@ -32,7 +32,7 @@ class FileLinker:
             target_base: 目标目录基础路径（用于混淆）
             
         Returns:
-            (是否成功, 使用的方法, 错误信息)
+            tuple: (是否成功, 方法名, 错误信息, 实际创建的文件路径)
         """
         try:
             # 应用文件夹名混淆
@@ -51,18 +51,18 @@ class FileLinker:
             try:
                 os.link(str(source), str(target))
                 logger.info(f"硬链接成功: {source} -> {target}")
-                return True, "硬链接", None
+                return True, "硬链接", None, target
             except OSError as e:
                 # 硬链接失败，降级为复制
                 logger.warning(f"硬链接失败，尝试复制: {e}")
                 shutil.copy2(str(source), str(target))
                 logger.info(f"复制成功: {source} -> {target}")
-                return True, "复制", None
+                return True, "复制", None, target
                 
         except Exception as e:
             error_msg = f"操作失败: {str(e)}"
             logger.error(error_msg)
-            return False, None, error_msg
+            return False, None, error_msg, None
     
     def _apply_folder_obfuscation(self, source: Path, target: Path, source_base: Path = None, target_base: Path = None) -> Path:
         """
@@ -148,6 +148,11 @@ class FileLinker:
             成功链接的文件数量
         """
         if not template_dir or not template_dir.exists():
+            return 0
+        
+        # 确保目标目录存在
+        if not target_dir.exists():
+            logger.debug(f"目标目录不存在，跳过模板文件链接: {target_dir}")
             return 0
         
         linked_count = 0

@@ -125,7 +125,7 @@ class FileMonitorHandler(FileSystemEventHandler):
                 target_file = target_path / relative_path
                 
                 logger.info(f"创建链接: {file_path} -> {target_file}")
-                success, method, error = self.linker.create_hardlink(
+                success, method, error, actual_target = self.linker.create_hardlink(
                     file_path, target_file, 
                     source_base=self.source_path, 
                     target_base=target_path
@@ -139,8 +139,8 @@ class FileMonitorHandler(FileSystemEventHandler):
                     success_targets.append(f"{target_name}: {file_path.name}")
                     
                     # 自动链接模板文件到剧集文件夹（只链接一次）
-                    if self.template_files_path and self.template_files_path.exists():
-                        target_show_dir = target_file.parent  # 剧集文件夹（如Season 1的父目录）
+                    if self.template_files_path and self.template_files_path.exists() and actual_target:
+                        target_show_dir = actual_target.parent  # 使用实际创建的文件路径
                         # 如果是季度文件夹，获取剧集根目录
                         if target_show_dir.name.startswith('Season'):
                             target_show_dir = target_show_dir.parent
@@ -366,7 +366,7 @@ class MonitorService:
                                 continue
                             
                             logger.info(f"同步: {file_path} -> {target_file}")
-                            success, method, error = linker.create_hardlink(
+                            success, method, error, actual_target = linker.create_hardlink(
                                 file_path, target_file,
                                 source_base=source,
                                 target_base=target
@@ -376,8 +376,8 @@ class MonitorService:
                                 success_count += 1
                                 
                                 # 自动链接模板文件到剧集文件夹（只链接一次）
-                                if template_dir and template_dir.exists():
-                                    target_show_dir = target_file.parent
+                                if template_dir and template_dir.exists() and actual_target:
+                                    target_show_dir = actual_target.parent  # 使用实际创建的文件路径
                                     # 如果是季度文件夹，获取剧集根目录
                                     if target_show_dir.name.startswith('Season'):
                                         target_show_dir = target_show_dir.parent
