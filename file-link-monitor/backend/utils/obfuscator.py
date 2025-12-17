@@ -1,11 +1,12 @@
 """
-文件夹名混淆器 - 拆字方案
-将汉字拆分为偏旁部首，达到混淆效果但保持一定辨识度
-兼容旧插件的混淆方式（中文+拼音混合）
+文件夹名混淆器 - 同音字混淆方案
+使用同音字替换达到混淆效果，更自然更难以识别
+支持路径白名单（如欧美剧集不混淆）
 """
 import re
 import hashlib
 from pathlib import Path
+from .homophone_obfuscator import HomophoneObfuscator
 
 
 class FolderObfuscator:
@@ -15,6 +16,11 @@ class FolderObfuscator:
     VIDEO_EXTENSIONS = {
         '.mkv', '.mp4', '.avi', '.rmvb', '.wmv', '.m2ts', '.iso',
         '.ts', '.mp4', '.flv', '.mpeg', '.mpg', '.mov'
+    }
+    
+    # 字幕文件扩展名
+    SUBTITLE_EXTENSIONS = {
+        '.srt', '.ass', '.ssa', '.sub', '.idx', '.sup', '.vtt'
     }
     
     # 常用汉字拆字映射表（固定规则）
@@ -69,14 +75,40 @@ class FolderObfuscator:
             enabled: 是否启用混淆
         """
         self.enabled = enabled
-        # 加载拼音映射表（用于旧混淆算法）
+        # 初始化同音字混淆器
+        self.homophone_obfuscator = HomophoneObfuscator()
+        # 加载拼音映射表（用于旧混淆算法备用）
         self.pinyin_map = self._load_pinyin_map()
+        # 分类文件夹不混淆（一级和二级）
+        self.category_folders = [
+            # 一级分类
+            '剧集', '电影', '动漫', '其他',
+            # 二级分类 - 电影
+            '港台电影', '国产电影', '日韩电影', '欧美电影', '动画电影',
+            # 二级分类 - 剧集
+            '港台剧集', '国产剧集', '日韩剧集', '南亚剧集', '欧美剧集',
+            # 二级分类 - 动漫
+            '国产动漫', '欧美动漫', '日本番剧',
+            # 二级分类 - 其他
+            '纪录影片', '综艺节目',
+        ]
     
     @staticmethod
     def is_video_file(file_path) -> bool:
         """判断是否为视频文件"""
         from pathlib import Path
         return Path(file_path).suffix.lower() in FolderObfuscator.VIDEO_EXTENSIONS
+    
+    @staticmethod
+    def is_subtitle_file(file_path) -> bool:
+        """判断是否为字幕文件"""
+        from pathlib import Path
+        return Path(file_path).suffix.lower() in FolderObfuscator.SUBTITLE_EXTENSIONS
+    
+    @staticmethod
+    def is_media_file(file_path) -> bool:
+        """判断是否为媒体文件（视频或字幕）"""
+        return FolderObfuscator.is_video_file(file_path) or FolderObfuscator.is_subtitle_file(file_path)
     
     @staticmethod
     def rename_video_file(file_name: str) -> str:
@@ -113,13 +145,12 @@ class FolderObfuscator:
         
         return f"{new_stem}{file_suffix}"
     
-    def obfuscate_name(self, name: str, max_length: int = 20) -> str:
+    def obfuscate_name(self, name: str) -> str:
         """
-        混淆文件夹名（优先旧混淆，无效果才用拆字）
+        混淆文件夹名 - 使用同音字替换
         
         Args:
             name: 原始文件夹名
-            max_length: 最大长度限制
             
         Returns:
             混淆后的名称
@@ -127,45 +158,12 @@ class FolderObfuscator:
         if not self.enabled:
             return name
         
-        # 1. 先尝试旧混淆算法
-        legacy_result = self.obfuscate_name_legacy(name)
+        # 分类文件夹不混淆
+        if name in self.category_folders:
+            return name
         
-        # 2. 如果旧混淆有效果（结果不等于原字符串），直接返回
-        if legacy_result != name:
-            return legacy_result
-        
-        # 3. 旧混淆无效果，使用拆字混淆
-        result = []
-        current_length = 0
-        
-        for i, char in enumerate(name):
-            # 如果已经达到长度限制，后续保持原样
-            if current_length >= max_length:
-                result.append(char)
-                continue
-            
-            if char in self.CHAR_SPLIT_MAP:
-                # 汉字拆分
-                split_chars = self.CHAR_SPLIT_MAP[char]
-                # 检查拆分后是否超长
-                if current_length + len(split_chars) <= max_length:
-                    result.append(split_chars)
-                    current_length += len(split_chars)
-                else:
-                    # 超长了，用原字
-                    result.append(char)
-                    current_length += 1
-            elif '\u4e00' <= char <= '\u9fff':
-                # 未在映射表的汉字，用单字旧混淆
-                legacy_char = self._obfuscate_single_char(char, i)
-                result.append(legacy_char)
-                current_length += len(legacy_char)
-            else:
-                # 数字、字母、符号保持不变
-                result.append(char)
-                current_length += 1
-        
-        return ''.join(result)
+        # 所有剧名都混淆（去年份+同音字替换）
+        return self.homophone_obfuscator.obfuscate_with_year(name)
     
     def _obfuscate_single_char(self, char: str, position: int) -> str:
         """
@@ -393,7 +391,7 @@ class FolderObfuscator:
     
     def check_legacy_path(self, source_path: Path, target_base: Path, relative_parts: list) -> tuple:
         """
-        检查是否存在旧混淆的多层路径结构
+        使用新的同音字混淆规则创建目录路径
         
         Args:
             source_path: 源文件路径
@@ -406,30 +404,17 @@ class FolderObfuscator:
         if not self.enabled or not relative_parts:
             return target_base / Path(*relative_parts), False
         
-        # 1. 尝试用旧算法混淆所有文件夹层级
-        legacy_parts = []
-        for part in relative_parts:
-            legacy_name = self.obfuscate_name_legacy(part)
-            legacy_parts.append(legacy_name)
-        
-        # 2. 检查旧混淆的完整路径是否存在
-        legacy_full_path = target_base / Path(*legacy_parts)
-        if legacy_full_path.exists():
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"✓ 检测到旧混淆路径: {'/'.join(legacy_parts)}")
-            return legacy_full_path, True
-        
-        # 3. 旧路径不存在，使用新混淆（拆字方案）
+        # 使用新混淆规则（同音字方案）
         new_parts = []
         for part in relative_parts:
-            new_name = self.obfuscate_name(part, max_length=20)
+            # 分类文件夹不混淆，剧名混淆
+            new_name = self.obfuscate_name(part)
             new_parts.append(new_name)
         
         new_full_path = target_base / Path(*new_parts)
         import logging
         logger = logging.getLogger(__name__)
-        logger.info(f"✓ 使用新混淆路径: {'/'.join(new_parts)}")
+        logger.info(f"✓ 同音字混淆: {'/'.join(new_parts)}")
         return new_full_path, False
     
     def test_obfuscate(self, test_names: list) -> dict:

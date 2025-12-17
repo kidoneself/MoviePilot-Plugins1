@@ -9,7 +9,8 @@ monitors:
       - path: /path/to/your/target2
         name: "115网盘"
     enabled: true
-    obfuscate_enabled: true   # 文件夹名混淆（拆字方案，固定算法）
+    obfuscate_enabled: true   # 文件夹名混淆（同音字方案，确定性算法，去年份）
+    template_files_path: /path/to/templates  # 固定文件模板目录（可选），如推广.txt、群二维码.jpg等
     exclude_patterns:
       - "*.tmp"
       - "*.part"
@@ -38,3 +39,4 @@ taosync:
   username: "admin"
   password: "a123456!@"
   job_id: 1
+  check_interval: 60  # 队列检查间隔（秒），当任务执行中时，每隔N秒检查是否空闲并重试

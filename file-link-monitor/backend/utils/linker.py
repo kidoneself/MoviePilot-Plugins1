@@ -136,6 +136,50 @@ class FileLinker:
         except ValueError:
             return file_path
     
+    def link_template_files(self, target_dir: Path, template_dir: Path) -> int:
+        """
+        将模板目录的文件硬链接到目标目录
+        
+        Args:
+            target_dir: 目标剧集文件夹路径
+            template_dir: 模板文件目录路径
+            
+        Returns:
+            成功链接的文件数量
+        """
+        if not template_dir or not template_dir.exists():
+            return 0
+        
+        linked_count = 0
+        try:
+            # 遍历模板目录中的所有文件
+            for template_file in template_dir.iterdir():
+                if template_file.is_file():
+                    target_file = target_dir / template_file.name
+                    
+                    # 如果目标文件已存在，跳过
+                    if target_file.exists():
+                        logger.debug(f"模板文件已存在，跳过: {target_file}")
+                        continue
+                    
+                    try:
+                        # 创建硬链接
+                        os.link(str(template_file), str(target_file))
+                        logger.info(f"✓ 模板文件硬链接: {template_file.name} -> {target_dir}")
+                        linked_count += 1
+                    except OSError as e:
+                        # 硬链接失败，尝试复制
+                        try:
+                            shutil.copy2(str(template_file), str(target_file))
+                            logger.info(f"✓ 模板文件复制: {template_file.name} -> {target_dir}")
+                            linked_count += 1
+                        except Exception as copy_err:
+                            logger.error(f"模板文件链接/复制失败: {template_file.name}, 错误: {copy_err}")
+        except Exception as e:
+            logger.error(f"处理模板文件失败: {e}")
+        
+        return linked_count
+    
     @staticmethod
     def should_exclude(file_path: Path, exclude_patterns: list) -> bool:
         """检查文件是否应该被排除"""

@@ -10,7 +10,7 @@ from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileMovedE
 from backend.models import LinkRecord, get_session
 from backend.utils.linker import FileLinker
 from backend.utils.notifier import Notifier
-from backend.utils.taosync import TaoSyncClient
+from backend.utils.taosync import TaoSyncClient, TaoSyncQueue
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,8 @@ class FileMonitorHandler(FileSystemEventHandler):
     """文件监控处理器"""
     
     def __init__(self, source_path: str, target_configs: List[dict], 
-                 exclude_patterns: List[str], db_engine, config: dict, obfuscate_enabled: bool = False):
+                 exclude_patterns: List[str], db_engine, config: dict, obfuscate_enabled: bool = False,
+                 template_files_path: str = None):
         self.source_path = Path(source_path)
         self.target_configs = target_configs  # [{"path": "...", "name": "..."}, ...]
         self.target_paths = [Path(t['path'] if isinstance(t, dict) else t) for t in target_configs]
@@ -28,18 +29,28 @@ class FileMonitorHandler(FileSystemEventHandler):
         self.obfuscate_enabled = obfuscate_enabled
         self.linker = FileLinker(obfuscate_enabled=obfuscate_enabled)
         self.notifier = Notifier(config)
+        self.template_files_path = Path(template_files_path) if template_files_path else None
+        self.linked_dirs = set()  # 记录已经链接过模板文件的目录
         
-        # 初始化TaoSync客户端
-        self.taosync_client = None
+        # 初始化TaoSync客户端和队列
+        self.taosync_queue = None
         taosync_config = config.get('taosync', {})
         if taosync_config.get('enabled'):
-            self.taosync_client = TaoSyncClient(
+            taosync_client = TaoSyncClient(
                 url=taosync_config.get('url', ''),
                 username=taosync_config.get('username', 'admin'),
                 password=taosync_config.get('password', ''),
                 job_id=taosync_config.get('job_id', 1)
             )
-            logger.info("TaoSync已启用")
+            # 创建队列管理器，设置检查间隔
+            check_interval = taosync_config.get('check_interval', 60)  # 默认60秒
+            self.taosync_queue = TaoSyncQueue(
+                client=taosync_client,
+                check_interval=check_interval,
+                notifier=lambda msg: self.notifier.notify_info("TaoSync队列", msg)
+            )
+            self.taosync_queue.start()
+            logger.info(f"TaoSync已启用，队列检查间隔: {check_interval}秒")
         
         # 批次汇总相关
         self.batch_files = []  # 批次处理的文件列表
@@ -77,10 +88,10 @@ class FileMonitorHandler(FileSystemEventHandler):
             logger.warning(f"文件不存在: {file_path}")
             return
         
-        # 只处理视频文件
+        # 只处理媒体文件（视频+字幕）
         from backend.utils.obfuscator import FolderObfuscator
-        if not FolderObfuscator.is_video_file(file_path):
-            logger.debug(f"非视频文件，跳过: {file_path}")
+        if not FolderObfuscator.is_media_file(file_path):
+            logger.debug(f"非媒体文件，跳过: {file_path}")
             return
         
         # 检查是否应该排除
@@ -126,6 +137,21 @@ class FileMonitorHandler(FileSystemEventHandler):
                     target_config = self.target_configs[idx]
                     target_name = target_config.get('name', target_config.get('path', str(target_path))) if isinstance(target_config, dict) else str(target_path)
                     success_targets.append(f"{target_name}: {file_path.name}")
+                    
+                    # 自动链接模板文件到剧集文件夹（只链接一次）
+                    if self.template_files_path and self.template_files_path.exists():
+                        target_show_dir = target_file.parent  # 剧集文件夹（如Season 1的父目录）
+                        # 如果是季度文件夹，获取剧集根目录
+                        if target_show_dir.name.startswith('Season'):
+                            target_show_dir = target_show_dir.parent
+                        
+                        # 使用目录路径作为唯一标识，避免重复链接
+                        dir_key = str(target_show_dir)
+                        if dir_key not in self.linked_dirs:
+                            linked_count = self.linker.link_template_files(target_show_dir, self.template_files_path)
+                            if linked_count > 0:
+                                logger.info(f"✓ 已链接 {linked_count} 个模板文件到: {target_show_dir}")
+                                self.linked_dirs.add(dir_key)
                 else:
                     failed_count += 1
                     last_error = error
@@ -198,12 +224,15 @@ class FileMonitorHandler(FileSystemEventHandler):
             self.notifier.notify_batch_sync_success(file_names)
             
             # 触发TaoSync同步
-            if self.taosync_client:
+            if self.taosync_queue:
                 logger.info(f"批次完成，触发TaoSync同步任务（共{file_count}个文件）")
-                if self.taosync_client.trigger_sync():
+                success, reason = self.taosync_queue.trigger_now(file_count=file_count)
+                if success:
                     self.notifier.notify_taosync_triggered_batch(file_count)
+                elif reason == "queued":
+                    logger.info(f"TaoSync任务已加入队列，等待执行（文件数: {file_count}）")
                 else:
-                    logger.error("TaoSync触发失败")
+                    logger.error(f"TaoSync触发失败: {reason}")
             
             logger.info(f"批次汇总通知已发送：共处理 {file_count} 个文件")
             
@@ -244,6 +273,7 @@ class MonitorService:
             targets_config = monitor['targets']
             exclude = monitor.get('exclude_patterns', [])
             obfuscate = monitor.get('obfuscate_enabled', False)
+            template_path = monitor.get('template_files_path')
             
             # 检查源目录是否存在
             if not Path(source).exists():
@@ -251,7 +281,7 @@ class MonitorService:
                 continue
             
             # 创建监控处理器（传递完整的target配置）
-            handler = FileMonitorHandler(source, targets_config, exclude, self.db_engine, self.config, obfuscate)
+            handler = FileMonitorHandler(source, targets_config, exclude, self.db_engine, self.config, obfuscate, template_path)
             self.handlers.append(handler)
             
             # 启动监控
@@ -289,6 +319,8 @@ class MonitorService:
                     targets.append(Path(t))
             exclude = monitor.get('exclude_patterns', [])
             obfuscate = monitor.get('obfuscate_enabled', False)
+            template_path = monitor.get('template_files_path')
+            template_dir = Path(template_path) if template_path else None
             
             if not source.exists():
                 logger.error(f"源目录不存在: {source}")
@@ -298,14 +330,15 @@ class MonitorService:
             
             linker = FileLinker(obfuscate_enabled=obfuscate)
             session = get_session(self.db_engine)
+            linked_dirs = set()  # 记录已链接模板文件的目录
             
             try:
                 # 递归扫描所有文件
                 for file_path in source.rglob('*'):
                     if file_path.is_file():
-                        # 只处理视频文件
+                        # 只处理媒体文件（视频+字幕）
                         from backend.utils.obfuscator import FolderObfuscator
-                        if not FolderObfuscator.is_video_file(file_path):
+                        if not FolderObfuscator.is_media_file(file_path):
                             continue
                         
                         # 检查是否排除
@@ -341,6 +374,21 @@ class MonitorService:
                             
                             if success:
                                 success_count += 1
+                                
+                                # 自动链接模板文件到剧集文件夹（只链接一次）
+                                if template_dir and template_dir.exists():
+                                    target_show_dir = target_file.parent
+                                    # 如果是季度文件夹，获取剧集根目录
+                                    if target_show_dir.name.startswith('Season'):
+                                        target_show_dir = target_show_dir.parent
+                                    
+                                    # 避免重复链接
+                                    dir_key = str(target_show_dir)
+                                    if dir_key not in linked_dirs:
+                                        linked_count = linker.link_template_files(target_show_dir, template_dir)
+                                        if linked_count > 0:
+                                            logger.info(f"✓ 已链接 {linked_count} 个模板文件到: {target_show_dir}")
+                                            linked_dirs.add(dir_key)
                             else:
                                 failed_count += 1
                             
@@ -378,6 +426,11 @@ class MonitorService:
     
     def stop(self):
         """停止监控"""
+        # 停止所有handler的TaoSync队列
+        for handler in self.handlers:
+            if hasattr(handler, 'taosync_queue') and handler.taosync_queue:
+                handler.taosync_queue.stop()
+        
         if self.observer:
             self.observer.stop()
             self.observer.join()
