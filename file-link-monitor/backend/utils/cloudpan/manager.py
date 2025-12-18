@@ -163,11 +163,14 @@ class CloudPanManager:
                     logger.error(f"❌ [{i}/{len(mappings)}] 错误: {mapping.custom_name} - {e}")
                     results[mapping.original_name] = None
             
-            logger.info(f"🎉 批量生成完成！成功: {sum(1 for v in results.values() if v)}/{len(results)}")
+            # 统计成功数量
+            success_count = sum(1 for v in results.values() if v)
+            logger.info(f"🎉 批量生成完成！成功: {success_count}/{len(results)}")
+            logger.info("ℹ️  浏览器保持打开状态，请手动检查。完成后手动关闭浏览器窗口。")
             return results
             
         except Exception as e:
             logger.error(f"批量生成链接失败: {e}")
+            logger.info("ℹ️  浏览器保持打开状态，请手动检查错误。")
             return {}
-        finally:
-            await self.close_all()
+        # 不自动关闭浏览器，方便用户调试

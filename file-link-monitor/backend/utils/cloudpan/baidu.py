@@ -30,6 +30,42 @@ class BaiduPan(CloudPanBase):
         except PlaywrightTimeoutError:
             return False
     
+    async def _close_popups(self):
+        """关闭百度网盘的各种弹窗"""
+        try:
+            # 使用实际的弹窗关闭按钮选择器
+            close_selectors = [
+                # 主弹窗关闭按钮（下载客户端弹窗）
+                '.pc-client-modal-close',
+                # 用户提示气泡
+                '.u-tooltip-inner i',
+                # 侧边栏气泡提示
+                '.wp-s-aside-nav-bubble-close',
+                # 其他通用关闭按钮
+                '[class*="close"]',
+                'button:has-text("关闭")',
+            ]
+            
+            for selector in close_selectors:
+                try:
+                    await self.page.click(selector, timeout=1000)
+                    await asyncio.sleep(0.3)
+                    logger.debug(f"已关闭弹窗: {selector}")
+                except:
+                    pass
+            
+            # 按ESC键关闭其他可能的弹窗
+            try:
+                await self.page.keyboard.press('Escape')
+                await asyncio.sleep(0.3)
+            except:
+                pass
+                
+            logger.info("✅ 已尝试关闭所有弹窗")
+            
+        except Exception as e:
+            logger.warning(f"关闭弹窗时出错（可忽略）: {e}")
+    
     async def login(self, wait_for_scan: bool = True) -> bool:
         """
         登录百度网盘（扫码登录）
@@ -50,6 +86,10 @@ class BaiduPan(CloudPanBase):
             if await self.is_logged_in():
                 logger.info("✅ 已登录百度网盘")
                 await self._save_cookies()
+                
+                # 关闭可能出现的弹窗
+                await self._close_popups()
+                
                 return True
             
             # 未登录，等待扫码
@@ -130,35 +170,47 @@ class BaiduPan(CloudPanBase):
             await self.page.goto(self.login_url, wait_until='domcontentloaded')
             await asyncio.sleep(2)
             
+            # 关闭可能出现的弹窗
+            await self._close_popups()
+            
             # 点击搜索框
-            await self.page.click('.wp-s-header__search input')
+            search_input = '.wp-s-core-pan__header-tool-bar--customize input'
+            await self.page.click(search_input)
             await asyncio.sleep(0.5)
             
             # 输入文件夹名并搜索
-            await self.page.fill('.wp-s-header__search input', folder_name)
+            await self.page.fill(search_input, folder_name)
             await self.page.keyboard.press('Enter')
             await asyncio.sleep(3)
             
-            # 2. 找到文件夹并右键点击
-            # 这里需要找到搜索结果中的文件夹
+            # 2. 找到文件夹并勾选
             try:
-                # 等待搜索结果
-                await self.page.wait_for_selector('.list-view__body', timeout=10000)
+                # 等待文件列表加载
+                await self.page.wait_for_selector('.wp-s-pan-table__body tbody tr', timeout=10000)
                 
-                # 找到第一个文件夹结果（假设是我们要的）
-                folder_item = await self.page.query_selector('.list-view__body .list-view__item')
-                if not folder_item:
+                # 找到第一个文件行
+                first_row = await self.page.query_selector('.wp-s-pan-table__body tbody tr')
+                if not first_row:
                     logger.warning(f"未找到文件夹: {folder_name}")
                     return None
                 
-                # 勾选该文件夹
-                checkbox = await folder_item.query_selector('input[type="checkbox"]')
-                if checkbox:
-                    await checkbox.click()
-                    await asyncio.sleep(0.5)
+                # 先hover到文件行，让复选框显示出来
+                await first_row.hover()
+                await asyncio.sleep(0.5)
+                
+                # 勾选该文件夹（点击checkbox所在的td）
+                checkbox_td = await first_row.query_selector('td.wp-s-pan-table__body-row--checkbox-block')
+                if checkbox_td:
+                    await checkbox_td.click()
+                    await asyncio.sleep(1)
+                    logger.info(f"✅ 已选中文件: {folder_name}")
+                else:
+                    logger.error("未找到复选框")
+                    return None
                 
                 # 点击顶部的"分享"按钮
-                await self.page.click('text=分享', timeout=5000)
+                share_btn = '.wp-s-agile-tool-bar__h-group button'
+                await self.page.click(share_btn, timeout=5000)
                 await asyncio.sleep(2)
                 
                 # 3. 设置分享选项
@@ -177,23 +229,46 @@ class BaiduPan(CloudPanBase):
                 
                 await asyncio.sleep(1)
                 
-                # 4. 创建链接
-                await self.page.click('button:has-text("创建链接")', timeout=5000)
+                # 4. 创建链接并复制
+                # 点击"复制链接"按钮（会自动创建链接并复制到剪贴板）
+                copy_link_btn = '.wp-share-file__link-create-btn button'
+                await self.page.click(copy_link_btn, timeout=5000)
                 await asyncio.sleep(2)
                 
-                # 5. 获取分享链接
-                # 等待链接生成
-                link_input = await self.page.wait_for_selector('input[readonly][value^="https://pan.baidu.com/s/"]', timeout=10000)
-                share_link = await link_input.get_attribute('value')
+                # 5. 从剪贴板获取分享链接
+                # 先授予剪贴板权限
+                try:
+                    context = self.page.context
+                    await context.grant_permissions(['clipboard-read'])
+                except Exception as e:
+                    logger.warning(f"授予剪贴板权限时出错: {e}")
+                
+                # 使用Playwright的evaluate方法读取剪贴板
+                try:
+                    clipboard_text = await self.page.evaluate('navigator.clipboard.readText()')
+                    logger.info(f"📋 从剪贴板获取到文本: {clipboard_text[:100]}...")
+                    
+                    # 从剪贴板文本中提取链接
+                    import re
+                    # 匹配百度网盘链接格式：https://pan.baidu.com/s/xxxxx?pwd=xxxx 或 https://pan.baidu.com/s/xxxxx
+                    match = re.search(r'https://pan\.baidu\.com/s/[\w\-]+(?:\?pwd=[\w]+)?', clipboard_text)
+                    if match:
+                        share_link = match.group(0)
+                        logger.info(f"✅ 成功提取分享链接: {share_link}")
+                    else:
+                        logger.error(f"未能从剪贴板文本中提取到链接")
+                        return None
+                        
+                except Exception as e:
+                    logger.error(f"读取剪贴板失败: {e}")
+                    return None
                 
                 # 关闭分享弹窗
                 try:
-                    await self.page.click('.dialog-footer button:has-text("知道了")', timeout=2000)
+                    await self.page.keyboard.press('Escape')
+                    await asyncio.sleep(0.5)
                 except:
-                    try:
-                        await self.page.keyboard.press('Escape')
-                    except:
-                        pass
+                    pass
                 
                 await asyncio.sleep(1)
                 

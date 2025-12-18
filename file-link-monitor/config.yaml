@@ -1,42 +1,31 @@
-# 文件监控硬链接系统配置
-
-# 监控配置
-monitors:
-  - source: /path/to/your/source
-    targets:
-      - path: /path/to/your/target1
-        name: "阿里云盘"
-      - path: /path/to/your/target2
-        name: "115网盘"
-    enabled: true
-    obfuscate_enabled: true   # 文件夹名混淆（同音字方案，确定性算法，去年份）
-    template_files_path: /path/to/templates  # 固定文件模板目录（可选），如推广.txt、群二维码.jpg等
-    exclude_patterns:
-      - "*.tmp"
-      - "*.part"
-      - ".DS_Store"
-
-# 服务器配置
-server:
-  host: 0.0.0.0
-  port: 8080
-  debug: false
-
-# 数据库配置
 database:
   path: ./data/database.db
-
-# 通知配置
+monitors:
+- enabled: true
+  exclude_patterns:
+  - '*.tmp'
+  - '*.part'
+  - .DS_Store
+  obfuscate_enabled: true
+  source: /path/to/your/source
+  targets:
+  - name: 阿里云盘1
+    path: /path/to/your/target1
+  - name: 115网盘
+    path: /path/to/your/target2
+  template_files_path: /path/to/templates
 notification:
   enabled: true
-  serverchan_url: "https://13922.push.ft07.com/send/sctp13922twpjwr8sh4gr8bdeupbzjda.send"
-  serverchan_sendkey: "sctp13922twpjwr8sh4gr8bdeupbzjda"
-  
-# TaoSync配置
+  serverchan_sendkey: sctp13922twpjwr8sh4gr8bdeupbzjda
+  serverchan_url: https://13922.push.ft07.com/send/sctp13922twpjwr8sh4gr8bdeupbzjda.send
+server:
+  debug: false
+  host: 0.0.0.0
+  port: 8080
 taosync:
+  check_interval: 60
   enabled: false
-  url: "http://10.10.10.17:8023"
-  username: "admin"
-  password: "a123456!@"
   job_id: 1
-  check_interval: 60  # 队列检查间隔（秒），当任务执行中时，每隔N秒检查是否空闲并重试
+  password: a123456!@
+  url: http://10.10.10.17:8023
+  username: admin
