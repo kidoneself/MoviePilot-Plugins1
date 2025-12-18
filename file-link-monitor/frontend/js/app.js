@@ -711,15 +711,19 @@ function renderMappings(mappings, total, page, totalPages) {
         return;
     }
     
-    let html = '<table class="data-table"><thead><tr><th>原名称</th><th>自定义名称</th><th>状态</th><th>备注</th><th>操作</th></tr></thead><tbody>';
+    let html = '<table class="data-table"><thead><tr><th>原名称</th><th>自定义名称</th><th>状态</th><th>百度网盘</th><th>夸克网盘</th><th>备注</th><th>操作</th></tr></thead><tbody>';
     
     mappings.forEach(m => {
         const statusBadge = m.enabled ? '<span class="badge success">✓ 启用</span>' : '<span class="badge">× 禁用</span>';
+        const baiduLink = m.baidu_link ? `<a href="${escapeHtml(m.baidu_link)}" target="_blank" style="color: #667eea;">🔗</a>` : '-';
+        const quarkLink = m.quark_link ? `<a href="${escapeHtml(m.quark_link)}" target="_blank" style="color: #667eea;">🔗</a>` : '-';
         html += `
             <tr>
                 <td>${escapeHtml(m.original_name)}</td>
                 <td><strong>${escapeHtml(m.custom_name)}</strong></td>
                 <td>${statusBadge}</td>
+                <td>${baiduLink}</td>
+                <td>${quarkLink}</td>
                 <td>${escapeHtml(m.note || '-')}</td>
                 <td>
                     <button class="btn-small" onclick="editMapping(${m.id})">编辑</button>
@@ -801,18 +805,25 @@ async function editMapping(id) {
     const customName = prompt('请输入新的自定义名称：');
     if (!customName) return;
     
+    const baiduLink = prompt('请输入百度网盘链接（可选，留空则不修改）：') || undefined;
+    const quarkLink = prompt('请输入夸克网盘链接（可选，留空则不修改）：') || undefined;
+    
     try {
+        const data = { custom_name: customName };
+        if (baiduLink !== undefined) data.baidu_link = baiduLink;
+        if (quarkLink !== undefined) data.quark_link = quarkLink;
+        
         const response = await fetch(`${API_BASE}/mappings/${id}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({custom_name: customName})
+            body: JSON.stringify(data)
         });
         
         const result = await response.json();
         
         if (result.success) {
             alert('✅ 映射更新成功！');
-            loadMappings();
+            loadMappings(currentMappingPage);
         } else {
             alert('❌ 更新失败: ' + result.message);
         }

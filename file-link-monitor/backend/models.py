@@ -42,6 +42,8 @@ class CustomNameMapping(Base):
     custom_name = Column(String(500), nullable=False)  # 自定义名称
     enabled = Column(Boolean, default=True)  # 是否启用
     note = Column(String(500))  # 备注说明
+    baidu_link = Column(String(1000))  # 百度网盘链接
+    quark_link = Column(String(1000))  # 夸克网盘链接
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     

@@ -27,6 +27,8 @@ class MappingCreate(BaseModel):
     original_name: str
     custom_name: str
     note: Optional[str] = None
+    baidu_link: Optional[str] = None
+    quark_link: Optional[str] = None
 
 
 class MappingUpdate(BaseModel):
@@ -34,6 +36,8 @@ class MappingUpdate(BaseModel):
     custom_name: Optional[str] = None
     enabled: Optional[bool] = None
     note: Optional[str] = None
+    baidu_link: Optional[str] = None
+    quark_link: Optional[str] = None
 
 
 @router.get("/mappings")
@@ -83,6 +87,8 @@ async def get_mappings(
                     "custom_name": m.custom_name,
                     "enabled": m.enabled,
                     "note": m.note,
+                    "baidu_link": m.baidu_link,
+                    "quark_link": m.quark_link,
                     "created_at": m.created_at.isoformat() if m.created_at else None,
                     "updated_at": m.updated_at.isoformat() if m.updated_at else None
                 }
@@ -122,7 +128,9 @@ async def create_mapping(mapping: MappingCreate, db: Session = Depends(get_db)):
         new_mapping = CustomNameMapping(
             original_name=mapping.original_name,
             custom_name=mapping.custom_name,
-            note=mapping.note
+            note=mapping.note,
+            baidu_link=mapping.baidu_link,
+            quark_link=mapping.quark_link
         )
         db.add(new_mapping)
         db.commit()
@@ -175,6 +183,10 @@ async def update_mapping(
             existing.enabled = mapping.enabled
         if mapping.note is not None:
             existing.note = mapping.note
+        if mapping.baidu_link is not None:
+            existing.baidu_link = mapping.baidu_link
+        if mapping.quark_link is not None:
+            existing.quark_link = mapping.quark_link
         
         db.commit()
         db.refresh(existing)
@@ -310,7 +322,7 @@ async def export_mappings(
         ws.title = "名称映射"
         
         # 设置表头
-        headers = ["原名", "混淆名"]
+        headers = ["原名", "混淆名", "百度网盘", "夸克网盘"]
         ws.append(headers)
         
         # 设置表头样式
@@ -328,11 +340,13 @@ async def export_mappings(
         for mapping in mappings:
             ws.append([
                 mapping.original_name,
-                mapping.custom_name
+                mapping.custom_name,
+                mapping.baidu_link or '-',
+                mapping.quark_link or '-'
             ])
             
             # 设置对齐和字体
-            for col_num in range(1, 3):
+            for col_num in range(1, 5):
                 cell = ws.cell(row=row_num, column=col_num)
                 cell.alignment = Alignment(horizontal="left", vertical="center")
                 cell.font = Font(size=12)
@@ -340,8 +354,10 @@ async def export_mappings(
             row_num += 1
         
         # 调整列宽
-        ws.column_dimensions['A'].width = 50
-        ws.column_dimensions['B'].width = 50
+        ws.column_dimensions['A'].width = 40
+        ws.column_dimensions['B'].width = 40
+        ws.column_dimensions['C'].width = 60
+        ws.column_dimensions['D'].width = 60
         
         # 添加统计信息
         ws.append([])
