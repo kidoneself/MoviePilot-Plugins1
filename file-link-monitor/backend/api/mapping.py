@@ -36,14 +36,18 @@ class MappingUpdate(BaseModel):
 
 @router.get("/mappings")
 async def get_mappings(
+    page: int = 1,
+    page_size: int = 20,
     enabled: Optional[bool] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
-    获取所有自定义名称映射
+    获取所有自定义名称映射（分页）
     
     Args:
+        page: 页码（从1开始）
+        page_size: 每页数量
         enabled: 过滤启用状态
         search: 搜索原名或自定义名
     """
@@ -59,7 +63,14 @@ async def get_mappings(
                 (CustomNameMapping.custom_name.like(f'%{search}%'))
             )
         
-        mappings = query.order_by(CustomNameMapping.created_at.desc()).all()
+        # 总数
+        total = query.count()
+        
+        # 分页
+        mappings = query.order_by(CustomNameMapping.created_at.desc())\
+            .offset((page - 1) * page_size)\
+            .limit(page_size)\
+            .all()
         
         return {
             "success": True,
@@ -75,7 +86,10 @@ async def get_mappings(
                 }
                 for m in mappings
             ],
-            "total": len(mappings)
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total + page_size - 1) // page_size
         }
     except Exception as e:
         logger.error(f"获取映射失败: {e}")

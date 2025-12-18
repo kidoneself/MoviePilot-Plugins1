@@ -670,13 +670,29 @@ async function resyncGroup(recordIds) {
 // ==================== 映射管理功能 ====================
 
 // 加载映射列表
-async function loadMappings() {
+let currentMappingPage = 1;
+let currentMappingSearch = '';
+
+async function loadMappings(page = 1) {
+    currentMappingPage = page;
+    const searchInput = document.getElementById('mappingSearch');
+    currentMappingSearch = searchInput ? searchInput.value : '';
+    
     try {
-        const response = await fetch(`${API_BASE}/mappings`);
+        const params = new URLSearchParams({
+            page: page,
+            page_size: 20
+        });
+        
+        if (currentMappingSearch) {
+            params.append('search', currentMappingSearch);
+        }
+        
+        const response = await fetch(`${API_BASE}/mappings?${params}`);
         const result = await response.json();
         
         if (result.success) {
-            renderMappings(result.data);
+            renderMappings(result.data, result.total, result.page, result.total_pages);
         } else {
             document.getElementById('mappingsList').innerHTML = `<div class="error">加载失败: ${result.message}</div>`;
         }
@@ -687,7 +703,7 @@ async function loadMappings() {
 }
 
 // 渲染映射列表
-function renderMappings(mappings) {
+function renderMappings(mappings, total, page, totalPages) {
     const container = document.getElementById('mappingsList');
     
     if (mappings.length === 0) {
@@ -715,6 +731,32 @@ function renderMappings(mappings) {
     });
     
     html += '</tbody></table>';
+    
+    // 添加分页
+    html += '<div class="pagination">';
+    html += `<span class="page-info">共 ${total} 条记录，第 ${page}/${totalPages} 页</span>`;
+    
+    if (totalPages > 1) {
+        if (page > 1) {
+            html += `<button class="page-btn" onclick="loadMappings(${page - 1})">上一页</button>`;
+        }
+        
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === page) {
+                html += `<button class="page-btn active">${i}</button>`;
+            } else if (i === 1 || i === totalPages || Math.abs(i - page) <= 2) {
+                html += `<button class="page-btn" onclick="loadMappings(${i})">${i}</button>`;
+            } else if (i === page - 3 || i === page + 3) {
+                html += '<span class="page-ellipsis">...</span>';
+            }
+        }
+        
+        if (page < totalPages) {
+            html += `<button class="page-btn" onclick="loadMappings(${page + 1})">下一页</button>`;
+        }
+    }
+    
+    html += '</div>';
     container.innerHTML = html;
 }
 
@@ -824,4 +866,19 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// 导出链接记录
+function exportRecords() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const searchInput = document.getElementById('searchInput').value;
+    
+    const params = new URLSearchParams();
+    if (statusFilter) params.append('status', statusFilter);
+    if (searchInput) params.append('search', searchInput);
+    
+    const url = `${API_BASE}/export/records?${params.toString()}`;
+    
+    // 直接在新窗口打开下载链接
+    window.open(url, '_blank');
 }

@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from typing import Optional
 import logging
+from io import BytesIO
+from datetime import datetime
 
 from backend.models import LinkRecord, get_session
 
@@ -489,3 +491,122 @@ async def resync_link(record_id: int, db: Session = Depends(get_db)):
         logger.error(f"重新同步失败: {e}")
         db.rollback()
         return {"success": False, "message": str(e)}
+
+
+@router.get("/export/records")
+async def export_records(
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    导出链接记录为Excel文件
+    
+    Args:
+        status: 过滤状态
+        search: 搜索关键词
+    """
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from pathlib import Path
+        
+        query = db.query(LinkRecord)
+        
+        if status:
+            query = query.filter(LinkRecord.status == status)
+        
+        if search:
+            query = query.filter(LinkRecord.source_file.like(f'%{search}%'))
+        
+        records = query.order_by(LinkRecord.created_at.desc()).all()
+        
+        # 创建Excel工作簿
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "链接记录"
+        
+        # 设置表头
+        headers = ["源文件", "目标文件", "文件大小(MB)", "链接方式", "状态", "创建时间", "错误信息"]
+        ws.append(headers)
+        
+        # 设置表头样式
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # 填充数据
+        row_num = 2
+        for record in records:
+            file_size_mb = round(record.file_size / (1024 * 1024), 2) if record.file_size else 0
+            created_at = record.created_at.strftime('%Y-%m-%d %H:%M:%S') if record.created_at else ''
+            
+            ws.append([
+                record.source_file,
+                record.target_file,
+                file_size_mb,
+                record.link_method or '-',
+                record.status,
+                created_at,
+                record.error_msg or '-'
+            ])
+            
+            # 设置对齐
+            for col_num in range(1, 8):
+                cell = ws.cell(row=row_num, column=col_num)
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+            
+            row_num += 1
+        
+        # 调整列宽
+        ws.column_dimensions['A'].width = 60
+        ws.column_dimensions['B'].width = 60
+        ws.column_dimensions['C'].width = 15
+        ws.column_dimensions['D'].width = 12
+        ws.column_dimensions['E'].width = 10
+        ws.column_dimensions['F'].width = 20
+        ws.column_dimensions['G'].width = 40
+        
+        # 添加统计信息
+        ws.append([])
+        ws.append([f"导出时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+        ws.append([f"总计: {len(records)} 条记录"])
+        ws.append([f"成功: {sum(1 for r in records if r.status == 'success')} 条"])
+        ws.append([f"失败: {sum(1 for r in records if r.status == 'failed')} 条"])
+        
+        # 保存到内存
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        # 生成文件名
+        filename = f"link_records_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        logger.info(f"✅ 成功导出链接记录: {len(records)} 条")
+        
+        # 返回Excel文件
+        return Response(
+            content=output.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+        
+    except ImportError:
+        logger.error("openpyxl库未安装，无法导出Excel")
+        return {
+            "success": False,
+            "message": "openpyxl库未安装，请安装: pip install openpyxl"
+        }
+    except Exception as e:
+        logger.error(f"导出失败: {e}")
+        return {
+            "success": False,
+            "message": f"导出失败: {str(e)}"
+        }

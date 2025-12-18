@@ -114,6 +114,7 @@
                     </select>
                 </div>
                 <button class="refresh-btn" onclick="loadRecords()">🔄 刷新</button>
+                <button class="refresh-btn" onclick="exportRecords()" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">📥 导出Excel</button>
             </div>
             <div class="records-list" id="recordsList">
                 <div class="loading">加载中...</div>
@@ -125,7 +126,11 @@
         <div class="tab-content" id="mappings-tab">
             <div class="panel-header">
                 <h3>自定义名称映射</h3>
-                <button class="btn-primary" onclick="showAddMappingDialog()">➕ 添加映射</button>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="mappingSearch" placeholder="搜索原名或自定义名..." style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 250px;">
+                    <button class="btn-primary" onclick="loadMappings(1)" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">🔍 搜索</button>
+                    <button class="btn-primary" onclick="showAddMappingDialog()">➕ 添加映射</button>
+                </div>
             </div>
             <div class="mappings-list" id="mappingsList">
                 <div class="loading">加载中...</div>
