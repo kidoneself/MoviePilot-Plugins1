@@ -373,17 +373,15 @@ async def delete_records_by_show(
         count = len(records)
         
         # 收集需要删除的目录（去重）
+        # target_file现在存的是实际混淆后的路径，直接提取即可
         dirs_to_delete = set()
         for record in records:
             target_path = Path(record.target_file)
             logger.info(f"处理记录: {record.target_file}")
             
-            # 找到剧集目录
-            # 1. 如果路径中有Season目录，取其父目录
-            # 2. 否则向上2级目录（文件->Season->剧集目录）
+            # 找到剧集目录（包含Season的父目录）
             show_dir = None
             for parent in target_path.parents:
-                logger.info(f"  检查父目录: {parent.name}")
                 if 'Season' in parent.name or 'season' in parent.name:
                     show_dir = parent.parent
                     logger.info(f"  找到Season目录，剧集目录: {show_dir}")

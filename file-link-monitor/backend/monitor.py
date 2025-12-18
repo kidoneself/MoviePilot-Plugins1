@@ -156,10 +156,10 @@ class FileMonitorHandler(FileSystemEventHandler):
                     failed_count += 1
                     last_error = error
                 
-                # 记录到数据库
+                # 记录到数据库（保存实际创建的混淆后路径）
                 record = LinkRecord(
                     source_file=str(file_path),
-                    target_file=str(target_file),
+                    target_file=str(actual_target) if actual_target else str(target_file),
                     file_size=file_size,
                     link_method=method,
                     status="success" if success else "failed",
@@ -392,10 +392,10 @@ class MonitorService:
                             else:
                                 failed_count += 1
                             
-                            # 记录到数据库
+                            # 记录到数据库（保存实际创建的混淆后路径）
                             record = LinkRecord(
                                 source_file=str(file_path),
-                                target_file=str(target_file),
+                                target_file=str(actual_target) if actual_target else str(target_file),
                                 file_size=file_size,
                                 link_method=method,
                                 status="success" if success else "failed",
