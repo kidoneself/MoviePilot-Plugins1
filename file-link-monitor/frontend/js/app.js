@@ -907,3 +907,61 @@ function exportMappings() {
     // 直接在新窗口打开下载链接
     window.open(url, '_blank');
 }
+
+// 生成百度网盘分享链接
+async function generateBaiduLinks() {
+    if (!confirm('确定要批量生成百度网盘分享链接吗？\n\n将会打开浏览器窗口，请在窗口中完成登录操作。\n处理过程可能需要较长时间，请耐心等待。')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/cloudpan/generate-links`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                pan_type: 'baidu',
+                expire_days: 0  // 永久有效
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ ' + result.message + '\n\n处理完成后会自动更新到映射表中。');
+        } else {
+            alert('❌ 启动失败: ' + result.message);
+        }
+    } catch (error) {
+        console.error('生成百度链接失败:', error);
+        alert('❌ 请求失败');
+    }
+}
+
+// 生成夸克网盘分享链接
+async function generateQuarkLinks() {
+    if (!confirm('确定要批量生成夸克网盘分享链接吗？\n\n将会打开浏览器窗口，请在窗口中完成登录操作。\n处理过程可能需要较长时间，请耐心等待。')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/cloudpan/generate-links`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                pan_type: 'quark',
+                expire_days: 0  // 永久有效
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ ' + result.message + '\n\n处理完成后会自动更新到映射表中。');
+        } else {
+            alert('❌ 启动失败: ' + result.message);
+        }
+    } catch (error) {
+        console.error('生成夸克链接失败:', error);
+        alert('❌ 请求失败');
+    }
+}
