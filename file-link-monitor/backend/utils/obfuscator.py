@@ -182,6 +182,48 @@ class FolderObfuscator:
             logger.error(f"查询自定义映射失败: {e}")
             return None
     
+    def _auto_create_mapping(self, original_name: str, obfuscated_name: str):
+        """
+        自动创建映射记录（如果不存在）
+        
+        Args:
+            original_name: 原始名称
+            obfuscated_name: 混淆后的名称
+        """
+        if not self.db_engine:
+            return
+        
+        try:
+            from backend.models import CustomNameMapping, get_session
+            session = get_session(self.db_engine)
+            
+            try:
+                # 检查是否已存在
+                existing = session.query(CustomNameMapping).filter(
+                    CustomNameMapping.original_name == original_name
+                ).first()
+                
+                if not existing:
+                    # 创建新映射
+                    new_mapping = CustomNameMapping(
+                        original_name=original_name,
+                        custom_name=obfuscated_name,
+                        enabled=True,
+                        note="自动创建"
+                    )
+                    session.add(new_mapping)
+                    session.commit()
+                    
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.debug(f"✓ 自动创建映射: {original_name} -> {obfuscated_name}")
+            finally:
+                session.close()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"自动创建映射失败: {e}")
+    
     def obfuscate_name(self, name: str) -> str:
         """
         混淆文件夹名 - 优先使用自定义映射，否则使用同音字替换
@@ -208,7 +250,12 @@ class FolderObfuscator:
             return custom_name
         
         # 2. 使用同音字混淆（去年份+同音字替换）
-        return self.homophone_obfuscator.obfuscate_with_year(name)
+        obfuscated = self.homophone_obfuscator.obfuscate_with_year(name)
+        
+        # 3. 自动创建映射记录到数据库（方便在页面上统一管理和修改）
+        self._auto_create_mapping(name, obfuscated)
+        
+        return obfuscated
     
     def _obfuscate_single_char(self, char: str, position: int) -> str:
         """
