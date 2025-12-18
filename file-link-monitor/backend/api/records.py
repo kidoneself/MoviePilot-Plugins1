@@ -350,12 +350,15 @@ async def delete_records_by_show(
     db: Session = Depends(get_db)
 ):
     """
-    删除指定剧集的所有硬链接记录
+    删除指定剧集的所有硬链接记录，并删除目标目录中的对应文件夹
     
     Args:
         show_name: 剧集名称（原始名称，会匹配路径中包含该名称的所有记录）
     """
     try:
+        from pathlib import Path
+        import shutil
+        
         # 查询包含该剧集名称的所有记录
         records = db.query(LinkRecord).filter(
             LinkRecord.source_file.like(f'%{show_name}%')
@@ -369,16 +372,39 @@ async def delete_records_by_show(
         
         count = len(records)
         
+        # 收集需要删除的目录（去重）
+        dirs_to_delete = set()
+        for record in records:
+            target_path = Path(record.target_file)
+            # 找到剧集目录（通常是包含年份的那个目录）
+            for parent in target_path.parents:
+                # 如果父目录名包含年份格式 (YYYY)，认为是剧集目录
+                if '(' in parent.name and ')' in parent.name:
+                    dirs_to_delete.add(str(parent))
+                    break
+        
         # 删除所有匹配的记录
         for record in records:
             db.delete(record)
         
         db.commit()
         
+        # 删除目录
+        deleted_dirs = []
+        for dir_path in dirs_to_delete:
+            try:
+                if Path(dir_path).exists():
+                    shutil.rmtree(dir_path)
+                    deleted_dirs.append(dir_path)
+                    logger.info(f"已删除目录: {dir_path}")
+            except Exception as e:
+                logger.error(f"删除目录失败 {dir_path}: {e}")
+        
         return {
             "success": True,
-            "message": f"已删除 {count} 条包含 '{show_name}' 的记录",
-            "count": count
+            "message": f"已删除 {count} 条记录和 {len(deleted_dirs)} 个目录",
+            "count": count,
+            "deleted_dirs": deleted_dirs
         }
     except Exception as e:
         logger.error(f"删除剧集记录失败: {e}")
