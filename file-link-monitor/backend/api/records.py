@@ -376,12 +376,21 @@ async def delete_records_by_show(
         dirs_to_delete = set()
         for record in records:
             target_path = Path(record.target_file)
-            # 找到剧集目录（通常是包含年份的那个目录）
+            # 找到剧集目录
+            # 1. 如果路径中有Season目录，取其父目录
+            # 2. 否则向上2级目录（文件->Season->剧集目录）
+            show_dir = None
             for parent in target_path.parents:
-                # 如果父目录名包含年份格式 (YYYY)，认为是剧集目录
-                if '(' in parent.name and ')' in parent.name:
-                    dirs_to_delete.add(str(parent))
+                if 'Season' in parent.name or 'season' in parent.name:
+                    show_dir = parent.parent
                     break
+            
+            # 如果没找到Season目录，默认向上2级
+            if not show_dir:
+                show_dir = target_path.parent.parent
+            
+            if show_dir and show_dir.exists():
+                dirs_to_delete.add(str(show_dir))
         
         # 删除所有匹配的记录
         for record in records:
