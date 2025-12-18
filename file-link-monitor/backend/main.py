@@ -85,21 +85,6 @@ frontend_path = Path(__file__).parent.parent / "frontend"
 app.mount("/assets", StaticFiles(directory=str(frontend_path / "assets")), name="assets")
 
 
-@app.get("/{full_path:path}")
-async def serve_frontend(full_path: str):
-    """
-    提供前端页面，支持Vue Router
-    - API请求由路由处理
-    - 其他所有路径返回index.html（Vue Router处理）
-    """
-    # API请求不处理
-    if full_path.startswith("api/"):
-        return {"error": "Not found"}
-    
-    # 直接返回index.html，让Vue Router处理路由
-    return FileResponse(str(frontend_path / "index.html"))
-
-
 @app.get("/health")
 async def health():
     """健康检查"""
@@ -317,6 +302,16 @@ async def sync_all():
     except Exception as e:
         logger.error(f"全量同步失败: {e}")
         return {"success": False, "message": str(e)}
+
+
+# 通配符路由放在最后，作为fallback处理Vue Router
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    """
+    提供前端页面，支持Vue Router
+    所有非API请求返回index.html
+    """
+    return FileResponse(str(frontend_path / "index.html"))
 
 
 if __name__ == "__main__":
