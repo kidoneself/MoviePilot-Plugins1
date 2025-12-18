@@ -26,7 +26,7 @@ class LinkRecord(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     source_file = Column(String(1000), nullable=False)
     target_file = Column(String(1000), nullable=False)
-    file_size = Column(Integer)
+    file_size = Column(BigInteger)
     link_method = Column(String(20))  # 硬链接/复制
     status = Column(String(20))  # success/failed
     error_msg = Column(Text)
