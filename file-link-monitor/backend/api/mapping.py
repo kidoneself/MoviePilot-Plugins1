@@ -242,50 +242,6 @@ async def delete_mapping(mapping_id: int, db: Session = Depends(get_db)):
         return {"success": False, "message": str(e)}
 
 
-@router.delete("/records/by-show")
-async def delete_records_by_show(
-    show_name: str,
-    db: Session = Depends(get_db)
-):
-    """
-    删除指定剧集的所有硬链接记录
-    
-    Args:
-        show_name: 剧集名称（原始名称，会匹配路径中包含该名称的所有记录）
-    """
-    try:
-        # 查询包含该剧集名称的所有记录
-        records = db.query(LinkRecord).filter(
-            LinkRecord.source_file.like(f'%{show_name}%')
-        ).all()
-        
-        if not records:
-            return {
-                "success": False,
-                "message": f"未找到包含 '{show_name}' 的记录"
-            }
-        
-        count = len(records)
-        
-        # 删除所有匹配的记录
-        for record in records:
-            db.delete(record)
-        
-        db.commit()
-        
-        logger.info(f"✅ 删除 {count} 条记录: {show_name}")
-        
-        return {
-            "success": True,
-            "message": f"成功删除 {count} 条记录",
-            "deleted_count": count
-        }
-    except Exception as e:
-        db.rollback()
-        logger.error(f"删除记录失败: {e}")
-        return {"success": False, "message": str(e)}
-
-
 @router.get("/export/mappings")
 async def export_mappings(
     enabled: Optional[bool] = None,

@@ -344,6 +344,48 @@ async def batch_delete_records(search: str, db: Session = Depends(get_db)):
         return {"success": False, "message": str(e)}
 
 
+@router.delete("/records/by-show")
+async def delete_records_by_show(
+    show_name: str,
+    db: Session = Depends(get_db)
+):
+    """
+    删除指定剧集的所有硬链接记录
+    
+    Args:
+        show_name: 剧集名称（原始名称，会匹配路径中包含该名称的所有记录）
+    """
+    try:
+        # 查询包含该剧集名称的所有记录
+        records = db.query(LinkRecord).filter(
+            LinkRecord.source_file.like(f'%{show_name}%')
+        ).all()
+        
+        if not records:
+            return {
+                "success": False,
+                "message": f"未找到包含 '{show_name}' 的记录"
+            }
+        
+        count = len(records)
+        
+        # 删除所有匹配的记录
+        for record in records:
+            db.delete(record)
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"已删除 {count} 条包含 '{show_name}' 的记录",
+            "count": count
+        }
+    except Exception as e:
+        logger.error(f"删除剧集记录失败: {e}")
+        db.rollback()
+        return {"success": False, "message": str(e)}
+
+
 @router.delete("/records/{record_id}")
 async def delete_record(record_id: int, db: Session = Depends(get_db)):
     """删除记录"""
