@@ -9,11 +9,14 @@ const targets = ref([])
 const selectedTarget = ref('')
 const sourceLoading = ref(false)
 const targetLoading = ref(false)
+const sourceDir = ref('')
 
 const loadSourceTree = async () => {
+  if (!sourceDir.value) return
+  
   sourceLoading.value = true
   try {
-    const res = await api.getTree({ path: '/path/to/your/source', depth: 2 })
+    const res = await api.getTree({ path: sourceDir.value, depth: 2 })
     if (res.data.success) {
       sourceTree.value = convertToTreeData(res.data.data)
     }
@@ -27,8 +30,13 @@ const loadSourceTree = async () => {
 const loadTargets = async () => {
   try {
     const res = await api.getConfig()
-    if (res.data.success && res.data.data.targets) {
-      targets.value = res.data.data.targets
+    if (res.data.success) {
+      targets.value = res.data.data.targets || []
+      sourceDir.value = res.data.data.source_dir || ''
+      // 加载源目录树
+      if (sourceDir.value) {
+        loadSourceTree()
+      }
     }
   } catch (error) {
     console.error('加载配置失败:', error)
@@ -65,7 +73,6 @@ const convertToTreeData = (data) => {
 }
 
 onMounted(() => {
-  loadSourceTree()
   loadTargets()
 })
 </script>
