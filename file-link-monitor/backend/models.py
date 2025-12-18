@@ -52,9 +52,23 @@ class CustomNameMapping(Base):
     )
 
 
-def init_database(db_path: str):
-    """初始化数据库"""
-    engine = create_engine(f'sqlite:///{db_path}', echo=False)
+def init_database(db_config: dict = None):
+    """
+    初始化数据库
+    使用MySQL（硬编码配置）
+    """
+    # MySQL配置（硬编码）
+    db_url = 'mysql+pymysql://root:MyStrongPass123@10.10.10.17:3306/file_link_monitor?charset=utf8mb4'
+    
+    engine = create_engine(
+        db_url, 
+        echo=False,
+        pool_size=10,
+        max_overflow=20,
+        pool_recycle=3600,
+        pool_pre_ping=True
+    )
+    
     Base.metadata.create_all(engine)
     return engine
 

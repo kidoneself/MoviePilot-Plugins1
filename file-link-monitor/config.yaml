@@ -1,5 +1,6 @@
-database:
-  path: ./data/database.db
+# 文件监控硬链接系统配置
+
+# 监控配置
 monitors:
 - enabled: true
   exclude_patterns:
@@ -14,14 +15,24 @@ monitors:
   - name: 115网盘
     path: /path/to/your/target2
   template_files_path: /path/to/templates
+
+# 服务器配置
+server:
+  host: 0.0.0.0
+  port: 8080
+  debug: false
+
+# 数据库配置（已改用MySQL，配置在代码中）
+database:
+  path: ./data/database.db
+
+# 通知配置
 notification:
   enabled: true
   serverchan_sendkey: sctp13922twpjwr8sh4gr8bdeupbzjda
   serverchan_url: https://13922.push.ft07.com/send/sctp13922twpjwr8sh4gr8bdeupbzjda.send
-server:
-  debug: false
-  host: 0.0.0.0
-  port: 8080
+  
+# TaoSync配置
 taosync:
   check_interval: 60
   enabled: false

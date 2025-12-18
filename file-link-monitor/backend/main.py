@@ -44,11 +44,9 @@ async def lifespan(app: FastAPI):
     with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
     
-    # 初始化数据库
-    db_path = config['database']['path']
-    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-    db_engine = init_database(db_path)
-    logger.info(f"✅ 数据库初始化完成: {db_path}")
+    # 初始化数据库（MySQL硬编码配置）
+    db_engine = init_database()
+    logger.info("✅ 数据库初始化完成: MySQL (10.10.10.17:3306/file_link_monitor)")
     
     # 启动监控服务
     monitor_service = MonitorService(config, db_engine)
