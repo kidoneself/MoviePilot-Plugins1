@@ -157,15 +157,36 @@ class FileMonitorHandler(FileSystemEventHandler):
                     last_error = error
                 
                 # 记录到数据库（保存实际创建的混淆后路径）
-                record = LinkRecord(
-                    source_file=str(file_path),
-                    target_file=str(actual_target) if actual_target else str(target_file),
-                    file_size=file_size,
-                    link_method=method,
-                    status="success" if success else "failed",
-                    error_msg=error
-                )
-                session.add(record)
+                # 查询或创建记录
+                record = session.query(LinkRecord).filter(
+                    LinkRecord.source_file == str(file_path)
+                ).first()
+                
+                if not record:
+                    # 创建新记录
+                    from backend.utils.obfuscator import FolderObfuscator
+                    original_name = FolderObfuscator.extract_show_name(file_path)
+                    record = LinkRecord(
+                        source_file=str(file_path),
+                        original_name=original_name,
+                        file_size=file_size
+                    )
+                    session.add(record)
+                
+                # 根据target_name判断是哪个网盘
+                target_config = self.target_configs[idx]
+                target_name = target_config.get('name', '') if isinstance(target_config, dict) else ''
+                
+                if success and actual_target:
+                    # 根据网盘名称更新对应字段
+                    if '夸克' in target_name or '测试1' in target_name or idx == 0:
+                        record.quark_target_file = str(actual_target)
+                        record.quark_synced_at = datetime.now()
+                    else:
+                        record.baidu_target_file = str(actual_target)
+                        record.baidu_synced_at = datetime.now()
+                    
+                    record.updated_at = datetime.now()
             
             session.commit()
             logger.info(f"✅ 文件处理完成: {file_path.name}")
@@ -350,20 +371,25 @@ class MonitorService:
                         file_size = file_path.stat().st_size
                         
                         # 为每个目标创建硬链接
-                        for target in targets:
+                        for idx, target in enumerate(targets):
                             target_file = target / relative_path
                             
-                            # 先查数据库是否已有成功记录
-                            # 用source_file + target根目录匹配（因为target_file可能是混淆后的路径）
-                            target_base_path = str(target)  # 例如：/media/网盘测试1
-                            existing = session.query(LinkRecord).filter(
-                                LinkRecord.source_file == str(file_path),
-                                LinkRecord.target_file.like(f'{target_base_path}/%'),  # 匹配目标根目录
-                                LinkRecord.status == "success"
+                            # 查询或创建记录
+                            record = session.query(LinkRecord).filter(
+                                LinkRecord.source_file == str(file_path)
                             ).first()
                             
-                            if existing:
-                                logger.debug(f"数据库已有记录，跳过: {file_path} -> {target_base_path}")
+                            # 判断是否已同步过（检查对应网盘字段）
+                            is_first_target = idx == 0
+                            already_synced = False
+                            if record:
+                                if is_first_target and record.quark_target_file:
+                                    already_synced = True
+                                elif not is_first_target and record.baidu_target_file:
+                                    already_synced = True
+                            
+                            if already_synced:
+                                logger.debug(f"数据库已有记录，跳过: {file_path} -> {target}")
                                 skipped_count += 1
                                 continue
                             
@@ -379,31 +405,39 @@ class MonitorService:
                                 
                                 # 自动链接模板文件到剧集文件夹（只链接一次）
                                 if template_dir and template_dir.exists() and actual_target:
-                                    target_show_dir = actual_target.parent  # 使用实际创建的文件路径
-                                    # 如果是季度文件夹，获取剧集根目录
+                                    target_show_dir = actual_target.parent
                                     if target_show_dir.name.startswith('Season'):
                                         target_show_dir = target_show_dir.parent
                                     
-                                    # 避免重复链接
                                     dir_key = str(target_show_dir)
                                     if dir_key not in linked_dirs:
                                         linked_count = linker.link_template_files(target_show_dir, template_dir)
                                         if linked_count > 0:
                                             logger.info(f"✓ 已链接 {linked_count} 个模板文件到: {target_show_dir}")
                                             linked_dirs.add(dir_key)
+                                
+                                # 更新或创建记录
+                                if not record:
+                                    from backend.utils.obfuscator import FolderObfuscator
+                                    original_name = FolderObfuscator.extract_show_name(file_path)
+                                    record = LinkRecord(
+                                        source_file=str(file_path),
+                                        original_name=original_name,
+                                        file_size=file_size
+                                    )
+                                    session.add(record)
+                                
+                                # 根据索引判断是哪个网盘
+                                if is_first_target:
+                                    record.quark_target_file = str(actual_target)
+                                    record.quark_synced_at = datetime.now()
+                                else:
+                                    record.baidu_target_file = str(actual_target)
+                                    record.baidu_synced_at = datetime.now()
+                                
+                                record.updated_at = datetime.now()
                             else:
                                 failed_count += 1
-                            
-                            # 记录到数据库（保存实际创建的混淆后路径）
-                            record = LinkRecord(
-                                source_file=str(file_path),
-                                target_file=str(actual_target) if actual_target else str(target_file),
-                                file_size=file_size,
-                                link_method=method,
-                                status="success" if success else "failed",
-                                error_msg=error
-                            )
-                            session.add(record)
                 
                 session.commit()
                 logger.info(f"✅ 全量同步完成: 总文件 {total_files}, 新建 {success_count}, 跳过 {skipped_count}, 失败 {failed_count}")

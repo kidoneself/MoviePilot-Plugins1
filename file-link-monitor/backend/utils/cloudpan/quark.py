@@ -100,19 +100,12 @@ class QuarkPan(CloudPanBase):
         try:
             logger.info(f"⏳ 开始为 {folder_name} 创建夸克网盘分享链接...")
             
-            # 导航到首页
-            await self.page.goto(self.login_url, wait_until='domcontentloaded')
-            await asyncio.sleep(2)
+            # 使用直接搜索URL
+            from urllib.parse import quote
+            search_url = f"https://pan.quark.cn/list#/list/search?key={quote(folder_name)}"
+            logger.info(f"🔍 直接访问搜索页面: {folder_name}")
             
-            # 1. 搜索文件夹
-            logger.info(f"🔍 搜索文件夹: {folder_name}")
-            search_input = '#ice-container > section > section > main > div > div.SectionHeaderController--section-header--g312qJc > div.SectionHeaderController--section-header-right--QIJ-wNk > div.file-search-box > input'
-            
-            await self.page.click(search_input)
-            await asyncio.sleep(0.5)
-            await self.page.fill(search_input, folder_name)
-            await asyncio.sleep(0.5)
-            await self.page.press(search_input, 'Enter')
+            await self.page.goto(search_url, wait_until='domcontentloaded')
             await asyncio.sleep(3)
             
             # 2. 检查是否有搜索结果，并检查是否失效

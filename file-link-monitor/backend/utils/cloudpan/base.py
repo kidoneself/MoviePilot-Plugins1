@@ -67,11 +67,38 @@ class CloudPanBase(ABC):
             try:
                 import json
                 with open(self.cookies_file, 'r', encoding='utf-8') as f:
-                    cookies = json.load(f)
-                await context.add_cookies(cookies)
-                logger.info(f"✅ 已加载{self.name}的Cookies")
+                    raw_cookies = json.load(f)
+                
+                # 转换cookie格式（浏览器导出 -> Playwright格式）
+                playwright_cookies = []
+                for cookie in raw_cookies:
+                    playwright_cookie = {
+                        'name': cookie['name'],
+                        'value': cookie['value'],
+                        'domain': cookie.get('domain', ''),
+                        'path': cookie.get('path', '/'),
+                    }
+                    
+                    # 转换过期时间字段名
+                    if 'expirationDate' in cookie:
+                        playwright_cookie['expires'] = cookie['expirationDate']
+                    elif 'expires' in cookie:
+                        playwright_cookie['expires'] = cookie['expires']
+                    
+                    # 可选字段
+                    if 'httpOnly' in cookie:
+                        playwright_cookie['httpOnly'] = cookie['httpOnly']
+                    if 'secure' in cookie:
+                        playwright_cookie['secure'] = cookie['secure']
+                    if 'sameSite' in cookie and cookie['sameSite'] != 'unspecified':
+                        playwright_cookie['sameSite'] = cookie['sameSite'].replace('no_restriction', 'None')
+                    
+                    playwright_cookies.append(playwright_cookie)
+                
+                await context.add_cookies(playwright_cookies)
+                logger.info(f"✅ 已加载{self.name}的Cookies ({len(playwright_cookies)}个)")
             except Exception as e:
-                logger.warning(f"加载{self.name} Cookies失败: {e}")
+                logger.warning(f"加载{self.name} Cookies失败: {e}", exc_info=True)
         
         self.page = await context.new_page()
         

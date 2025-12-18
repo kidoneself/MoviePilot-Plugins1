@@ -23,14 +23,16 @@ class CloudPanManager:
         'quark': QuarkPan,
     }
     
-    def __init__(self, headless: bool = False):
+    def __init__(self, headless: bool = False, cookies_dir: str = "./cookies"):
         """
         初始化
         
         Args:
             headless: 是否无头模式
+            cookies_dir: Cookie保存目录
         """
         self.headless = headless
+        self.cookies_dir = cookies_dir
         self.pans: Dict[str, CloudPanBase] = {}
         
     async def init_pan(self, pan_type: str) -> Optional[CloudPanBase]:
@@ -52,10 +54,17 @@ class CloudPanManager:
         
         try:
             pan_class = self.SUPPORTED_PANS[pan_type]
-            pan = pan_class(headless=self.headless)
+            pan = pan_class(headless=self.headless, cookies_dir=self.cookies_dir)
             await pan.start()
             
-            # 尝试登录
+            # 如果有cookie文件，跳过登录验证（cookie已在start时加载）
+            # 直接开始使用，如果cookie无效会在操作时发现
+            if pan.cookies_file.exists():
+                logger.info(f"✅ 检测到{pan_type}网盘cookie，跳过登录验证")
+                self.pans[pan_type] = pan
+                return pan
+            
+            # 没有cookie，需要登录
             if not await pan.login(wait_for_scan=True):
                 logger.error(f"{pan_type}网盘登录失败")
                 await pan.close()
@@ -82,7 +91,8 @@ class CloudPanManager:
         db: Session,
         pan_type: str = 'baidu',
         target_path: str = None,
-        expire_days: int = 0
+        expire_days: int = 0,
+        original_name: str = None
     ) -> Dict[str, str]:
         """
         批量生成分享链接并更新到数据库
@@ -92,6 +102,7 @@ class CloudPanManager:
             pan_type: 网盘类型（baidu/quark）
             target_path: 目标网盘路径前缀（如：/剧集/国产剧集）
             expire_days: 有效期天数
+            original_name: 指定单个剧集名称（可选）
             
         Returns:
             {剧集名: 分享链接}
@@ -109,38 +120,48 @@ class CloudPanManager:
                 CustomNameMapping.enabled == True
             )
             
-            # 根据网盘类型过滤
-            if pan_type == 'baidu':
-                # 只处理没有百度网盘链接的
-                query = query.filter(
-                    (CustomNameMapping.baidu_link == None) |
-                    (CustomNameMapping.baidu_link == '')
-                )
-            elif pan_type == 'quark':
-                # 只处理没有夸克网盘链接的
-                query = query.filter(
-                    (CustomNameMapping.quark_link == None) |
-                    (CustomNameMapping.quark_link == '')
-                )
+            # 如果指定了剧集名，只处理该剧集
+            if original_name:
+                query = query.filter(CustomNameMapping.original_name == original_name)
+            else:
+                # 批量模式：根据网盘类型过滤没有链接的记录
+                if pan_type == 'baidu':
+                    query = query.filter(
+                        (CustomNameMapping.baidu_link == None) |
+                        (CustomNameMapping.baidu_link == '')
+                    )
+                elif pan_type == 'quark':
+                    query = query.filter(
+                        (CustomNameMapping.quark_link == None) |
+                        (CustomNameMapping.quark_link == '')
+                    )
             
             mappings = query.all()
-            logger.info(f"📊 找到 {len(mappings)} 条需要生成{pan_type}链接的记录")
+            if original_name:
+                logger.info(f"📊 找到指定剧集: {original_name}")
+            else:
+                logger.info(f"📊 找到 {len(mappings)} 条需要生成{pan_type}链接的记录")
             
             results = {}
             
             # 批量处理
             for i, mapping in enumerate(mappings, 1):
                 try:
-                    logger.info(f"⏳ [{i}/{len(mappings)}] 处理: {mapping.custom_name}")
+                    # 根据网盘类型使用对应的名称
+                    folder_name = mapping.quark_name if pan_type == 'quark' else mapping.baidu_name
+                    if not folder_name:
+                        folder_name = mapping.original_name
+                    
+                    logger.info(f"⏳ [{i}/{len(mappings)}] 处理: {folder_name}")
                     
                     # 构建完整路径
                     if target_path:
-                        folder_path = f"{target_path}/{mapping.custom_name}"
+                        folder_path = f"{target_path}/{folder_name}"
                     else:
-                        folder_path = mapping.custom_name
+                        folder_path = folder_name
                     
                     # 创建分享链接
-                    link = await pan.create_share_link(mapping.custom_name, expire_days)
+                    link = await pan.create_share_link(folder_name, expire_days)
                     
                     if link:
                         # 更新到数据库
@@ -151,16 +172,16 @@ class CloudPanManager:
                         
                         db.commit()
                         results[mapping.original_name] = link
-                        logger.info(f"✅ [{i}/{len(mappings)}] 成功: {mapping.custom_name} -> {link}")
+                        logger.info(f"✅ [{i}/{len(mappings)}] 成功: {folder_name} -> {link}")
                     else:
-                        logger.warning(f"⚠️ [{i}/{len(mappings)}] 失败: {mapping.custom_name}")
+                        logger.warning(f"⚠️ [{i}/{len(mappings)}] 失败: {folder_name}")
                         results[mapping.original_name] = None
                     
                     # 避免频率限制
                     await asyncio.sleep(3)
                     
                 except Exception as e:
-                    logger.error(f"❌ [{i}/{len(mappings)}] 错误: {mapping.custom_name} - {e}")
+                    logger.error(f"❌ [{i}/{len(mappings)}] 错误: {folder_name} - {e}")
                     results[mapping.original_name] = None
             
             # 统计成功数量

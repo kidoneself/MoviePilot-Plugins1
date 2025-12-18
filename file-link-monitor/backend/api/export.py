@@ -33,16 +33,19 @@ async def export_name_mapping(db: Session = Depends(get_db)):
         from openpyxl import Workbook
         from openpyxl.styles import Font, Alignment, PatternFill
         
-        # 查询所有成功的硬链接记录
-        records = db.query(LinkRecord).filter(
-            LinkRecord.status == "success"
-        ).all()
+        # 查询所有硬链接记录
+        records = db.query(LinkRecord).all()
         
         # 提取文件夹名称映射（去重）
         mapping = {}
         for record in records:
             source_path = Path(record.source_file)
-            target_path = Path(record.target_file)
+            # 优先使用quark_target_file，如果没有则使用baidu_target_file
+            target_file = record.quark_target_file or record.baidu_target_file
+            if not target_file:
+                continue
+            
+            target_path = Path(target_file)
             
             # 获取剧集名称（去掉Season和文件名）
             source_parts = source_path.parts

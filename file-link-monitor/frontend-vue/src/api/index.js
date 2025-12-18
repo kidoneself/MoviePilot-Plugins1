@@ -28,6 +28,10 @@ export default {
     return api.delete(`/mappings/${id}`)
   },
   
+  resyncToTarget(data) {
+    return api.post('/mappings/resync', data)
+  },
+  
   exportMappings(params) {
     return api.get('/export/mappings', { params, responseType: 'blob' })
   },
@@ -39,10 +43,19 @@ export default {
   
   // 上传网盘Cookie
   uploadCookie(panType, cookieData) {
-    return api.post('/cloudpan/upload-cookie', null, {
-      params: { pan_type: panType },
-      data: cookieData
+    return api.post('/cloudpan/upload-cookie', cookieData, {
+      params: { pan_type: panType }
     })
+  },
+  
+  // 批量导入百度链接
+  importBaiduLinks(csvData) {
+    return api.post('/cloudpan/import-baidu-links', csvData)
+  },
+  
+  // 批量导入夸克链接
+  importQuarkLinks(csvData) {
+    return api.post('/cloudpan/import-quark-links', csvData)
   },
 
   // 链接记录
@@ -75,5 +88,10 @@ export default {
   // 全量同步
   syncAll() {
     return api.post('/sync-all')
+  },
+
+  // 今日同步统计
+  getTodaySync() {
+    return api.get('/today-sync')
   }
 }

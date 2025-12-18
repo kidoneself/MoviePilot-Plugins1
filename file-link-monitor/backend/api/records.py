@@ -5,6 +5,7 @@ from typing import Optional
 import logging
 from io import BytesIO
 from datetime import datetime
+from pathlib import Path
 
 from backend.models import LinkRecord, get_session
 
@@ -41,9 +42,9 @@ async def get_records(
         if search:
             query = query.filter(LinkRecord.source_file.like(f'%{search}%'))
         
-        # 状态筛选
-        if status:
-            query = query.filter(LinkRecord.status == status)
+        # 状态筛选（新表结构不支持status）
+        # if status:
+        #     query = query.filter(LinkRecord.status == status)
         
         # 总数
         total = query.count()
@@ -85,12 +86,10 @@ async def get_records(
                 groups[show_name].append({
                     "id": record.id,
                     "source_file": record.source_file,
-                    "target_file": record.target_file,
+                    "quark_target_file": record.quark_target_file,
+                    "baidu_target_file": record.baidu_target_file,
                     "file_size": record.file_size,
-                    "link_method": record.link_method,
-                    "status": record.status,
-                    "error_msg": record.error_msg,
-                    "created_at": record.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                    "created_at": record.created_at.strftime("%Y-%m-%d %H:%M:%S") if record.created_at else None
                 })
             
             # 转换为列表格式
@@ -128,12 +127,10 @@ async def get_records(
                 groups[source_file].append({
                     "id": record.id,
                     "source_file": record.source_file,
-                    "target_file": record.target_file,
+                    "quark_target_file": record.quark_target_file,
+                    "baidu_target_file": record.baidu_target_file,
                     "file_size": record.file_size,
-                    "link_method": record.link_method,
-                    "status": record.status,
-                    "error_msg": record.error_msg,
-                    "created_at": record.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                    "created_at": record.created_at.strftime("%Y-%m-%d %H:%M:%S") if record.created_at else None
                 })
             
             # 转换为列表格式
@@ -171,7 +168,11 @@ async def get_records(
             target_shows = defaultdict(lambda: defaultdict(list))
             
             for record in records:
-                target_path = Path(record.target_file)
+                # 优先使用quark_target_file，如果没有则使用baidu_target_file
+                target_file = record.quark_target_file or record.baidu_target_file
+                if not target_file:
+                    continue
+                target_path = Path(target_file)
                 # 提取目标根目录（如 /media/网盘测试1）
                 target_base = str(target_path.parts[0:3] if len(target_path.parts) >= 3 else target_path.parts[0:2])
                 
@@ -204,12 +205,10 @@ async def get_records(
                         "records": [{
                             "id": r.id,
                             "source_file": r.source_file,
-                            "target_file": r.target_file,
+                            "quark_target_file": r.quark_target_file,
+                            "baidu_target_file": r.baidu_target_file,
                             "file_size": r.file_size,
-                            "link_method": r.link_method,
-                            "status": r.status,
-                            "error_msg": r.error_msg,
-                            "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                            "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else None
                         } for r in records_list]
                     })
                 
@@ -242,12 +241,11 @@ async def get_records(
             data.append({
                 "id": record.id,
                 "source_file": record.source_file,
-                "target_file": record.target_file,
+                "original_name": record.original_name,
+                "quark_target_file": record.quark_target_file,
+                "baidu_target_file": record.baidu_target_file,
                 "file_size": record.file_size,
-                "link_method": record.link_method,
-                "status": record.status,
-                "error_msg": record.error_msg,
-                "created_at": record.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                "created_at": record.created_at.strftime("%Y-%m-%d %H:%M:%S") if record.created_at else None
             })
         
         return {
@@ -270,15 +268,13 @@ async def get_stats(db: Session = Depends(get_db)):
         # 总记录数
         total_records = db.query(func.count(LinkRecord.id)).scalar()
         
-        # 成功/失败数
+        # 同步统计（有任一网盘同步即算成功）
         success_count = db.query(func.count(LinkRecord.id))\
-                         .filter(LinkRecord.status == 'success').scalar()
-        failed_count = db.query(func.count(LinkRecord.id))\
-                        .filter(LinkRecord.status == 'failed').scalar()
+                         .filter((LinkRecord.quark_target_file.isnot(None)) | (LinkRecord.baidu_target_file.isnot(None))).scalar()
+        failed_count = 0  # 新表结构不记录失败
         
         # 总大小
-        total_size = db.query(func.sum(LinkRecord.file_size))\
-                      .filter(LinkRecord.status == 'success').scalar() or 0
+        total_size = db.query(func.sum(LinkRecord.file_size)).scalar() or 0
         
         # 今天的记录
         from datetime import datetime, timedelta
@@ -296,10 +292,11 @@ async def get_stats(db: Session = Depends(get_db)):
         for r in recent:
             recent_data.append({
                 "source_file": r.source_file,
-                "target_file": r.target_file,
+                "original_name": r.original_name,
+                "quark_target_file": r.quark_target_file,
+                "baidu_target_file": r.baidu_target_file,
                 "file_size": r.file_size,
-                "status": r.status,
-                "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else None
             })
         
         return {
@@ -315,6 +312,87 @@ async def get_stats(db: Session = Depends(get_db)):
         }
     except Exception as e:
         logger.error(f"获取统计信息失败: {e}")
+        return {"success": False, "message": str(e)}
+
+
+@router.get("/today-sync")
+async def get_today_sync(db: Session = Depends(get_db)):
+    """获取今日同步明细，按网盘和目录结构分组"""
+    try:
+        from datetime import datetime, timedelta
+        import re
+        from collections import defaultdict
+        
+        # 获取今天的记录
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        records = db.query(LinkRecord).filter(
+            LinkRecord.created_at >= today
+        ).all()
+        
+        logger.info(f"今日同步统计：查询到 {len(records)} 条记录")
+        
+        # 按网盘分组
+        result = {
+            'quark': defaultdict(lambda: defaultdict(lambda: defaultdict(list))),
+            'baidu': defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        }
+        
+        # 定义分类列表
+        category1_list = ['剧集', '电影', '动漫', '其他']
+        category2_list = [
+            '港台电影', '国产电影', '日韩电影', '欧美电影', '动画电影',
+            '港台剧集', '国产剧集', '日韩剧集', '南亚剧集', '欧美剧集',
+            '国产动漫', '欧美动漫', '日本番剧',
+            '纪录影片', '综艺节目'
+        ]
+        
+        for record in records:
+            source_path = Path(record.source_file)
+            parts = list(source_path.parts)
+            filename = source_path.name
+            show_name = record.original_name
+            
+            if not show_name:
+                logger.debug(f"跳过：无剧名 {record.source_file}")
+                continue
+            
+            # 从路径中找分类
+            category1 = ''
+            category2 = ''
+            
+            for part in parts:
+                if part in category1_list:
+                    category1 = part
+                elif part in category2_list:
+                    category2 = part
+            
+            if not category1 or not category2:
+                logger.debug(f"跳过：分类不全 {record.source_file}, cat1={category1}, cat2={category2}")
+                continue
+            
+            logger.debug(f"解析成功：{category1} > {category2} > {show_name} > {filename}")
+            
+            # 夸克网盘
+            if record.quark_target_file:
+                result['quark'][category1][category2][show_name].append(filename)
+            
+            # 百度网盘
+            if record.baidu_target_file:
+                result['baidu'][category1][category2][show_name].append(filename)
+        
+        # 转换为普通dict便于JSON序列化
+        output = {
+            'quark': {k: {k2: {k3: sorted(v3) for k3, v3 in v2.items()} for k2, v2 in v.items()} for k, v in result['quark'].items()},
+            'baidu': {k: {k2: {k3: sorted(v3) for k3, v3 in v2.items()} for k2, v2 in v.items()} for k, v in result['baidu'].items()}
+        }
+        
+        return {
+            "success": True,
+            "data": output
+        }
+        
+    except Exception as e:
+        logger.error(f"获取今日同步统计失败: {e}")
         return {"success": False, "message": str(e)}
 
 
@@ -373,32 +451,35 @@ async def delete_records_by_show(
         count = len(records)
         
         # 收集需要删除的目录（去重）
-        # target_file现在存的是实际混淆后的路径，直接提取即可
         dirs_to_delete = set()
         for record in records:
-            target_path = Path(record.target_file)
-            logger.info(f"处理记录: {record.target_file}")
-            
-            # 找到剧集目录（包含Season的父目录）
-            show_dir = None
-            for parent in target_path.parents:
-                if 'Season' in parent.name or 'season' in parent.name:
-                    show_dir = parent.parent
-                    logger.info(f"  找到Season目录，剧集目录: {show_dir}")
-                    break
-            
-            # 如果没找到Season目录，默认向上2级
-            if not show_dir:
-                show_dir = target_path.parent.parent
-                logger.info(f"  未找到Season目录，使用默认向上2级: {show_dir}")
-            
-            if show_dir:
-                logger.info(f"  目录存在检查: {show_dir.exists()} - {show_dir}")
-                if show_dir.exists():
-                    dirs_to_delete.add(str(show_dir))
-                    logger.info(f"  ✓ 添加到删除列表: {show_dir}")
-                else:
-                    logger.warning(f"  ✗ 目录不存在: {show_dir}")
+            # 删除夸克和百度的目录
+            for target_file in [record.quark_target_file, record.baidu_target_file]:
+                if not target_file:
+                    continue
+                target_path = Path(target_file)
+                logger.info(f"处理记录: {target_file}")
+                
+                # 找到剧集目录（包含Season的父目录）
+                show_dir = None
+                for parent in target_path.parents:
+                    if 'Season' in parent.name or 'season' in parent.name:
+                        show_dir = parent.parent
+                        logger.info(f"  找到Season目录，剧集目录: {show_dir}")
+                        break
+                
+                # 如果没找到Season目录，默认向上2级
+                if not show_dir:
+                    show_dir = target_path.parent.parent
+                    logger.info(f"  未找到Season目录，使用默认向上2级: {show_dir}")
+                
+                if show_dir:
+                    logger.info(f"  目录存在检查: {show_dir.exists()} - {show_dir}")
+                    if show_dir.exists():
+                        dirs_to_delete.add(str(show_dir))
+                        logger.info(f"  ✓ 添加到删除列表: {show_dir}")
+                    else:
+                        logger.warning(f"  ✗ 目录不存在: {show_dir}")
         
         # 删除所有匹配的记录
         for record in records:
@@ -598,8 +679,8 @@ async def export_records(
         
         query = db.query(LinkRecord)
         
-        if status:
-            query = query.filter(LinkRecord.status == status)
+        # if status:
+        #     query = query.filter(LinkRecord.status == status)
         
         if search:
             query = query.filter(LinkRecord.source_file.like(f'%{search}%'))
@@ -612,7 +693,7 @@ async def export_records(
         ws.title = "链接记录"
         
         # 设置表头
-        headers = ["源文件", "目标文件", "文件大小(MB)", "链接方式", "状态", "创建时间", "错误信息"]
+        headers = ["源文件", "夸克目标", "百度目标", "文件大小(MB)", "创建时间"]
         ws.append(headers)
         
         # 设置表头样式
@@ -633,16 +714,14 @@ async def export_records(
             
             ws.append([
                 record.source_file,
-                record.target_file,
+                record.quark_target_file or '-',
+                record.baidu_target_file or '-',
                 file_size_mb,
-                record.link_method or '-',
-                record.status,
-                created_at,
-                record.error_msg or '-'
+                created_at
             ])
             
             # 设置对齐
-            for col_num in range(1, 8):
+            for col_num in range(1, 6):
                 cell = ws.cell(row=row_num, column=col_num)
                 cell.alignment = Alignment(horizontal="left", vertical="center")
             
@@ -651,7 +730,7 @@ async def export_records(
         # 调整列宽
         ws.column_dimensions['A'].width = 60
         ws.column_dimensions['B'].width = 60
-        ws.column_dimensions['C'].width = 15
+        ws.column_dimensions['C'].width = 60
         ws.column_dimensions['D'].width = 12
         ws.column_dimensions['E'].width = 10
         ws.column_dimensions['F'].width = 20
@@ -661,8 +740,6 @@ async def export_records(
         ws.append([])
         ws.append([f"导出时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
         ws.append([f"总计: {len(records)} 条记录"])
-        ws.append([f"成功: {sum(1 for r in records if r.status == 'success')} 条"])
-        ws.append([f"失败: {sum(1 for r in records if r.status == 'failed')} 条"])
         
         # 保存到内存
         output = BytesIO()

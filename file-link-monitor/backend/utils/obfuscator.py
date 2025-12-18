@@ -102,10 +102,24 @@ class FolderObfuscator:
         return Path(file_path).suffix.lower() in FolderObfuscator.VIDEO_EXTENSIONS
     
     @staticmethod
-    def is_subtitle_file(file_path) -> bool:
-        """判断是否为字幕文件"""
-        from pathlib import Path
-        return Path(file_path).suffix.lower() in FolderObfuscator.SUBTITLE_EXTENSIONS
+    def is_media_file(file_path):
+        """检查是否是媒体文件（视频+字幕）"""
+        ext = Path(file_path).suffix.lower()
+        return ext in FolderObfuscator.VIDEO_EXTENSIONS or ext in FolderObfuscator.SUBTITLE_EXTENSIONS
+    
+    @staticmethod
+    def extract_show_name(file_path):
+        """从文件路径提取剧集名称（包含年份的目录名）"""
+        file_path = Path(file_path)
+        # 向上查找包含年份格式 (YYYY) 的目录
+        for parent in file_path.parents:
+            if re.search(r'\(\d{4}\)', parent.name):
+                return parent.name
+        # 如果没找到年份，返回倒数第2级目录（通常是剧集目录）
+        parts = file_path.parts
+        if len(parts) >= 3:
+            return parts[-3]
+        return None
     
     @staticmethod
     def is_media_file(file_path) -> bool:
@@ -172,7 +186,8 @@ class FolderObfuscator:
                 ).first()
                 
                 if mapping:
-                    return mapping.custom_name
+                    # 优先返回quark_name，如果没有则返回baidu_name，都没有则返回原名
+                    return mapping.quark_name or mapping.baidu_name or name
                 return None
             finally:
                 session.close()

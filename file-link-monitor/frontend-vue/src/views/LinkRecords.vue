@@ -7,7 +7,6 @@ const records = ref([])
 const total = ref(0)
 const loading = ref(false)
 const searchText = ref('')
-const statusFilter = ref('')
 const groupByFilter = ref('')
 const currentPage = ref(1)
 const pageSize = ref(20)
@@ -20,7 +19,6 @@ const loadRecords = async () => {
       page_size: pageSize.value
     }
     if (searchText.value) params.search = searchText.value
-    if (statusFilter.value) params.status = statusFilter.value
     if (groupByFilter.value) params.group_by = groupByFilter.value
     
     const res = await api.getRecords(params)
@@ -58,7 +56,6 @@ const handleBatchDelete = async () => {
 const exportRecords = () => {
   const params = {}
   if (searchText.value) params.search = searchText.value
-  if (statusFilter.value) params.status = statusFilter.value
   
   api.exportRecords(params).then(res => {
     const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -129,19 +126,21 @@ onMounted(() => {
       </div>
 
       <el-table :data="records" v-loading="loading" stripe style="margin-top: 20px">
-        <el-table-column prop="source_file" label="源文件" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="target_show" label="网盘目录" min-width="150" />
-        <el-table-column prop="target_file" label="目标文件" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="file_size" label="文件大小" width="120">
+        <el-table-column prop="original_name" label="剧集原名" min-width="150" />
+        <el-table-column prop="source_file" label="源文件" min-width="250" show-overflow-tooltip />
+        <el-table-column prop="quark_target_file" label="夸克目标" min-width="250" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ formatFileSize(row.file_size) }}
+            {{ row.quark_target_file || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="baidu_target_file" label="百度目标" min-width="250" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-tag :type="row.status === 'success' ? 'success' : 'danger'" size="small">
-              {{ row.status === 'success' ? '成功' : '失败' }}
-            </el-tag>
+            {{ row.baidu_target_file || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="file_size" label="文件大小" width="110">
+          <template #default="{ row }">
+            {{ formatFileSize(row.file_size) }}
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="160" />

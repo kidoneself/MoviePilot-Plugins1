@@ -20,30 +20,43 @@ class MonitorConfig(Base):
 
 
 class LinkRecord(Base):
-    """硬链接记录表"""
+    """硬链接记录表（支持双网盘）"""
     __tablename__ = "link_records"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    source_file = Column(String(1000), nullable=False)
-    target_file = Column(String(1000), nullable=False)
+    source_file = Column(String(768), nullable=False, unique=True)
+    original_name = Column(String(191))
     file_size = Column(BigInteger)
-    link_method = Column(String(20))  # 硬链接/复制
-    status = Column(String(20))  # success/failed
-    error_msg = Column(Text)
+    
+    # 网盘1（夸克）
+    quark_target_file = Column(String(1000))
+    quark_synced_at = Column(DateTime)
+    
+    # 网盘2（百度）
+    baidu_target_file = Column(String(1000))
+    baidu_synced_at = Column(DateTime)
+    
     created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 class CustomNameMapping(Base):
-    """自定义名称映射表"""
+    """自定义名称映射表（支持双网盘）"""
     __tablename__ = "custom_name_mapping"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    original_name = Column(String(500), nullable=False, unique=True)  # 原名（唯一）
-    custom_name = Column(String(500), nullable=False)  # 自定义名称
-    enabled = Column(Boolean, default=True)  # 是否启用
-    note = Column(String(500))  # 备注说明
-    baidu_link = Column(String(1000))  # 百度网盘链接
-    quark_link = Column(String(1000))  # 夸克网盘链接
+    original_name = Column(String(191), nullable=False, unique=True)
+    
+    # 双网盘显示名
+    quark_name = Column(String(500))
+    baidu_name = Column(String(500))
+    
+    # 网盘链接
+    quark_link = Column(String(1000))
+    baidu_link = Column(String(1000))
+    
+    enabled = Column(Boolean, default=True)
+    note = Column(String(500))
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     
@@ -58,7 +71,7 @@ def init_database(db_config: dict = None):
     使用MySQL（硬编码配置）
     """
     # MySQL配置（硬编码）
-    db_url = 'mysql+pymysql://root:MyStrongPass123@10.10.10.17:3306/file_link_monitor?charset=utf8mb4'
+    db_url = 'mysql+pymysql://root:MyStrongPass123@10.10.10.17:3306/file_link_monitor_v2?charset=utf8mb4'
     
     engine = create_engine(
         db_url, 

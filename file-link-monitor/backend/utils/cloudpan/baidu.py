@@ -166,22 +166,16 @@ class BaiduPan(CloudPanBase):
             分享链接，失败返回None
         """
         try:
-            # 1. 搜索文件夹
-            await self.page.goto(self.login_url, wait_until='domcontentloaded')
-            await asyncio.sleep(2)
+            # 使用直接搜索URL
+            from urllib.parse import quote
+            search_url = f"https://pan.baidu.com/disk/main?from=homeFlow#/index?category=all&search={quote(folder_name)}"
+            logger.info(f"🔍 直接访问搜索页面: {folder_name}")
+            
+            await self.page.goto(search_url, wait_until='domcontentloaded')
+            await asyncio.sleep(3)
             
             # 关闭可能出现的弹窗
             await self._close_popups()
-            
-            # 点击搜索框
-            search_input = '.wp-s-core-pan__header-tool-bar--customize input'
-            await self.page.click(search_input)
-            await asyncio.sleep(0.5)
-            
-            # 输入文件夹名并搜索
-            await self.page.fill(search_input, folder_name)
-            await self.page.keyboard.press('Enter')
-            await asyncio.sleep(3)
             
             # 2. 找到文件夹并勾选
             try:
@@ -248,13 +242,25 @@ class BaiduPan(CloudPanBase):
                     clipboard_text = await self.page.evaluate('navigator.clipboard.readText()')
                     logger.info(f"📋 从剪贴板获取到文本: {clipboard_text[:100]}...")
                     
-                    # 从剪贴板文本中提取链接
+                    # 从剪贴板文本中提取链接和提取码
                     import re
-                    # 匹配百度网盘链接格式：https://pan.baidu.com/s/xxxxx?pwd=xxxx 或 https://pan.baidu.com/s/xxxxx
-                    match = re.search(r'https://pan\.baidu\.com/s/[\w\-]+(?:\?pwd=[\w]+)?', clipboard_text)
-                    if match:
-                        share_link = match.group(0)
-                        logger.info(f"✅ 成功提取分享链接: {share_link}")
+                    
+                    # 提取链接（不带pwd参数的基础链接）
+                    link_match = re.search(r'https://pan\.baidu\.com/s/[\w\-]+', clipboard_text)
+                    # 提取提取码
+                    pwd_match = re.search(r'(?:提取码[：:]\s*|pwd=)([\w]+)', clipboard_text)
+                    
+                    if link_match:
+                        base_link = link_match.group(0)
+                        
+                        if pwd_match:
+                            pwd = pwd_match.group(1)
+                            # 格式化成: https://pan.baidu.com/s/xxxxx?pwd=xxxx 提取码: xxxx
+                            share_link = f"{base_link}?pwd={pwd} 提取码: {pwd}"
+                            logger.info(f"✅ 成功提取分享链接和提取码: {share_link}")
+                        else:
+                            share_link = base_link
+                            logger.info(f"✅ 成功提取分享链接（无提取码）: {share_link}")
                     else:
                         logger.error(f"未能从剪贴板文本中提取到链接")
                         return None

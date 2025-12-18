@@ -14,6 +14,11 @@ const stats = ref({
   total_size: '0 B'
 })
 
+const todaySync = ref({
+  quark: {},
+  baidu: {}
+})
+const showTodayDetail = ref(false)
 const activeMenu = ref('mappings')
 
 const loadStats = async () => {
@@ -24,6 +29,17 @@ const loadStats = async () => {
     }
   } catch (error) {
     console.error('加载统计失败:', error)
+  }
+}
+
+const loadTodaySync = async () => {
+  try {
+    const res = await api.getTodaySync()
+    if (res.data.success) {
+      todaySync.value = res.data.data
+    }
+  } catch (error) {
+    console.error('加载今日同步失败:', error)
   }
 }
 
@@ -47,7 +63,11 @@ const syncAll = async () => {
 
 onMounted(() => {
   loadStats()
-  setInterval(loadStats, 30000)
+  loadTodaySync()
+  setInterval(() => {
+    loadStats()
+    loadTodaySync()
+  }, 30000)
   
   // 根据当前路由设置active菜单
   const path = router.currentRoute.value.path
@@ -69,7 +89,9 @@ onMounted(() => {
           <el-statistic title="总记录" :value="stats.total_count" />
           <el-statistic title="成功" :value="stats.success_count" value-style="color: #67C23A" />
           <el-statistic title="失败" :value="stats.failed_count" value-style="color: #F56C6C" />
-          <el-statistic title="总大小" :value="stats.total_size" />
+          <el-button v-if="stats.today_count > 0" type="warning" size="small" @click="showTodayDetail = true">
+            📊 今日明细
+          </el-button>
         </el-space>
       </div>
     </el-header>
@@ -110,6 +132,41 @@ onMounted(() => {
         <router-view />
       </el-main>
     </el-container>
+    
+    <!-- 今日同步明细弹窗 -->
+    <el-dialog v-model="showTodayDetail" title="📊 今日同步明细" width="800px">
+      <!-- 夸克网盘 -->
+      <div v-if="Object.keys(todaySync.quark).length > 0" class="pan-section">
+        <h4>📦 夸克网盘</h4>
+        <div v-for="(cat2Items, cat1) in todaySync.quark" :key="'quark-' + cat1" class="category-section">
+          <div v-for="(shows, cat2) in cat2Items" :key="'quark-' + cat1 + '-' + cat2">
+            <div class="category-title">{{ cat1 }} > {{ cat2 }}</div>
+            <div v-for="(files, showName) in shows" :key="'quark-show-' + showName" class="show-item">
+              <span class="show-name">{{ showName }}:</span>
+              <span class="file-list">{{ files.join(', ') }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 百度网盘 -->
+      <div v-if="Object.keys(todaySync.baidu).length > 0" class="pan-section">
+        <h4>📦 百度网盘</h4>
+        <div v-for="(cat2Items, cat1) in todaySync.baidu" :key="'baidu-' + cat1" class="category-section">
+          <div v-for="(shows, cat2) in cat2Items" :key="'baidu-' + cat1 + '-' + cat2">
+            <div class="category-title">{{ cat1 }} > {{ cat2 }}</div>
+            <div v-for="(files, showName) in shows" :key="'baidu-show-' + showName" class="show-item">
+              <span class="show-name">{{ showName }}:</span>
+              <span class="file-list">{{ files.join(', ') }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div v-if="Object.keys(todaySync.quark).length === 0 && Object.keys(todaySync.baidu).length === 0" class="empty-tip">
+        暂无同步记录
+      </div>
+    </el-dialog>
   </el-container>
 </template>
 
@@ -165,6 +222,63 @@ onMounted(() => {
 
 .app-main {
   background: #ffffff;
+  padding: 20px;
+}
+
+.today-sync-card {
+  margin-bottom: 20px;
+}
+
+.today-sync-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+}
+
+.today-sync-card .rotate {
+  transition: transform 0.3s;
+}
+
+.pan-section {
+  margin-bottom: 20px;
+}
+
+.pan-section h4 {
+  margin: 0 0 10px 0;
+  color: #409eff;
+  font-size: 16px;
+}
+
+.category-section {
+  margin-bottom: 15px;
+}
+
+.category-title {
+  font-weight: bold;
+  color: #606266;
+  margin-bottom: 5px;
+  padding-left: 20px;
+}
+
+.show-item {
+  padding: 5px 0 5px 40px;
+  font-size: 14px;
+}
+
+.show-item .show-name {
+  font-weight: 500;
+  color: #303133;
+  margin-right: 8px;
+}
+
+.show-item .file-list {
+  color: #606266;
+}
+
+.empty-tip {
+  text-align: center;
+  color: #909399;
   padding: 20px;
 }
 </style>
