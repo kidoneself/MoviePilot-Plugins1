@@ -376,21 +376,31 @@ async def delete_records_by_show(
         dirs_to_delete = set()
         for record in records:
             target_path = Path(record.target_file)
+            logger.info(f"处理记录: {record.target_file}")
+            
             # 找到剧集目录
             # 1. 如果路径中有Season目录，取其父目录
             # 2. 否则向上2级目录（文件->Season->剧集目录）
             show_dir = None
             for parent in target_path.parents:
+                logger.info(f"  检查父目录: {parent.name}")
                 if 'Season' in parent.name or 'season' in parent.name:
                     show_dir = parent.parent
+                    logger.info(f"  找到Season目录，剧集目录: {show_dir}")
                     break
             
             # 如果没找到Season目录，默认向上2级
             if not show_dir:
                 show_dir = target_path.parent.parent
+                logger.info(f"  未找到Season目录，使用默认向上2级: {show_dir}")
             
-            if show_dir and show_dir.exists():
-                dirs_to_delete.add(str(show_dir))
+            if show_dir:
+                logger.info(f"  目录存在检查: {show_dir.exists()} - {show_dir}")
+                if show_dir.exists():
+                    dirs_to_delete.add(str(show_dir))
+                    logger.info(f"  ✓ 添加到删除列表: {show_dir}")
+                else:
+                    logger.warning(f"  ✗ 目录不存在: {show_dir}")
         
         # 删除所有匹配的记录
         for record in records:
