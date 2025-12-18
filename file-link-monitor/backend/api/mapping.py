@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 import logging
+from io import BytesIO
+from datetime import datetime
 
 from backend.models import CustomNameMapping, LinkRecord, get_session
 
@@ -270,3 +272,110 @@ async def delete_records_by_show(
         db.rollback()
         logger.error(f"删除记录失败: {e}")
         return {"success": False, "message": str(e)}
+
+
+@router.get("/export/mappings")
+async def export_mappings(
+    enabled: Optional[bool] = None,
+    search: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    导出名称映射为Excel文件（只包含原名和自定义名两列）
+    
+    Args:
+        enabled: 过滤启用状态
+        search: 搜索关键词
+    """
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        
+        query = db.query(CustomNameMapping)
+        
+        if enabled is not None:
+            query = query.filter(CustomNameMapping.enabled == enabled)
+        
+        if search:
+            query = query.filter(
+                (CustomNameMapping.original_name.like(f'%{search}%')) |
+                (CustomNameMapping.custom_name.like(f'%{search}%'))
+            )
+        
+        mappings = query.order_by(CustomNameMapping.original_name).all()
+        
+        # 创建Excel工作簿
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "名称映射"
+        
+        # 设置表头
+        headers = ["原名", "混淆名"]
+        ws.append(headers)
+        
+        # 设置表头样式
+        header_fill = PatternFill(start_color="667eea", end_color="667eea", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=14)
+        
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # 填充数据
+        row_num = 2
+        for mapping in mappings:
+            ws.append([
+                mapping.original_name,
+                mapping.custom_name
+            ])
+            
+            # 设置对齐和字体
+            for col_num in range(1, 3):
+                cell = ws.cell(row=row_num, column=col_num)
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+                cell.font = Font(size=12)
+            
+            row_num += 1
+        
+        # 调整列宽
+        ws.column_dimensions['A'].width = 50
+        ws.column_dimensions['B'].width = 50
+        
+        # 添加统计信息
+        ws.append([])
+        ws.append([f"导出时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+        ws.append([f"总计: {len(mappings)} 条映射"])
+        
+        # 保存到内存
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        # 生成文件名
+        filename = f"name_mappings_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        logger.info(f"✅ 成功导出名称映射: {len(mappings)} 条")
+        
+        # 返回Excel文件
+        return Response(
+            content=output.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+        
+    except ImportError:
+        logger.error("openpyxl库未安装，无法导出Excel")
+        return {
+            "success": False,
+            "message": "openpyxl库未安装，请安装: pip install openpyxl"
+        }
+    except Exception as e:
+        logger.error(f"导出失败: {e}")
+        return {
+            "success": False,
+            "message": f"导出失败: {str(e)}"
+        }

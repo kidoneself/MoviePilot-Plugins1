@@ -882,3 +882,17 @@ function exportRecords() {
     // 直接在新窗口打开下载链接
     window.open(url, '_blank');
 }
+
+// 导出名称映射
+function exportMappings() {
+    const searchInput = document.getElementById('mappingSearch');
+    const search = searchInput ? searchInput.value : '';
+    
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    
+    const url = `${API_BASE}/export/mappings?${params.toString()}`;
+    
+    // 直接在新窗口打开下载链接
+    window.open(url, '_blank');
+}
