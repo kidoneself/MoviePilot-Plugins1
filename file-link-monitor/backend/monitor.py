@@ -354,14 +354,16 @@ class MonitorService:
                             target_file = target / relative_path
                             
                             # 先查数据库是否已有成功记录
+                            # 用source_file + target根目录匹配（因为target_file可能是混淆后的路径）
+                            target_base_path = str(target)  # 例如：/media/网盘测试1
                             existing = session.query(LinkRecord).filter(
                                 LinkRecord.source_file == str(file_path),
-                                LinkRecord.target_file == str(target_file),
+                                LinkRecord.target_file.like(f'{target_base_path}/%'),  # 匹配目标根目录
                                 LinkRecord.status == "success"
                             ).first()
                             
                             if existing:
-                                logger.debug(f"数据库已有记录，跳过: {target_file}")
+                                logger.debug(f"数据库已有记录，跳过: {file_path} -> {target_base_path}")
                                 skipped_count += 1
                                 continue
                             
