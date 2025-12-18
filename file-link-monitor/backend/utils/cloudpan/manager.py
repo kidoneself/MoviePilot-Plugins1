@@ -23,14 +23,20 @@ class CloudPanManager:
         'quark': QuarkPan,
     }
     
-    def __init__(self, headless: bool = False, cookies_dir: str = "./cookies"):
+    def __init__(self, headless: bool = False, cookies_dir: str = None):
         """
         初始化
         
         Args:
             headless: 是否无头模式
-            cookies_dir: Cookie保存目录
+            cookies_dir: Cookie保存目录（默认为项目根目录/cookies）
         """
+        from pathlib import Path
+        if cookies_dir is None:
+            # 默认使用项目根目录下的cookies文件夹
+            project_root = Path(__file__).parent.parent.parent.parent
+            cookies_dir = str(project_root / 'cookies')
+        
         self.headless = headless
         self.cookies_dir = cookies_dir
         self.pans: Dict[str, CloudPanBase] = {}

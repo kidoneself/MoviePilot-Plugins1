@@ -15,14 +15,19 @@ logger = logging.getLogger(__name__)
 class CloudPanBase(ABC):
     """网盘自动化基类"""
     
-    def __init__(self, headless: bool = False, cookies_dir: str = "./data/cookies"):
+    def __init__(self, headless: bool = False, cookies_dir: str = None):
         """
         初始化
         
         Args:
             headless: 是否无头模式（False可以看到浏览器操作）
-            cookies_dir: Cookie保存目录
+            cookies_dir: Cookie保存目录（默认为项目根目录/cookies）
         """
+        if cookies_dir is None:
+            # 默认使用项目根目录下的cookies文件夹
+            project_root = Path(__file__).parent.parent.parent.parent
+            cookies_dir = str(project_root / 'cookies')
+        
         self.headless = headless
         self.cookies_dir = Path(cookies_dir)
         self.cookies_dir.mkdir(parents=True, exist_ok=True)
