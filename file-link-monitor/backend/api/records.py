@@ -335,7 +335,8 @@ async def get_today_sync(db: Session = Depends(get_db)):
         # 按网盘分组
         result = {
             'quark': defaultdict(lambda: defaultdict(lambda: defaultdict(list))),
-            'baidu': defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+            'baidu': defaultdict(lambda: defaultdict(lambda: defaultdict(list))),
+            'xunlei': defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
         }
         
         # 定义分类列表
@@ -380,11 +381,16 @@ async def get_today_sync(db: Session = Depends(get_db)):
             # 百度网盘
             if record.baidu_target_file:
                 result['baidu'][category1][category2][show_name].append(filename)
+            
+            # 迅雷网盘
+            if record.xunlei_target_file:
+                result['xunlei'][category1][category2][show_name].append(filename)
         
         # 转换为普通dict便于JSON序列化
         output = {
             'quark': {k: {k2: {k3: sorted(v3) for k3, v3 in v2.items()} for k2, v2 in v.items()} for k, v in result['quark'].items()},
-            'baidu': {k: {k2: {k3: sorted(v3) for k3, v3 in v2.items()} for k2, v2 in v.items()} for k, v in result['baidu'].items()}
+            'baidu': {k: {k2: {k3: sorted(v3) for k3, v3 in v2.items()} for k2, v2 in v.items()} for k, v in result['baidu'].items()},
+            'xunlei': {k: {k2: {k3: sorted(v3) for k3, v3 in v2.items()} for k2, v2 in v.items()} for k, v in result['xunlei'].items()}
         }
         
         return {

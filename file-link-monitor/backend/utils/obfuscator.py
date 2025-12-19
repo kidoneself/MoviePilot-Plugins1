@@ -220,10 +220,12 @@ class FolderObfuscator:
                 ).first()
                 
                 if not existing:
-                    # 创建新映射
+                    # 创建新映射（三个网盘都用混淆后的名字）
                     new_mapping = CustomNameMapping(
                         original_name=original_name,
-                        custom_name=obfuscated_name,
+                        quark_name=obfuscated_name,
+                        baidu_name=obfuscated_name,
+                        xunlei_name=obfuscated_name,
                         enabled=True,
                         note="自动创建"
                     )

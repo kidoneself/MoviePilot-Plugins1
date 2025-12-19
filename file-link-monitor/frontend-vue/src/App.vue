@@ -139,8 +139,10 @@ onMounted(() => {
           <div v-for="(shows, cat2) in cat2Items" :key="'quark-' + cat1 + '-' + cat2">
             <div class="category-title">{{ cat1 }} > {{ cat2 }}</div>
             <div v-for="(files, showName) in shows" :key="'quark-show-' + showName" class="show-item">
-              <span class="show-name">{{ showName }}:</span>
-              <span class="file-list">{{ files.join(', ') }}</span>
+              <div class="show-name">{{ showName }}:</div>
+              <ul class="file-list">
+                <li v-for="(file, idx) in files" :key="idx">{{ file }}</li>
+              </ul>
             </div>
           </div>
         </div>
@@ -153,14 +155,32 @@ onMounted(() => {
           <div v-for="(shows, cat2) in cat2Items" :key="'baidu-' + cat1 + '-' + cat2">
             <div class="category-title">{{ cat1 }} > {{ cat2 }}</div>
             <div v-for="(files, showName) in shows" :key="'baidu-show-' + showName" class="show-item">
-              <span class="show-name">{{ showName }}:</span>
-              <span class="file-list">{{ files.join(', ') }}</span>
+              <div class="show-name">{{ showName }}:</div>
+              <ul class="file-list">
+                <li v-for="(file, idx) in files" :key="idx">{{ file }}</li>
+              </ul>
             </div>
           </div>
         </div>
       </div>
       
-      <div v-if="Object.keys(todaySync.quark).length === 0 && Object.keys(todaySync.baidu).length === 0" class="empty-tip">
+      <!-- 迅雷网盘 -->
+      <div v-if="Object.keys(todaySync.xunlei || {}).length > 0" class="pan-section">
+        <h4>📦 迅雷网盘</h4>
+        <div v-for="(cat2Items, cat1) in todaySync.xunlei" :key="'xunlei-' + cat1" class="category-section">
+          <div v-for="(shows, cat2) in cat2Items" :key="'xunlei-' + cat1 + '-' + cat2">
+            <div class="category-title">{{ cat1 }} > {{ cat2 }}</div>
+            <div v-for="(files, showName) in shows" :key="'xunlei-show-' + showName" class="show-item">
+              <div class="show-name">{{ showName }}:</div>
+              <ul class="file-list">
+                <li v-for="(file, idx) in files" :key="idx">{{ file }}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div v-if="Object.keys(todaySync.quark).length === 0 && Object.keys(todaySync.baidu).length === 0 && Object.keys(todaySync.xunlei || {}).length === 0" class="empty-tip">
         暂无同步记录
       </div>
     </el-dialog>
@@ -259,18 +279,35 @@ onMounted(() => {
 }
 
 .show-item {
-  padding: 5px 0 5px 40px;
+  padding: 8px 0 8px 40px;
   font-size: 14px;
+  margin-bottom: 10px;
 }
 
 .show-item .show-name {
-  font-weight: 500;
+  font-weight: 600;
   color: #303133;
-  margin-right: 8px;
+  margin-bottom: 5px;
 }
 
 .show-item .file-list {
   color: #606266;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.show-item .file-list li {
+  padding: 3px 0;
+  padding-left: 15px;
+  position: relative;
+}
+
+.show-item .file-list li:before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #909399;
 }
 
 .empty-tip {

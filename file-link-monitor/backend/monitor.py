@@ -394,12 +394,13 @@ class MonitorService:
                             ).first()
                             
                             # 判断是否已同步过（检查对应网盘字段）
-                            is_first_target = idx == 0
                             already_synced = False
                             if record:
-                                if is_first_target and record.quark_target_file:
+                                if idx == 0 and record.quark_target_file:
                                     already_synced = True
-                                elif not is_first_target and record.baidu_target_file:
+                                elif idx == 1 and record.baidu_target_file:
+                                    already_synced = True
+                                elif idx == 2 and record.xunlei_target_file:
                                     already_synced = True
                             
                             if already_synced:
@@ -442,12 +443,15 @@ class MonitorService:
                                     session.add(record)
                                 
                                 # 根据索引判断是哪个网盘
-                                if is_first_target:
+                                if idx == 0:
                                     record.quark_target_file = str(actual_target)
                                     record.quark_synced_at = datetime.now()
-                                else:
+                                elif idx == 1:
                                     record.baidu_target_file = str(actual_target)
                                     record.baidu_synced_at = datetime.now()
+                                elif idx == 2:
+                                    record.xunlei_target_file = str(actual_target)
+                                    record.xunlei_synced_at = datetime.now()
                                 
                                 record.updated_at = datetime.now()
                             else:

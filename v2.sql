@@ -5,8 +5,10 @@ create table custom_name_mapping
     original_name varchar(191)         not null,
     quark_name    varchar(500)         null,
     baidu_name    varchar(500)         null,
+    xunlei_name   varchar(500)         null comment '迅雷网盘显示名称',
     quark_link    varchar(1000)        null,
     baidu_link    varchar(1000)        null,
+    xunlei_link   varchar(1000)        null comment '迅雷网盘分享链接',
     enabled       tinyint(1)           null,
     is_completed  tinyint(1) default 0 not null comment '是否完结',
     note          varchar(500)         null,
@@ -21,17 +23,19 @@ create index idx_original_name
 
 create table link_records
 (
-    id                int auto_increment
+    id                 int auto_increment
         primary key,
-    source_file       varchar(768)  not null,
-    original_name     varchar(191)  null,
-    file_size         bigint        null,
-    quark_target_file varchar(1000) null,
-    quark_synced_at   datetime      null,
-    baidu_target_file varchar(1000) null,
-    baidu_synced_at   datetime      null,
-    created_at        datetime      null,
-    updated_at        datetime      null,
+    source_file        varchar(768)  not null,
+    original_name      varchar(191)  null,
+    file_size          bigint        null,
+    quark_target_file  varchar(1000) null,
+    quark_synced_at    datetime      null,
+    baidu_target_file  varchar(1000) null,
+    xunlei_target_file varchar(1000) null comment '迅雷网盘目标路径',
+    baidu_synced_at    datetime      null,
+    xunlei_synced_at   datetime      null comment '迅雷网盘同步时间',
+    created_at         datetime      null,
+    updated_at         datetime      null,
     constraint source_file
         unique (source_file)
 );
