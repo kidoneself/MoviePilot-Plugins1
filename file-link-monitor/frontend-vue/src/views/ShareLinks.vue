@@ -93,22 +93,42 @@ const formatItemText = (item) => {
   return text
 }
 
-const copyItem = async (item) => {
-  const text = formatItemText(item)
+const copyToClipboard = (text) => {
+  // 创建临时textarea元素
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  
+  // 选中并复制
+  textarea.select()
+  textarea.setSelectionRange(0, textarea.value.length)
+  
   try {
-    await navigator.clipboard.writeText(text)
-    ElMessage.success('已复制到剪贴板')
+    const successful = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    return successful
   } catch (error) {
+    document.body.removeChild(textarea)
+    return false
+  }
+}
+
+const copyItem = (item) => {
+  const text = formatItemText(item)
+  if (copyToClipboard(text)) {
+    ElMessage.success('已复制到剪贴板')
+  } else {
     ElMessage.error('复制失败')
   }
 }
 
-const copyAllLinks = async () => {
+const copyAllLinks = () => {
   const allText = shareLinks.value.map(item => formatItemText(item)).join('\n')
-  try {
-    await navigator.clipboard.writeText(allText)
+  if (copyToClipboard(allText)) {
     ElMessage.success('已复制全部链接')
-  } catch (error) {
+  } else {
     ElMessage.error('复制失败')
   }
 }
