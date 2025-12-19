@@ -581,6 +581,19 @@ async def resync_to_target(
         
         db.commit()
         
+        # 触发TaoSync同步
+        if success_count > 0:
+            try:
+                from backend.main import monitor_service
+                if monitor_service and monitor_service.handlers:
+                    for handler in monitor_service.handlers:
+                        if hasattr(handler, 'taosync_queue') and handler.taosync_queue:
+                            logger.info(f"重转完成，触发TaoSync同步（{success_count}个文件）")
+                            handler.taosync_queue.trigger_now(file_count=success_count)
+                            break
+            except Exception as e:
+                logger.error(f"触发TaoSync失败: {e}")
+        
         target_names = {'quark': '夸克', 'baidu': '百度', 'xunlei': '迅雷'}
         target_name = target_names.get(request.target_type, '未知')
         return {

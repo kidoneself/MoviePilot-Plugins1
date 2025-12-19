@@ -3,6 +3,7 @@ import MappingManage from '../views/MappingManage.vue'
 import LinkRecords from '../views/LinkRecords.vue'
 import DirectoryTree from '../views/DirectoryTree.vue'
 import Config from '../views/Config.vue'
+import ShareLinks from '../views/ShareLinks.vue'
 
 const routes = [
   {
@@ -23,6 +24,11 @@ const routes = [
     path: '/tree',
     name: 'Tree',
     component: DirectoryTree
+  },
+  {
+    path: '/share-links',
+    name: 'ShareLinks',
+    component: ShareLinks
   },
   {
     path: '/config',

@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Document, List, Folder, Setting } from '@element-plus/icons-vue'
+import { Document, List, Folder, Share, Setting } from '@element-plus/icons-vue'
 import api from './api'
 
 const router = useRouter()
@@ -61,6 +61,33 @@ const syncAll = async () => {
   }
 }
 
+const triggerTaoSync = async () => {
+  try {
+    const res = await api.triggerTaoSync()
+    if (res.data.success) {
+      ElMessage.success('TaoSync云盘同步已触发')
+    } else {
+      ElMessage.error('触发失败: ' + res.data.message)
+    }
+  } catch (error) {
+    ElMessage.error('请求失败')
+  }
+}
+
+const batchLinkTemplates = async () => {
+  try {
+    ElMessage.info('开始批量补充模板文件...')
+    const res = await api.batchLinkTemplates()
+    if (res.data.success) {
+      ElMessage.success(res.data.message)
+    } else {
+      ElMessage.error('补充失败: ' + res.data.message)
+    }
+  } catch (error) {
+    ElMessage.error('请求失败')
+  }
+}
+
 onMounted(() => {
   loadStats()
   loadTodaySync()
@@ -95,6 +122,12 @@ onMounted(() => {
           <el-button type="success" @click="syncAll">
             🔄 全量同步
           </el-button>
+          <el-button type="primary" @click="triggerTaoSync">
+            ☁️ 触发云盘同步
+          </el-button>
+          <el-button type="info" @click="batchLinkTemplates">
+            📁 批量补充模板
+          </el-button>
         </el-space>
       </div>
     </el-header>
@@ -118,9 +151,13 @@ onMounted(() => {
             <el-icon><Folder /></el-icon>
             <span>目录树</span>
           </el-menu-item>
+          <el-menu-item index="share-links">
+            <el-icon><Share /></el-icon>
+            <span>分享链接</span>
+          </el-menu-item>
           <el-menu-item index="config">
             <el-icon><Setting /></el-icon>
-            <span>配置</span>
+            <span>系统配置</span>
           </el-menu-item>
         </el-menu>
       </el-aside>

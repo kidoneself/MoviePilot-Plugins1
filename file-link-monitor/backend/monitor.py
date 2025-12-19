@@ -470,6 +470,17 @@ class MonitorService:
         # 发送全量同步完成通知
         self.notifier.notify_full_sync_complete(total_files, success_count, skipped_count, failed_count)
         
+        # 触发TaoSync同步
+        if success_count > 0:
+            try:
+                for handler in self.handlers:
+                    if hasattr(handler, 'taosync_queue') and handler.taosync_queue:
+                        logger.info(f"全量同步完成，触发TaoSync同步（新建{success_count}个文件）")
+                        handler.taosync_queue.trigger_now(file_count=success_count)
+                        break
+            except Exception as e:
+                logger.error(f"触发TaoSync失败: {e}")
+        
         return {
             "success": True,
             "total_files": total_files,
@@ -477,6 +488,83 @@ class MonitorService:
             "skipped_count": skipped_count,
             "failed_count": failed_count
         }
+    
+    def batch_link_templates(self):
+        """批量补充模板文件到所有剧集/电影目录"""
+        if not self.handlers:
+            return {"success": False, "message": "没有监控处理器"}
+        
+        handler = self.handlers[0]
+        if not handler.template_files_path or not handler.template_files_path.exists():
+            return {"success": False, "message": "模板文件路径未配置或不存在"}
+        
+        from pathlib import Path
+        total_dirs = 0
+        processed_dirs = 0
+        skipped_dirs = 0
+        
+        try:
+            logger.info("开始批量补充模板文件...")
+            
+            # 遍历所有目标路径
+            for target_path in handler.target_paths:
+                if not target_path.exists():
+                    logger.warning(f"目标路径不存在: {target_path}")
+                    continue
+                
+                # 扫描第3层目录（剧集/电影根目录）
+                # 第1层: 剧集/电影/动漫
+                # 第2层: 国产剧集/欧美电影等
+                # 第3层: 具体剧名/电影名
+                for first_level in target_path.iterdir():
+                    if not first_level.is_dir():
+                        continue
+                    
+                    for second_level in first_level.iterdir():
+                        if not second_level.is_dir():
+                            continue
+                        
+                        for show_dir in second_level.iterdir():
+                            if not show_dir.is_dir():
+                                continue
+                            
+                            total_dirs += 1
+                            
+                            # 检查是否已有模板文件（检查第一个模板文件即可）
+                            has_template = False
+                            for template_file in handler.template_files_path.iterdir():
+                                if template_file.is_file():
+                                    target_file = show_dir / template_file.name
+                                    if target_file.exists():
+                                        has_template = True
+                                        break
+                            
+                            if has_template:
+                                skipped_dirs += 1
+                                logger.debug(f"跳过（已有模板）: {show_dir}")
+                                continue
+                            
+                            # 补充模板文件
+                            linked_count = handler.linker.link_template_files(
+                                show_dir, handler.template_files_path
+                            )
+                            if linked_count > 0:
+                                processed_dirs += 1
+                                logger.info(f"✓ 补充{linked_count}个模板文件: {show_dir}")
+            
+            logger.info(f"✅ 批量补充完成: 扫描 {total_dirs} 个目录，补充 {processed_dirs} 个，跳过 {skipped_dirs} 个")
+            
+            return {
+                "success": True,
+                "total_dirs": total_dirs,
+                "processed_dirs": processed_dirs,
+                "skipped_dirs": skipped_dirs,
+                "message": f"批量补充完成: 扫描{total_dirs}个目录，补充{processed_dirs}个，跳过{skipped_dirs}个"
+            }
+            
+        except Exception as e:
+            logger.error(f"批量补充模板文件失败: {e}")
+            return {"success": False, "message": str(e)}
     
     def stop(self):
         """停止监控"""

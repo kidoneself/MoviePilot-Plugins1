@@ -232,3 +232,76 @@ async def generate_share_link(request: GenerateLinkRequest, db: Session = Depend
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"生成链接失败: {str(e)}")
+
+
+@router.get("/share-links")
+def get_all_share_links(db: Session = Depends(get_db)):
+    """获取所有剧集的分享链接"""
+    try:
+        # 查询所有有分享链接的映射
+        mappings = db.query(CustomNameMapping).filter(
+            (CustomNameMapping.baidu_link.isnot(None)) |
+            (CustomNameMapping.quark_link.isnot(None)) |
+            (CustomNameMapping.xunlei_link.isnot(None))
+        ).order_by(CustomNameMapping.original_name).all()
+        
+        result = []
+        for mapping in mappings:
+            import re
+            
+            # 处理百度链接和提取码
+            baidu_pwd = None
+            baidu_link = mapping.baidu_link
+            
+            # 如果baidu_link包含提取码文本，清理掉
+            if baidu_link:
+                # 移除多余的提取码文本
+                if '提取码:' in baidu_link or '提取码：' in baidu_link:
+                    # 提取URL部分（只保留链接）
+                    url_match = re.search(r'(https://pan\.baidu\.com/s/[^\s]+)', baidu_link)
+                    if url_match:
+                        baidu_link = url_match.group(1)
+                
+                # 从URL参数提取提取码
+                if '?pwd=' in baidu_link:
+                    parts = baidu_link.split('?pwd=')
+                    if len(parts) == 2:
+                        baidu_link = parts[0]  # 只保留链接部分
+                        baidu_pwd = parts[1].split()[0]  # 提取码可能后面还有文字
+            
+            # 处理迅雷链接和提取码
+            xunlei_pwd = None
+            xunlei_link = mapping.xunlei_link
+            
+            if xunlei_link:
+                # 从URL参数提取提取码
+                if '?pwd=' in xunlei_link:
+                    parts = xunlei_link.split('?pwd=')
+                    if len(parts) == 2:
+                        xunlei_link = parts[0]  # 只保留链接部分
+                        xunlei_pwd = parts[1].split()[0]  # 提取码可能后面还有文字
+                
+                # 如果链接中包含"提取码:"文本，也清理
+                if '提取码:' in xunlei_link or '提取码：' in xunlei_link:
+                    url_match = re.search(r'(https://pan\.xunlei\.com/s/[^\s]+)', xunlei_link)
+                    if url_match:
+                        xunlei_link = url_match.group(1)
+            
+            item = {
+                "original_name": mapping.original_name,
+                "is_completed": mapping.is_completed or False,
+                "baidu_link": baidu_link,
+                "baidu_pwd": baidu_pwd,
+                "quark_link": mapping.quark_link,
+                "xunlei_link": xunlei_link,
+                "xunlei_pwd": xunlei_pwd
+            }
+            result.append(item)
+        
+        return {
+            "success": True,
+            "data": result
+        }
+    except Exception as e:
+        logger.error(f"获取分享链接失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -68,6 +68,16 @@ export default {
     return api.post('/sync-all')
   },
 
+  // 触发TaoSync
+  triggerTaoSync() {
+    return api.post('/trigger-taosync')
+  },
+
+  // 批量补充模板文件
+  batchLinkTemplates() {
+    return api.post('/batch-link-templates')
+  },
+
   // 今日同步统计
   getTodaySync() {
     return api.get('/today-sync')
@@ -80,5 +90,10 @@ export default {
 
   generateShareLink(panType, originalName) {
     return api.post('/generate-link', { pan_type: panType, original_name: originalName })
+  },
+
+  // 获取所有分享链接
+  getShareLinks() {
+    return api.get('/share-links')
   }
 }

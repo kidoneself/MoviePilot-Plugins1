@@ -302,6 +302,45 @@ async def sync_all():
         return {"success": False, "message": str(e)}
 
 
+@app.post("/api/trigger-taosync")
+async def trigger_taosync():
+    """手动触发TaoSync同步"""
+    try:
+        if not monitor_service or not monitor_service.handlers:
+            return {"success": False, "message": "监控服务未启动"}
+        
+        triggered = False
+        for handler in monitor_service.handlers:
+            if hasattr(handler, 'taosync_queue') and handler.taosync_queue:
+                logger.info("手动触发TaoSync同步")
+                success, reason = handler.taosync_queue.trigger_now(force=True)
+                triggered = True
+                if success:
+                    return {"success": True, "message": "TaoSync同步已触发"}
+                else:
+                    return {"success": False, "message": f"触发失败: {reason}"}
+        
+        if not triggered:
+            return {"success": False, "message": "TaoSync未配置或未启用"}
+    except Exception as e:
+        logger.error(f"触发TaoSync失败: {e}")
+        return {"success": False, "message": str(e)}
+
+
+@app.post("/api/batch-link-templates")
+async def batch_link_templates():
+    """批量补充模板文件到所有剧集/电影目录"""
+    try:
+        if not monitor_service or not monitor_service.handlers:
+            return {"success": False, "message": "监控服务未启动"}
+        
+        result = monitor_service.batch_link_templates()
+        return result
+    except Exception as e:
+        logger.error(f"批量补充模板文件失败: {e}")
+        return {"success": False, "message": str(e)}
+
+
 # 通配符路由放在最后，作为fallback处理Vue Router
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str):
