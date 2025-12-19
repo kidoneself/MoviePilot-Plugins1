@@ -18,6 +18,7 @@ const formData = ref({
   original_name: '',
   quark_name: '',
   baidu_name: '',
+  xunlei_name: '',
   note: '',
   enabled: true
 })
@@ -59,6 +60,7 @@ const handleAdd = () => {
     original_name: '',
     quark_name: '',
     baidu_name: '',
+    xunlei_name: '',
     note: '',
     enabled: true
   }
@@ -223,6 +225,7 @@ const updateMapping = async (row) => {
     const res = await api.updateMapping(row.id, {
       quark_name: row.quark_name,
       baidu_name: row.baidu_name,
+      xunlei_name: row.xunlei_name,
       note: row.note,
       enabled: row.enabled,
       is_completed: row.is_completed
@@ -242,7 +245,8 @@ const updateMapping = async (row) => {
 
 const resyncToTarget = async (row, targetType) => {
   try {
-    const targetName = targetType === 'quark' ? '夸克' : '百度'
+    const targetNames = {'quark': '夸克', 'baidu': '百度', 'xunlei': '迅雷'}
+    const targetName = targetNames[targetType] || '未知'
     await ElMessageBox.confirm(
       `确定要重转"${row.original_name}"到${targetName}网盘吗？将删除旧文件并用新名称重新同步。`,
       '确认重转',
@@ -286,6 +290,10 @@ const copyLinks = async (row) => {
     links.push(`【夸克网盘】${row.quark_link}`)
   }
   
+  if (row.xunlei_link) {
+    links.push(`【迅雷网盘】${row.xunlei_link}`)
+  }
+  
   if (links.length === 0) {
     ElMessage.warning('暂无可复制的链接')
     return
@@ -324,14 +332,16 @@ const copyLinks = async (row) => {
 // Cookie管理
 const openCookieDialog = (panType) => {
   cookiePanType.value = panType
-  cookieDialogTitle.value = `导入${panType === 'baidu' ? '百度' : '夸克'}网盘Cookie`
+  const panNames = {'baidu': '百度', 'quark': '夸克', 'xunlei': '迅雷'}
+  cookieDialogTitle.value = `导入${panNames[panType]}网盘Cookie`
   cookieText.value = ''
   cookieDialogVisible.value = true
 }
 
 const uploadCookie = async () => {
   if (!cookieText.value.trim()) {
-    const panName = cookiePanType.value === 'baidu' ? '百度' : '夸克'
+    const panNames = {'baidu': '百度', 'quark': '夸克', 'xunlei': '迅雷'}
+    const panName = panNames[cookiePanType.value] || '网盘'
     ElMessage.warning(`请粘贴${panName}网盘Cookie`)
     return
   }
@@ -353,7 +363,8 @@ const uploadCookie = async () => {
 const generateSingleLink = async (row, panType) => {
   try {
     loading.value = true
-    const panName = panType === 'baidu' ? '百度' : '夸克'
+    const panNames = {'baidu': '百度', 'quark': '夸克', 'xunlei': '迅雷'}
+    const panName = panNames[panType] || '网盘'
     const res = await api.generateShareLink(panType, row.original_name)
     
     if (res.data.success) {
@@ -416,6 +427,7 @@ onMounted(() => {
             <el-button @click="exportMappings">导出Excel</el-button>
             <el-button type="success" @click="openCookieDialog('baidu')">导入百度Cookie</el-button>
             <el-button type="warning" @click="openCookieDialog('quark')">导入夸克Cookie</el-button>
+            <el-button type="info" @click="openCookieDialog('xunlei')">导入迅雷Cookie</el-button>
             <el-button type="primary" @click="handleAdd">添加映射</el-button>
           </el-space>
         </div>
@@ -444,14 +456,16 @@ onMounted(() => {
                 <el-button size="small" type="success" @click="copyLinks(row)">复制</el-button>
                 <el-button size="small" type="primary" @click="generateSingleLink(row, 'baidu')">获取百度</el-button>
                 <el-button size="small" type="warning" @click="generateSingleLink(row, 'quark')">获取夸克</el-button>
+                <el-button size="small" type="info" @click="generateSingleLink(row, 'xunlei')">获取迅雷</el-button>
                 <el-button size="small" type="primary" plain @click="resyncToTarget(row, 'baidu')">重转百度</el-button>
                 <el-button size="small" type="warning" plain @click="resyncToTarget(row, 'quark')">重转夸克</el-button>
+                <el-button size="small" type="info" plain @click="resyncToTarget(row, 'xunlei')">重转迅雷</el-button>
                 <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
               </div>
             </div>
           </template>
 
-          <!-- 网盘信息区（左右并排，名称链接同行） -->
+          <!-- 网盘信息区（三列并排，名称链接同行） -->
           <div class="pan-sections">
             <!-- 百度网盘 -->
             <div class="pan-section baidu-section">
@@ -508,6 +522,34 @@ onMounted(() => {
                 <span v-else class="no-link">未生成</span>
               </div>
             </div>
+
+            <!-- 迅雷网盘 -->
+            <div class="pan-section xunlei-section">
+              <div class="pan-row">
+                <span class="pan-label">迅雷</span>
+                <el-input 
+                  v-model="row.xunlei_name" 
+                  size="small" 
+                  placeholder="原名"
+                  @blur="updateMapping(row)" 
+                  class="name-input"
+                />
+              </div>
+              <div class="pan-row">
+                <span class="pan-label">链接</span>
+                <a
+                  v-if="row.xunlei_link"
+                  :href="row.xunlei_link.split(' ')[0]"
+                  target="_blank"
+                  class="link-text"
+                  @click="(e) => { if (!e.metaKey && !e.ctrlKey) { e.preventDefault(); copyLink(row.xunlei_link); } }"
+                  :title="row.xunlei_link"
+                >
+                  {{ row.xunlei_link }}
+                </a>
+                <span v-else class="no-link">未生成</span>
+              </div>
+            </div>
           </div>
         </el-card>
       </div>
@@ -538,6 +580,9 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="百度显示名">
           <el-input v-model="formData.baidu_name" placeholder="请输入百度显示名（可选）" />
+        </el-form-item>
+        <el-form-item label="迅雷显示名">
+          <el-input v-model="formData.xunlei_name" placeholder="请输入迅雷显示名（可选）" />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="formData.note" placeholder="备注信息（可选）" type="textarea" />
@@ -634,10 +679,10 @@ onMounted(() => {
   gap: 4px;
 }
 
-/* 网盘区块容器 - 左右并排 */
+/* 网盘区块容器 - 三列并排 */
 .pan-sections {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
 }
 
@@ -655,6 +700,10 @@ onMounted(() => {
 
 .quark-section {
   border-left-color: #e6a23c;
+}
+
+.xunlei-section {
+  border-left-color: #909399;
 }
 
 /* 网盘行（名称和链接同行显示） */

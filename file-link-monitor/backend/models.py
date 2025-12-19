@@ -36,6 +36,10 @@ class LinkRecord(Base):
     baidu_target_file = Column(String(1000))
     baidu_synced_at = Column(DateTime)
     
+    # 网盘3（迅雷）
+    xunlei_target_file = Column(String(1000))
+    xunlei_synced_at = Column(DateTime)
+    
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
@@ -47,13 +51,15 @@ class CustomNameMapping(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     original_name = Column(String(191), nullable=False, unique=True)
     
-    # 双网盘显示名
+    # 三网盘显示名
     quark_name = Column(String(500))
     baidu_name = Column(String(500))
+    xunlei_name = Column(String(500))
     
     # 网盘链接
     quark_link = Column(String(1000))
     baidu_link = Column(String(1000))
+    xunlei_link = Column(String(1000))
     
     enabled = Column(Boolean, default=True)
     is_completed = Column(Boolean, default=False, comment='是否完结')
@@ -71,7 +77,7 @@ class PanCookie(Base):
     __tablename__ = 'pan_cookies'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    pan_type = Column(String(20), nullable=False, unique=True, comment='网盘类型: baidu/quark')
+    pan_type = Column(String(20), nullable=False, unique=True, comment='网盘类型: baidu/quark/xunlei')
     cookie = Column(Text, nullable=False, comment='Cookie字符串')
     is_active = Column(Boolean, default=True, comment='是否启用')
     last_check_time = Column(DateTime, comment='最后检查时间')

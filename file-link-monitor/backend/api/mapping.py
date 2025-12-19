@@ -27,20 +27,24 @@ class MappingCreate(BaseModel):
     original_name: str
     quark_name: Optional[str] = None
     baidu_name: Optional[str] = None
+    xunlei_name: Optional[str] = None
     note: Optional[str] = None
     baidu_link: Optional[str] = None
     quark_link: Optional[str] = None
+    xunlei_link: Optional[str] = None
 
 
 class MappingUpdate(BaseModel):
     """更新映射请求"""
     quark_name: Optional[str] = None
     baidu_name: Optional[str] = None
+    xunlei_name: Optional[str] = None
     enabled: Optional[bool] = None
     is_completed: Optional[bool] = None
     note: Optional[str] = None
     baidu_link: Optional[str] = None
     quark_link: Optional[str] = None
+    xunlei_link: Optional[str] = None
 
 
 @router.get("/mappings")
@@ -70,7 +74,8 @@ async def get_mappings(
             query = query.filter(
                 (CustomNameMapping.original_name.like(f'%{search}%')) |
                 (CustomNameMapping.quark_name.like(f'%{search}%')) |
-                (CustomNameMapping.baidu_name.like(f'%{search}%'))
+                (CustomNameMapping.baidu_name.like(f'%{search}%')) |
+                (CustomNameMapping.xunlei_name.like(f'%{search}%'))
             )
         
         # 总数
@@ -90,10 +95,13 @@ async def get_mappings(
                     "original_name": m.original_name,
                     "quark_name": m.quark_name,
                     "baidu_name": m.baidu_name,
+                    "xunlei_name": m.xunlei_name,
                     "enabled": m.enabled,
+                    "is_completed": m.is_completed,
                     "note": m.note,
                     "baidu_link": m.baidu_link,
                     "quark_link": m.quark_link,
+                    "xunlei_link": m.xunlei_link,
                     "created_at": m.created_at.isoformat() if m.created_at else None,
                     "updated_at": m.updated_at.isoformat() if m.updated_at else None
                 }
@@ -134,9 +142,11 @@ async def create_mapping(mapping: MappingCreate, db: Session = Depends(get_db)):
             original_name=mapping.original_name,
             quark_name=mapping.quark_name.strip() if mapping.quark_name else None,
             baidu_name=mapping.baidu_name.strip() if mapping.baidu_name else None,
+            xunlei_name=mapping.xunlei_name.strip() if mapping.xunlei_name else None,
             note=mapping.note,
             baidu_link=mapping.baidu_link,
-            quark_link=mapping.quark_link
+            quark_link=mapping.quark_link,
+            xunlei_link=mapping.xunlei_link
         )
         db.add(new_mapping)
         db.commit()
@@ -188,6 +198,8 @@ async def update_mapping(
             existing.quark_name = mapping.quark_name.strip() if mapping.quark_name else None
         if mapping.baidu_name is not None:
             existing.baidu_name = mapping.baidu_name.strip() if mapping.baidu_name else None
+        if mapping.xunlei_name is not None:
+            existing.xunlei_name = mapping.xunlei_name.strip() if mapping.xunlei_name else None
         if mapping.enabled is not None:
             existing.enabled = mapping.enabled
         if mapping.is_completed is not None:
@@ -198,6 +210,8 @@ async def update_mapping(
             existing.baidu_link = mapping.baidu_link
         if mapping.quark_link is not None:
             existing.quark_link = mapping.quark_link
+        if mapping.xunlei_link is not None:
+            existing.xunlei_link = mapping.xunlei_link
         
         db.commit()
         db.refresh(existing)
@@ -280,7 +294,8 @@ async def export_mappings(
             query = query.filter(
                 (CustomNameMapping.original_name.like(f'%{search}%')) |
                 (CustomNameMapping.quark_name.like(f'%{search}%')) |
-                (CustomNameMapping.baidu_name.like(f'%{search}%'))
+                (CustomNameMapping.baidu_name.like(f'%{search}%')) |
+                (CustomNameMapping.xunlei_name.like(f'%{search}%'))
             )
         
         mappings = query.order_by(CustomNameMapping.original_name).all()
@@ -291,7 +306,7 @@ async def export_mappings(
         ws.title = "名称映射"
         
         # 设置表头
-        headers = ["原名", "夸克显示名", "百度显示名", "百度链接", "夸克链接"]
+        headers = ["原名", "夸克显示名", "百度显示名", "迅雷显示名", "百度链接", "夸克链接", "迅雷链接"]
         ws.append(headers)
         
         # 设置表头样式
@@ -311,12 +326,14 @@ async def export_mappings(
                 mapping.original_name,
                 mapping.quark_name or '-',
                 mapping.baidu_name or '-',
+                mapping.xunlei_name or '-',
                 mapping.baidu_link or '-',
-                mapping.quark_link or '-'
+                mapping.quark_link or '-',
+                mapping.xunlei_link or '-'
             ])
             
             # 设置对齐和字体
-            for col_num in range(1, 6):
+            for col_num in range(1, 8):
                 cell = ws.cell(row=row_num, column=col_num)
                 cell.alignment = Alignment(horizontal="left", vertical="center")
                 cell.font = Font(size=12)
@@ -327,8 +344,10 @@ async def export_mappings(
         ws.column_dimensions['A'].width = 35
         ws.column_dimensions['B'].width = 25
         ws.column_dimensions['C'].width = 25
-        ws.column_dimensions['D'].width = 60
+        ws.column_dimensions['D'].width = 25
         ws.column_dimensions['E'].width = 60
+        ws.column_dimensions['F'].width = 60
+        ws.column_dimensions['G'].width = 60
         
         # 添加统计信息
         ws.append([])
@@ -371,7 +390,7 @@ async def export_mappings(
 class ResyncRequest(BaseModel):
     """重转请求"""
     original_name: str
-    target_type: str  # 'quark' 或 'baidu'
+    target_type: str  # 'quark', 'baidu' 或 'xunlei'
 
 
 @router.post("/mappings/resync")
@@ -407,13 +426,24 @@ async def resync_to_target(
         if request.target_type == 'quark':
             mapping.quark_link = None
             logger.info(f"✅ 已清空 '{request.original_name}' 的夸克链接")
-        else:
+        elif request.target_type == 'baidu':
             mapping.baidu_link = None
             logger.info(f"✅ 已清空 '{request.original_name}' 的百度链接")
+        elif request.target_type == 'xunlei':
+            mapping.xunlei_link = None
+            logger.info(f"✅ 已清空 '{request.original_name}' 的迅雷链接")
         db.commit()
         
         # 获取显示名称
-        display_name = mapping.quark_name if request.target_type == 'quark' else mapping.baidu_name
+        if request.target_type == 'quark':
+            display_name = mapping.quark_name
+        elif request.target_type == 'baidu':
+            display_name = mapping.baidu_name
+        elif request.target_type == 'xunlei':
+            display_name = mapping.xunlei_name
+        else:
+            display_name = None
+        
         if not display_name:
             display_name = request.original_name
         
@@ -441,7 +471,18 @@ async def resync_to_target(
             return {"success": False, "message": "目标配置不足"}
         
         # 确定目标路径
-        target_idx = 0 if request.target_type == 'quark' else 1
+        if request.target_type == 'quark':
+            target_idx = 0
+        elif request.target_type == 'baidu':
+            target_idx = 1
+        elif request.target_type == 'xunlei':
+            target_idx = 2
+        else:
+            return {"success": False, "message": "不支持的网盘类型"}
+        
+        if len(targets) <= target_idx:
+            return {"success": False, "message": f"目标配置不足，需要至少{target_idx + 1}个目标"}
+        
         target_config = targets[target_idx]
         target_base = Path(target_config.get('path', ''))
         
@@ -453,9 +494,12 @@ async def resync_to_target(
         if request.target_type == 'quark':
             old_name = mapping.quark_name
             mapping.quark_name = display_name
-        else:
+        elif request.target_type == 'baidu':
             old_name = mapping.baidu_name
             mapping.baidu_name = display_name
+        elif request.target_type == 'xunlei':
+            old_name = mapping.xunlei_name
+            mapping.xunlei_name = display_name
         db.commit()
         
         success_count = 0
@@ -470,7 +514,14 @@ async def resync_to_target(
                     continue
                 
                 # 获取旧的目标文件路径
-                old_target_file = record.quark_target_file if request.target_type == 'quark' else record.baidu_target_file
+                if request.target_type == 'quark':
+                    old_target_file = record.quark_target_file
+                elif request.target_type == 'baidu':
+                    old_target_file = record.baidu_target_file
+                elif request.target_type == 'xunlei':
+                    old_target_file = record.xunlei_target_file
+                else:
+                    old_target_file = None
                 
                 # 删除旧文件
                 if old_target_file:
@@ -501,9 +552,12 @@ async def resync_to_target(
                     if request.target_type == 'quark':
                         record.quark_target_file = str(actual_target)
                         record.quark_synced_at = datetime.now()
-                    else:
+                    elif request.target_type == 'baidu':
                         record.baidu_target_file = str(actual_target)
                         record.baidu_synced_at = datetime.now()
+                    elif request.target_type == 'xunlei':
+                        record.xunlei_target_file = str(actual_target)
+                        record.xunlei_synced_at = datetime.now()
                     
                     record.updated_at = datetime.now()
                     success_count += 1
@@ -527,7 +581,8 @@ async def resync_to_target(
         
         db.commit()
         
-        target_name = '夸克' if request.target_type == 'quark' else '百度'
+        target_names = {'quark': '夸克', 'baidu': '百度', 'xunlei': '迅雷'}
+        target_name = target_names.get(request.target_type, '未知')
         return {
             "success": True,
             "message": f"重转完成: 成功 {success_count} 个文件，失败 {failed_count} 个",
