@@ -1,5 +1,16 @@
 database:
-  path: ./data/database.db
+  type: mysql  # mysql 或 sqlite
+  # MySQL配置
+  mysql:
+    host: 10.10.10.17
+    port: 3306
+    user: root
+    password: MyStrongPass123
+    database: file_link_monitor_v2
+    charset: utf8mb4
+  # SQLite配置（备用）
+  sqlite:
+    path: ./data/database.db
 monitors:
 - enabled: true
   exclude_patterns:

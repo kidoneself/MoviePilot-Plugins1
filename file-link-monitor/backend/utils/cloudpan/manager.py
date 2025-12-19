@@ -149,6 +149,7 @@ class CloudPanManager:
                 logger.info(f"📊 找到 {len(mappings)} 条需要生成{pan_type}链接的记录")
             
             results = {}
+            updated_mappings = []  # 收集需要更新的映射
             
             # 批量处理
             for i, mapping in enumerate(mappings, 1):
@@ -170,18 +171,30 @@ class CloudPanManager:
                     link = await pan.create_share_link(folder_name, expire_days)
                     
                     if link:
-                        # 更新到数据库
+                        # 更新映射对象（还未提交）
                         if pan_type == 'baidu':
                             mapping.baidu_link = link
                         elif pan_type == 'quark':
                             mapping.quark_link = link
                         
-                        db.commit()
+                        updated_mappings.append(mapping)
                         results[mapping.original_name] = link
                         logger.info(f"✅ [{i}/{len(mappings)}] 成功: {folder_name} -> {link}")
                     else:
                         logger.warning(f"⚠️ [{i}/{len(mappings)}] 失败: {folder_name}")
                         results[mapping.original_name] = None
+                    
+                    # 每10条或最后一条时批量提交
+                    if len(updated_mappings) >= 10 or i == len(mappings):
+                        try:
+                            db.commit()
+                            logger.info(f"💾 批量提交 {len(updated_mappings)} 条记录")
+                            updated_mappings.clear()
+                        except Exception as commit_error:
+                            db.rollback()
+                            logger.error(f"提交失败，已回滚: {commit_error}")
+                            # 清空已更新列表，避免重复
+                            updated_mappings.clear()
                     
                     # 避免频率限制
                     await asyncio.sleep(3)

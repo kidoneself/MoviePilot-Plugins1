@@ -198,37 +198,46 @@ async def import_baidu_links(request: Request, db: Session = Depends(get_db)):
         skip_count = 0
         results = []
         
-        for row in csv_reader:
-            file_name = row.get('文件名', '').strip()
-            link = row.get('链接', '').strip()
-            pwd = row.get('提取码', '').strip()
+        try:
+            for row in csv_reader:
+                file_name = row.get('文件名', '').strip()
+                link = row.get('链接', '').strip()
+                pwd = row.get('提取码', '').strip()
+                
+                if not file_name or not link:
+                    continue
+                
+                # 格式化链接
+                if pwd and '?pwd=' not in link:
+                    formatted_link = f"{link}?pwd={pwd} 提取码: {pwd}"
+                elif '?pwd=' in link and pwd:
+                    formatted_link = f"{link} 提取码: {pwd}"
+                else:
+                    formatted_link = link
+                
+                # 根据百度显示名查找映射
+                mapping = db.query(CustomNameMapping).filter(
+                    CustomNameMapping.baidu_name == file_name
+                ).first()
+                
+                if mapping:
+                    mapping.baidu_link = formatted_link
+                    success_count += 1
+                    results.append(f"✅ {file_name}")
+                    logger.info(f"✅ 导入成功: {file_name} -> {formatted_link}")
+                else:
+                    skip_count += 1
+                    results.append(f"⚠️ {file_name} (未找到匹配)")
+                    logger.warning(f"⚠️ 未找到映射: {file_name}")
             
-            if not file_name or not link:
-                continue
+            # 批量commit，提升性能
+            db.commit()
+            logger.info(f"✅ 批量提交完成: 成功{success_count}条")
             
-            # 格式化链接
-            if pwd and '?pwd=' not in link:
-                formatted_link = f"{link}?pwd={pwd} 提取码: {pwd}"
-            elif '?pwd=' in link and pwd:
-                formatted_link = f"{link} 提取码: {pwd}"
-            else:
-                formatted_link = link
-            
-            # 根据百度显示名查找映射
-            mapping = db.query(CustomNameMapping).filter(
-                CustomNameMapping.baidu_name == file_name
-            ).first()
-            
-            if mapping:
-                mapping.baidu_link = formatted_link
-                db.commit()
-                success_count += 1
-                results.append(f"✅ {file_name}")
-                logger.info(f"✅ 导入成功: {file_name} -> {formatted_link}")
-            else:
-                skip_count += 1
-                results.append(f"⚠️ {file_name} (未找到匹配)")
-                logger.warning(f"⚠️ 未找到映射: {file_name}")
+        except Exception as commit_error:
+            db.rollback()
+            logger.error(f"批量导入事务失败，已回滚: {commit_error}")
+            raise
         
         return {
             "success": True,
@@ -266,32 +275,41 @@ async def import_quark_links(request: Request, db: Session = Depends(get_db)):
         skip_count = 0
         results = []
         
-        for row in csv_reader:
-            file_name = row.get('文件名', '').strip()
-            link = row.get('分享链接', '').strip()
-            pwd = row.get('提取码', '').strip()
+        try:
+            for row in csv_reader:
+                file_name = row.get('文件名', '').strip()
+                link = row.get('分享链接', '').strip()
+                pwd = row.get('提取码', '').strip()
+                
+                if not file_name or not link:
+                    continue
+                
+                # 夸克链接格式（通常没有提取码）
+                formatted_link = link
+                
+                # 根据夸克显示名查找映射
+                mapping = db.query(CustomNameMapping).filter(
+                    CustomNameMapping.quark_name == file_name
+                ).first()
+                
+                if mapping:
+                    mapping.quark_link = formatted_link
+                    success_count += 1
+                    results.append(f"✅ {file_name}")
+                    logger.info(f"✅ 导入成功: {file_name} -> {formatted_link}")
+                else:
+                    skip_count += 1
+                    results.append(f"⚠️ {file_name} (未找到匹配)")
+                    logger.warning(f"⚠️ 未找到映射: {file_name}")
             
-            if not file_name or not link:
-                continue
+            # 批量commit，提升性能
+            db.commit()
+            logger.info(f"✅ 批量提交完成: 成功{success_count}条")
             
-            # 夸克链接格式（通常没有提取码）
-            formatted_link = link
-            
-            # 根据夸克显示名查找映射
-            mapping = db.query(CustomNameMapping).filter(
-                CustomNameMapping.quark_name == file_name
-            ).first()
-            
-            if mapping:
-                mapping.quark_link = formatted_link
-                db.commit()
-                success_count += 1
-                results.append(f"✅ {file_name}")
-                logger.info(f"✅ 导入成功: {file_name} -> {formatted_link}")
-            else:
-                skip_count += 1
-                results.append(f"⚠️ {file_name} (未找到匹配)")
-                logger.warning(f"⚠️ 未找到映射: {file_name}")
+        except Exception as commit_error:
+            db.rollback()
+            logger.error(f"批量导入事务失败，已回滚: {commit_error}")
+            raise
         
         return {
             "success": True,

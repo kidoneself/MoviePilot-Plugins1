@@ -68,19 +68,43 @@ class CustomNameMapping(Base):
 def init_database(db_config: dict = None):
     """
     初始化数据库
-    使用MySQL（硬编码配置）
+    支持MySQL和SQLite，从配置文件读取
     """
-    # MySQL配置（硬编码）
-    db_url = 'mysql+pymysql://root:MyStrongPass123@10.10.10.17:3306/file_link_monitor_v2?charset=utf8mb4'
+    if not db_config:
+        db_config = {}
     
-    engine = create_engine(
-        db_url, 
-        echo=False,
-        pool_size=10,
-        max_overflow=20,
-        pool_recycle=3600,
-        pool_pre_ping=True
-    )
+    db_type = db_config.get('type', 'mysql')
+    
+    if db_type == 'mysql':
+        # MySQL配置
+        mysql_config = db_config.get('mysql', {})
+        host = mysql_config.get('host', '10.10.10.17')
+        port = mysql_config.get('port', 3306)
+        user = mysql_config.get('user', 'root')
+        password = mysql_config.get('password', 'MyStrongPass123')
+        database = mysql_config.get('database', 'file_link_monitor_v2')
+        charset = mysql_config.get('charset', 'utf8mb4')
+        
+        db_url = f'mysql+pymysql://{user}:{password}@{host}:{port}/{database}?charset={charset}'
+        
+        engine = create_engine(
+            db_url, 
+            echo=False,
+            pool_size=10,
+            max_overflow=20,
+            pool_recycle=3600,
+            pool_pre_ping=True
+        )
+    else:
+        # SQLite配置
+        sqlite_config = db_config.get('sqlite', {})
+        db_path = sqlite_config.get('path', './data/database.db')
+        
+        from pathlib import Path
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        
+        db_url = f'sqlite:///{db_path}'
+        engine = create_engine(db_url, echo=False)
     
     Base.metadata.create_all(engine)
     return engine
