@@ -477,7 +477,13 @@ class FolderObfuscator:
     
     def obfuscate_folder_path(self, relative_parts: list) -> list:
         """
-        混淆文件夹路径（保留第一层分类目录和Season目录）
+        混淆文件夹路径（只混淆第3层剧名目录）
+        
+        路径结构：
+        - 第1层：剧集/电影/动漫 → 不混淆
+        - 第2层：国产剧集/欧美电影 → 不混淆
+        - 第3层：剧名 → 混淆
+        - 第4层+：Season/extras/中文等 → 不混淆
         
         Args:
             relative_parts: 相对路径的各部分（不含文件名）
@@ -491,25 +497,19 @@ class FolderObfuscator:
         new_parts = []
         
         for i, dir_name in enumerate(relative_parts):
-            # 保留第一层分类目录不变（剧集、电影、动漫等）
-            if i == 0:
+            # 只混淆第3层（索引2）的剧名目录
+            if i == 2:
+                obfuscated = self.obfuscate_name(dir_name)
+                new_parts.append(obfuscated)
+            else:
+                # 其他层全部保持原样
                 new_parts.append(dir_name)
-                continue
-            
-            # 保留Season目录不变
-            if re.match(r'^Season\s+\d+$', dir_name, re.IGNORECASE):
-                new_parts.append(dir_name)
-                continue
-            
-            # 其他目录：混淆（第二层及以后）
-            obfuscated = self.obfuscate_name(dir_name)
-            new_parts.append(obfuscated)
         
         return new_parts
     
     def check_legacy_path(self, source_path: Path, target_base: Path, relative_parts: list) -> tuple:
         """
-        使用新的同音字混淆规则创建目录路径
+        使用新的同音字混淆规则创建目录路径（只混淆第3层剧名）
         
         Args:
             source_path: 源文件路径
@@ -522,12 +522,8 @@ class FolderObfuscator:
         if not self.enabled or not relative_parts:
             return target_base / Path(*relative_parts), False
         
-        # 使用新混淆规则（同音字方案）
-        new_parts = []
-        for part in relative_parts:
-            # 分类文件夹不混淆，剧名混淆
-            new_name = self.obfuscate_name(part)
-            new_parts.append(new_name)
+        # 使用obfuscate_folder_path统一处理
+        new_parts = self.obfuscate_folder_path(relative_parts)
         
         new_full_path = target_base / Path(*new_parts)
         import logging
