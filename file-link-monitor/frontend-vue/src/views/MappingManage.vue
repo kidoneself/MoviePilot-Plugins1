@@ -22,16 +22,12 @@ const formData = ref({
   enabled: true
 })
 
+// Cookie管理
 const cookieDialogVisible = ref(false)
-const cookieDialogTitle = ref('')
-const cookiePanType = ref('')
+const cookieDialogTitle = ref('导入Cookie')
+const cookiePanType = ref('baidu')  // baidu/quark
 const cookieText = ref('')
 
-const importDialogVisible = ref(false)
-const importCsvText = ref('')
-
-const importQuarkDialogVisible = ref(false)
-const importQuarkCsvText = ref('')
 
 const loadMappings = async () => {
   loading.value = true
@@ -143,11 +139,40 @@ const handleClearRecords = async (row) => {
 }
 
 const copyLink = (link) => {
-  navigator.clipboard.writeText(link).then(() => {
-    ElMessage.success('链接已复制')
-  }).catch(() => {
+  try {
+    // 尝试使用现代API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(() => {
+        ElMessage.success('链接已复制')
+      }).catch(() => {
+        // 降级到传统方法
+        fallbackCopy(link)
+      })
+    } else {
+      // 直接使用传统方法
+      fallbackCopy(link)
+    }
+  } catch (error) {
+    console.error('复制失败:', error)
     ElMessage.error('复制失败')
-  })
+  }
+}
+
+const fallbackCopy = (text) => {
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  const success = document.execCommand('copy')
+  document.body.removeChild(textarea)
+  
+  if (success) {
+    ElMessage.success('链接已复制')
+  } else {
+    ElMessage.error('复制失败，请手动复制')
+  }
 }
 
 const generateBaiduLinks = async () => {
@@ -192,63 +217,6 @@ const generateQuarkLinks = async () => {
   }
 }
 
-const generateSingleLink = async (row, panType) => {
-  try {
-    await ElMessageBox.confirm(
-      `确定要为"${row.original_name}"生成${panType === 'baidu' ? '百度' : '夸克'}网盘分享链接吗？`,
-      '确认生成',
-      { type: 'info' }
-    )
-    
-    const res = await api.generateLinks({ 
-      pan_type: panType, 
-      expire_days: 0,
-      original_name: row.original_name  // 传递剧集原始名称，后端会自动查找对应的网盘名称
-    })
-    
-    if (res.data.success) {
-      ElMessage.success(res.data.message + '\n\n处理完成后会自动更新。')
-      // 3秒后刷新列表查看结果
-      setTimeout(() => {
-        loadMappings()
-      }, 3000)
-    } else {
-      ElMessage.error('启动失败: ' + res.data.message)
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('请求失败')
-    }
-  }
-}
-
-const showCookieUpload = (panType) => {
-  cookiePanType.value = panType
-  cookieDialogTitle.value = `导入${panType === 'baidu' ? '百度' : '夸克'}网盘Cookie`
-  cookieText.value = ''
-  cookieDialogVisible.value = true
-}
-
-const uploadCookie = async () => {
-  if (!cookieText.value.trim()) {
-    ElMessage.warning('请粘贴Cookie内容')
-    return
-  }
-  
-  try {
-    // 直接发送cookie字符串，后端会自动解析
-    const res = await api.uploadCookie(cookiePanType.value, cookieText.value.trim())
-    
-    if (res.data.success) {
-      ElMessage.success(res.data.message)
-      cookieDialogVisible.value = false
-    } else {
-      ElMessage.error(res.data.message)
-    }
-  } catch (e) {
-    ElMessage.error('上传失败: ' + (e.response?.data?.message || e.message))
-  }
-}
 
 const updateMapping = async (row) => {
   try {
@@ -256,7 +224,8 @@ const updateMapping = async (row) => {
       quark_name: row.quark_name,
       baidu_name: row.baidu_name,
       note: row.note,
-      enabled: row.enabled
+      enabled: row.enabled,
+      is_completed: row.is_completed
     })
     
     if (res.data.success) {
@@ -352,95 +321,56 @@ const copyLinks = async (row) => {
   }
 }
 
-const openImportDialog = () => {
-  importCsvText.value = ''
-  importDialogVisible.value = true
+// Cookie管理
+const openCookieDialog = (panType) => {
+  cookiePanType.value = panType
+  cookieDialogTitle.value = `导入${panType === 'baidu' ? '百度' : '夸克'}网盘Cookie`
+  cookieText.value = ''
+  cookieDialogVisible.value = true
 }
 
-const handleBaiduFileChange = async (file) => {
-  const reader = new FileReader()
-  reader.onload = async (e) => {
-    importCsvText.value = e.target.result
-    await importBaiduLinks()
-  }
-  reader.readAsText(file.raw, 'UTF-8')
-  return false
-}
-
-const importBaiduLinks = async () => {
-  if (!importCsvText.value.trim()) {
-    ElMessage.warning('请选择CSV文件')
+const uploadCookie = async () => {
+  if (!cookieText.value.trim()) {
+    const panName = cookiePanType.value === 'baidu' ? '百度' : '夸克'
+    ElMessage.warning(`请粘贴${panName}网盘Cookie`)
     return
   }
   
   try {
-    const res = await api.importBaiduLinks(importCsvText.value.trim())
-    
+    const res = await api.updateCookie(cookiePanType.value, cookieText.value.trim())
     if (res.data.success) {
       ElMessage.success(res.data.message)
-      importDialogVisible.value = false
-      importCsvText.value = ''
-      loadMappings()
-      
-      // 显示详细结果
-      if (res.data.details && res.data.details.length > 0) {
-        ElMessageBox.alert(
-          res.data.details.join('\n'),
-          '导入详情',
-          { confirmButtonText: '确定' }
-        )
-      }
+      cookieDialogVisible.value = false
     } else {
-      ElMessage.error(res.data.message)
+      ElMessage.error(res.data.message || '上传失败')
     }
-  } catch (e) {
-    ElMessage.error('导入失败: ' + (e.response?.data?.message || e.message))
+  } catch (error) {
+    ElMessage.error('上传Cookie失败: ' + (error.response?.data?.detail || error.message))
   }
 }
 
-const openImportQuarkDialog = () => {
-  importQuarkCsvText.value = ''
-  importQuarkDialogVisible.value = true
-}
-
-const handleQuarkFileChange = async (file) => {
-  const reader = new FileReader()
-  reader.onload = async (e) => {
-    importQuarkCsvText.value = e.target.result
-    await importQuarkLinks()
-  }
-  reader.readAsText(file.raw, 'UTF-8')
-  return false
-}
-
-const importQuarkLinks = async () => {
-  if (!importQuarkCsvText.value.trim()) {
-    ElMessage.warning('请选择CSV文件')
-    return
-  }
-  
+// 生成单个分享链接
+const generateSingleLink = async (row, panType) => {
   try {
-    const res = await api.importQuarkLinks(importQuarkCsvText.value.trim())
+    loading.value = true
+    const panName = panType === 'baidu' ? '百度' : '夸克'
+    const res = await api.generateShareLink(panType, row.original_name)
     
     if (res.data.success) {
-      ElMessage.success(res.data.message)
-      importQuarkDialogVisible.value = false
-      importQuarkCsvText.value = ''
-      loadMappings()
-      
-      // 显示详细结果
-      if (res.data.details && res.data.details.length > 0) {
-        ElMessageBox.alert(
-          res.data.details.join('\n'),
-          '导入详情',
-          { confirmButtonText: '确定' }
-        )
+      const result = res.data.results[row.original_name]
+      if (result.success) {
+        ElMessage.success(`${panName}链接生成成功`)
+        loadMappings()
+      } else {
+        ElMessage.error(result.error || '生成失败')
       }
     } else {
-      ElMessage.error(res.data.message)
+      ElMessage.error(res.data.message || '生成失败')
     }
-  } catch (e) {
-    ElMessage.error('导入失败: ' + (e.response?.data?.message || e.message))
+  } catch (error) {
+    ElMessage.error('生成链接失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    loading.value = false
   }
 }
 
@@ -484,87 +414,103 @@ onMounted(() => {
             />
             <el-button type="primary" @click="loadMappings">搜索</el-button>
             <el-button @click="exportMappings">导出Excel</el-button>
-            <el-button type="info" @click="openImportDialog">导入百度链接</el-button>
-            <el-button type="info" @click="openImportQuarkDialog">导入夸克链接</el-button>
-            <el-button type="success" @click="generateBaiduLinks">生成百度链接</el-button>
-            <el-button type="warning" @click="generateQuarkLinks">生成夸克链接</el-button>
-            <el-button @click="showCookieUpload('baidu')">导入百度Cookie</el-button>
-            <el-button @click="showCookieUpload('quark')">导入夸克Cookie</el-button>
+            <el-button type="success" @click="openCookieDialog('baidu')">导入百度Cookie</el-button>
+            <el-button type="warning" @click="openCookieDialog('quark')">导入夸克Cookie</el-button>
             <el-button type="primary" @click="handleAdd">添加映射</el-button>
           </el-space>
         </div>
       </template>
 
-      <el-table :data="mappings" v-loading="loading" stripe>
-        <el-table-column prop="original_name" label="剧集原名" min-width="150" />
-        <el-table-column prop="quark_name" label="夸克显示名" min-width="150">
-          <template #default="{ row }">
-            <el-input v-model="row.quark_name" size="small" @blur="updateMapping(row)" />
-          </template>
-        </el-table-column>
-        <el-table-column prop="baidu_name" label="百度显示名" min-width="150">
-          <template #default="{ row }">
-            <el-input v-model="row.baidu_name" size="small" @blur="updateMapping(row)" />
-          </template>
-        </el-table-column>
-        <el-table-column prop="enabled" label="状态" width="80">
-          <template #default="{ row }">
-            <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
-              {{ row.enabled ? '启用' : '禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="baidu_link" label="百度网盘" min-width="220">
-          <template #default="{ row }">
-            <div v-if="row.baidu_link" style="display: flex; align-items: center; gap: 8px;">
-              <a
-                :href="row.baidu_link"
-                target="_blank"
-                class="link-text"
-                @click.prevent="(e) => { if (!e.metaKey && !e.ctrlKey) copyLink(row.baidu_link) }"
-                :title="row.baidu_link"
-                style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
-              >
-                {{ row.baidu_link }}
-              </a>
-              <el-button size="small" @click="generateSingleLink(row, 'baidu')">重新获取</el-button>
+      <!-- 卡片列表布局 -->
+      <div v-loading="loading" class="mapping-cards">
+        <el-card v-for="row in mappings" :key="row.id" class="mapping-card" shadow="hover">
+          <!-- 卡片头部：剧集名称、状态、操作按钮 -->
+          <template #header>
+            <div class="card-header-content">
+              <div class="show-info">
+                <h3>{{ row.original_name }}</h3>
+                <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
+                  {{ row.enabled ? '启用' : '禁用' }}
+                </el-tag>
+                <el-switch 
+                  v-model="row.is_completed" 
+                  size="small"
+                  @change="updateMapping(row)"
+                  active-text="完结"
+                  inactive-text="更新中"
+                />
+              </div>
+              <div class="show-actions">
+                <el-button size="small" type="success" @click="copyLinks(row)">复制</el-button>
+                <el-button size="small" type="primary" @click="generateSingleLink(row, 'baidu')">获取百度</el-button>
+                <el-button size="small" type="warning" @click="generateSingleLink(row, 'quark')">获取夸克</el-button>
+                <el-button size="small" type="primary" plain @click="resyncToTarget(row, 'baidu')">重转百度</el-button>
+                <el-button size="small" type="warning" plain @click="resyncToTarget(row, 'quark')">重转夸克</el-button>
+                <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+              </div>
             </div>
-            <el-button v-else type="primary" size="small" @click="generateSingleLink(row, 'baidu')">
-              获取链接
-            </el-button>
           </template>
-        </el-table-column>
-        <el-table-column prop="quark_link" label="夸克网盘" min-width="220">
-          <template #default="{ row }">
-            <div v-if="row.quark_link" style="display: flex; align-items: center; gap: 8px;">
-              <a
-                :href="row.quark_link"
-                target="_blank"
-                class="link-text"
-                @click.prevent="(e) => { if (!e.metaKey && !e.ctrlKey) copyLink(row.quark_link) }"
-                :title="row.quark_link"
-                style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
-              >
-                {{ row.quark_link }}
-              </a>
-              <el-button size="small" @click="generateSingleLink(row, 'quark')">重新获取</el-button>
+
+          <!-- 网盘信息区（左右并排，名称链接同行） -->
+          <div class="pan-sections">
+            <!-- 百度网盘 -->
+            <div class="pan-section baidu-section">
+              <div class="pan-row">
+                <span class="pan-label">百度</span>
+                <el-input 
+                  v-model="row.baidu_name" 
+                  size="small" 
+                  placeholder="原名"
+                  @blur="updateMapping(row)" 
+                  class="name-input"
+                />
+              </div>
+              <div class="pan-row">
+                <span class="pan-label">链接</span>
+                <a
+                  v-if="row.baidu_link"
+                  :href="row.baidu_link.split(' ')[0]"
+                  target="_blank"
+                  class="link-text"
+                  @click="(e) => { if (!e.metaKey && !e.ctrlKey) { e.preventDefault(); copyLink(row.baidu_link); } }"
+                  :title="row.baidu_link"
+                >
+                  {{ row.baidu_link }}
+                </a>
+                <span v-else class="no-link">未生成</span>
+              </div>
             </div>
-            <el-button v-else type="warning" size="small" @click="generateSingleLink(row, 'quark')">
-              获取链接
-            </el-button>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="350" fixed="right">
-          <template #default="{ row }">
-            <el-space wrap>
-              <el-button size="small" type="success" @click="copyLinks(row)">复制</el-button>
-              <el-button size="small" type="warning" @click="resyncToTarget(row, 'quark')">重转夸克</el-button>
-              <el-button size="small" type="primary" @click="resyncToTarget(row, 'baidu')">重转百度</el-button>
-              <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
-            </el-space>
-          </template>
-        </el-table-column>
-      </el-table>
+
+            <!-- 夸克网盘 -->
+            <div class="pan-section quark-section">
+              <div class="pan-row">
+                <span class="pan-label">夸克</span>
+                <el-input 
+                  v-model="row.quark_name" 
+                  size="small" 
+                  placeholder="原名"
+                  @blur="updateMapping(row)" 
+                  class="name-input"
+                />
+              </div>
+              <div class="pan-row">
+                <span class="pan-label">链接</span>
+                <a
+                  v-if="row.quark_link"
+                  :href="row.quark_link.split(' ')[0]"
+                  target="_blank"
+                  class="link-text"
+                  @click="(e) => { if (!e.metaKey && !e.ctrlKey) { e.preventDefault(); copyLink(row.quark_link); } }"
+                  :title="row.quark_link"
+                >
+                  {{ row.quark_link }}
+                </a>
+                <span v-else class="no-link">未生成</span>
+              </div>
+            </div>
+          </div>
+        </el-card>
+      </div>
 
       <el-pagination
         v-model:current-page="currentPage"
@@ -607,74 +553,7 @@ onMounted(() => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="importDialogVisible" title="批量导入百度链接" width="600px">
-      <el-alert type="info" :closable="false" style="margin-bottom: 15px">
-        <p><strong>CSV格式说明：</strong></p>
-        <p>文件名,链接,提取码,分享时间,分享状态</p>
-        <p>灵指,https://pan.baidu.com/s/xxx,yyds,2025-12-19 00:11,生成成功</p>
-        <p style="margin-top: 10px; color: #E6A23C;">
-          ⚠️ 注意：根据"文件名"匹配"百度显示名"字段，匹配成功才会导入
-        </p>
-      </el-alert>
-      
-      <el-upload
-        drag
-        accept=".csv"
-        :auto-upload="false"
-        :on-change="handleBaiduFileChange"
-        :show-file-list="true"
-        :limit="1"
-      >
-        <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-        <div class="el-upload__text">
-          拖拽CSV文件到此处 或 <em>点击选择文件</em>
-        </div>
-        <template #tip>
-          <div class="el-upload__tip">
-            只支持.csv格式文件
-          </div>
-        </template>
-      </el-upload>
-      
-      <template #footer>
-        <el-button @click="importDialogVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="importQuarkDialogVisible" title="批量导入夸克链接" width="600px">
-      <el-alert type="info" :closable="false" style="margin-bottom: 15px">
-        <p><strong>CSV格式说明：</strong></p>
-        <p>序号,文件名,分享链接,提取码,状态</p>
-        <p>1,斑马英语s1,https://pan.quark.cn/s/xxx,,分享完成</p>
-        <p style="margin-top: 10px; color: #E6A23C;">
-          ⚠️ 注意：根据"文件名"匹配"夸克显示名"字段，匹配成功才会导入
-        </p>
-      </el-alert>
-      
-      <el-upload
-        drag
-        accept=".csv"
-        :auto-upload="false"
-        :on-change="handleQuarkFileChange"
-        :show-file-list="true"
-        :limit="1"
-      >
-        <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-        <div class="el-upload__text">
-          拖拽CSV文件到此处 或 <em>点击选择文件</em>
-        </div>
-        <template #tip>
-          <div class="el-upload__tip">
-            只支持.csv格式文件
-          </div>
-        </template>
-      </el-upload>
-      
-      <template #footer>
-        <el-button @click="importQuarkDialogVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
-
+    <!-- Cookie导入对话框 -->
     <el-dialog v-model="cookieDialogVisible" :title="cookieDialogTitle" width="600px">
       <el-alert type="info" :closable="false" style="margin-bottom: 15px">
         <p><strong>如何获取Cookie：</strong></p>
@@ -682,14 +561,14 @@ onMounted(() => {
         <p>2. 按F12打开开发者工具</p>
         <p>3. 切换到"Network"（网络）标签</p>
         <p>4. 刷新页面，点击任意请求</p>
-        <p>5. 复制完整的Cookie值并粘贴到下方</p>
+        <p>5. 在请求头中找到Cookie，复制完整的Cookie值并粘贴到下方</p>
       </el-alert>
       
       <el-input
         v-model="cookieText"
         type="textarea"
         :rows="10"
-        placeholder='直接粘贴浏览器Cookie字符串即可，格式如：name1=value1; name2=value2; ...'
+        :placeholder="`直接粘贴浏览器Cookie字符串即可，格式如：${cookiePanType === 'baidu' ? 'BAIDUID=xxx; BDUSS=xxx' : 'b-user-id=xxx; __uid=xxx'}; ...`"
       />
       
       <template #footer>
@@ -712,15 +591,140 @@ onMounted(() => {
   font-weight: bold;
 }
 
+/* 卡片列表布局 */
+.mapping-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mapping-card {
+  transition: all 0.2s;
+}
+
+.mapping-card:hover {
+  transform: translateY(-1px);
+}
+
+/* 卡片头部 */
+.card-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.show-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.show-info h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.show-actions {
+  display: flex;
+  gap: 4px;
+}
+
+/* 网盘区块容器 - 左右并排 */
+.pan-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* 网盘区块 */
+.pan-section {
+  padding: 6px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+  border-left: 3px solid;
+}
+
+.baidu-section {
+  border-left-color: #409eff;
+}
+
+.quark-section {
+  border-left-color: #e6a23c;
+}
+
+/* 网盘行（名称和链接同行显示） */
+.pan-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.pan-row:last-child {
+  margin-bottom: 0;
+}
+
+.pan-label {
+  min-width: 50px;
+  font-size: 12px;
+  color: #606266;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.name-input {
+  flex: 1;
+}
+
 .link-text {
+  flex: 1;
   color: #409eff;
   text-decoration: none;
   cursor: pointer;
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
 }
 
 .link-text:hover {
   color: #66b1ff;
   text-decoration: underline;
+}
+
+.no-link {
+  flex: 1;
+  color: #909399;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .card-header-content {
+    flex-wrap: wrap;
+  }
+  
+  .show-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .pan-sections {
+    grid-template-columns: 1fr;
+  }
+  
+  .pan-row {
+    flex-wrap: wrap;
+  }
+  
+  .pan-label {
+    min-width: 100%;
+  }
 }
 </style>

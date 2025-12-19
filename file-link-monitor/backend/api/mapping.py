@@ -37,6 +37,7 @@ class MappingUpdate(BaseModel):
     quark_name: Optional[str] = None
     baidu_name: Optional[str] = None
     enabled: Optional[bool] = None
+    is_completed: Optional[bool] = None
     note: Optional[str] = None
     baidu_link: Optional[str] = None
     quark_link: Optional[str] = None
@@ -189,6 +190,8 @@ async def update_mapping(
             existing.baidu_name = mapping.baidu_name.strip() if mapping.baidu_name else None
         if mapping.enabled is not None:
             existing.enabled = mapping.enabled
+        if mapping.is_completed is not None:
+            existing.is_completed = mapping.is_completed
         if mapping.note is not None:
             existing.note = mapping.note
         if mapping.baidu_link is not None:

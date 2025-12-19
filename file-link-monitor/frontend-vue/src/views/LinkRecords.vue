@@ -82,6 +82,44 @@ const formatFileSize = (bytes) => {
   return `${size.toFixed(2)} ${units[unitIndex]}`
 }
 
+// 从路径中提取文件名
+const getFileName = (path) => {
+  if (!path) return '-'
+  const parts = path.split('/')
+  return parts[parts.length - 1] || path
+}
+
+// 提取集数信息（支持多种格式）
+const extractEpisode = (filename) => {
+  if (!filename) return ''
+  
+  // 匹配常见集数格式：S01E01, EP01, E01, 第01集, 01, etc.
+  const patterns = [
+    /S\d+E(\d+)/i,           // S01E01
+    /EP?(\d+)/i,             // EP01, E01
+    /第(\d+)[集话]/,         // 第01集
+    /\[(\d+)\]/,             // [01]
+    /\.(\d+)\./,             // .01.
+    /-(\d+)\./,              // -01.
+  ]
+  
+  for (const pattern of patterns) {
+    const match = filename.match(pattern)
+    if (match) {
+      return `第${parseInt(match[1])}集`
+    }
+  }
+  
+  return ''
+}
+
+// 获取完整的文件显示名（文件名 + 集数）
+const getFileDisplay = (path) => {
+  const filename = getFileName(path)
+  const episode = extractEpisode(filename)
+  return episode ? `${episode} - ${filename}` : filename
+}
+
 onMounted(() => {
   loadRecords()
 })
@@ -126,24 +164,35 @@ onMounted(() => {
       </div>
 
       <el-table :data="records" v-loading="loading" stripe style="margin-top: 20px">
-        <el-table-column prop="original_name" label="剧集原名" min-width="150" />
-        <el-table-column prop="source_file" label="源文件" min-width="250" show-overflow-tooltip />
-        <el-table-column prop="quark_target_file" label="夸克目标" min-width="250" show-overflow-tooltip>
+        <el-table-column prop="original_name" label="剧集" width="150" />
+        <el-table-column label="文件名/集数" min-width="300">
           <template #default="{ row }">
-            {{ row.quark_target_file || '-' }}
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-weight: 600; color: #409eff;">{{ extractEpisode(row.source_file) || '未识别' }}</span>
+              <span style="font-size: 12px; color: #606266;">{{ getFileName(row.source_file) }}</span>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column prop="baidu_target_file" label="百度目标" min-width="250" show-overflow-tooltip>
+        <el-table-column label="网盘" width="100">
           <template #default="{ row }">
-            {{ row.baidu_target_file || '-' }}
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <el-tag v-if="row.quark_target_file" type="warning" size="small">夸克</el-tag>
+              <el-tag v-if="row.baidu_target_file" type="primary" size="small">百度</el-tag>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column prop="file_size" label="文件大小" width="110">
+        <el-table-column prop="source_file" label="源路径" min-width="200" show-overflow-tooltip />
+        <el-table-column label="目标路径" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.quark_target_file || row.baidu_target_file || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="file_size" label="大小" width="100">
           <template #default="{ row }">
             {{ formatFileSize(row.file_size) }}
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="160" />
+        <el-table-column prop="created_at" label="时间" width="160" />
       </el-table>
 
       <el-pagination

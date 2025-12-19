@@ -36,28 +36,6 @@ export default {
     return api.get('/export/mappings', { params, responseType: 'blob' })
   },
 
-  // 网盘链接生成
-  generateLinks(data) {
-    return api.post('/cloudpan/generate-links', data)
-  },
-  
-  // 上传网盘Cookie
-  uploadCookie(panType, cookieData) {
-    return api.post('/cloudpan/upload-cookie', cookieData, {
-      params: { pan_type: panType }
-    })
-  },
-  
-  // 批量导入百度链接
-  importBaiduLinks(csvData) {
-    return api.post('/cloudpan/import-baidu-links', csvData)
-  },
-  
-  // 批量导入夸克链接
-  importQuarkLinks(csvData) {
-    return api.post('/cloudpan/import-quark-links', csvData)
-  },
-
   // 链接记录
   getRecords(params) {
     return api.get('/records', { params })
@@ -93,5 +71,14 @@ export default {
   // 今日同步统计
   getTodaySync() {
     return api.get('/today-sync')
+  },
+
+  // 分享链接管理
+  updateCookie(panType, cookie) {
+    return api.post('/cookie', { pan_type: panType, cookie })
+  },
+
+  generateShareLink(panType, originalName) {
+    return api.post('/generate-link', { pan_type: panType, original_name: originalName })
   }
 }

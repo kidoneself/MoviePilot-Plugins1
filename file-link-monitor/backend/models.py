@@ -56,6 +56,7 @@ class CustomNameMapping(Base):
     baidu_link = Column(String(1000))
     
     enabled = Column(Boolean, default=True)
+    is_completed = Column(Boolean, default=False, comment='是否完结')
     note = Column(String(500))
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
@@ -63,6 +64,21 @@ class CustomNameMapping(Base):
     __table_args__ = (
         Index('idx_original_name', 'original_name'),
     )
+
+
+class PanCookie(Base):
+    """网盘Cookie管理表"""
+    __tablename__ = 'pan_cookies'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pan_type = Column(String(20), nullable=False, unique=True, comment='网盘类型: baidu/quark')
+    cookie = Column(Text, nullable=False, comment='Cookie字符串')
+    is_active = Column(Boolean, default=True, comment='是否启用')
+    last_check_time = Column(DateTime, comment='最后检查时间')
+    check_status = Column(String(50), comment='检查状态: valid/invalid/unknown')
+    check_error = Column(Text, comment='检查错误信息')
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 def init_database(db_config: dict = None):
