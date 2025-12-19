@@ -244,6 +244,7 @@ async def get_records(
                 "original_name": record.original_name,
                 "quark_target_file": record.quark_target_file,
                 "baidu_target_file": record.baidu_target_file,
+                "xunlei_target_file": record.xunlei_target_file,
                 "file_size": record.file_size,
                 "created_at": record.created_at.strftime("%Y-%m-%d %H:%M:%S") if record.created_at else None
             })

@@ -10,6 +10,7 @@ import logging
 from backend.models import PanCookie, CustomNameMapping, get_session
 from backend.utils.baidu_api import BaiduPanAPI
 from backend.utils.quark_api import QuarkAPI
+from backend.utils.xunlei_api import XunleiAPI
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ async def update_cookie(request: UpdateCookieRequest, db: Session = Depends(get_
     """
     try:
         pan_type = request.pan_type.lower()
-        if pan_type not in ['baidu', 'quark']:
+        if pan_type not in ['baidu', 'quark', 'xunlei']:
             raise HTTPException(status_code=400, detail="不支持的网盘类型")
         
         # 查找或创建
@@ -143,9 +144,13 @@ async def generate_share_link(request: GenerateLinkRequest, db: Session = Depend
                 query = query.filter(
                     (CustomNameMapping.baidu_link == None) | (CustomNameMapping.baidu_link == '')
                 )
-            else:
+            elif pan_type == 'quark':
                 query = query.filter(
                     (CustomNameMapping.quark_link == None) | (CustomNameMapping.quark_link == '')
+                )
+            else:  # xunlei
+                query = query.filter(
+                    (CustomNameMapping.xunlei_link == None) | (CustomNameMapping.xunlei_link == '')
                 )
             mappings = query.all()
         
@@ -159,8 +164,10 @@ async def generate_share_link(request: GenerateLinkRequest, db: Session = Depend
         # 3. 初始化API
         if pan_type == 'baidu':
             api = BaiduPanAPI(cookie_obj.cookie)
-        else:
+        elif pan_type == 'quark':
             api = QuarkAPI(cookie_obj.cookie)
+        else:  # xunlei
+            api = XunleiAPI(cookie_obj.cookie)
         
         # 4. 批量生成链接
         results = {}
@@ -171,8 +178,10 @@ async def generate_share_link(request: GenerateLinkRequest, db: Session = Depend
             # 确定文件名
             if pan_type == 'baidu':
                 folder_name = mapping.baidu_name or mapping.original_name
-            else:
+            elif pan_type == 'quark':
                 folder_name = mapping.quark_name or mapping.original_name
+            else:  # xunlei
+                folder_name = mapping.xunlei_name or mapping.original_name
             
             logger.info(f"处理: {mapping.original_name} -> {folder_name}")
             
@@ -191,8 +200,10 @@ async def generate_share_link(request: GenerateLinkRequest, db: Session = Depend
                 # 成功，更新数据库
                 if pan_type == 'baidu':
                     mapping.baidu_link = link
-                else:
+                elif pan_type == 'quark':
                     mapping.quark_link = link
+                else:  # xunlei
+                    mapping.xunlei_link = link
                 
                 results[mapping.original_name] = {
                     'success': True,

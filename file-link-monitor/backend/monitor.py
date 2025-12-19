@@ -36,11 +36,25 @@ class FileMonitorHandler(FileSystemEventHandler):
         self.taosync_queue = None
         taosync_config = config.get('taosync', {})
         if taosync_config.get('enabled'):
+            # 读取任务ID配置（支持列表或单个ID）
+            job_id_config = taosync_config.get('job_id')
+            if isinstance(job_id_config, list):
+                # 列表格式：[1, 2, 3]
+                job_ids = job_id_config
+            elif isinstance(job_id_config, (int, str)):
+                # 单个ID或逗号分隔的字符串："1,2,3"
+                if isinstance(job_id_config, str) and ',' in job_id_config:
+                    job_ids = [int(x.strip()) for x in job_id_config.split(',')]
+                else:
+                    job_ids = [int(job_id_config)]
+            else:
+                job_ids = [1]  # 默认值
+            
             taosync_client = TaoSyncClient(
                 url=taosync_config.get('url', ''),
                 username=taosync_config.get('username', 'admin'),
                 password=taosync_config.get('password', ''),
-                job_id=taosync_config.get('job_id', 1)
+                job_ids=job_ids  # 使用job_ids参数
             )
             # 创建队列管理器，设置检查间隔
             check_interval = taosync_config.get('check_interval', 60)  # 默认60秒
@@ -50,7 +64,7 @@ class FileMonitorHandler(FileSystemEventHandler):
                 notifier=lambda msg: self.notifier.notify_info("TaoSync队列", msg)
             )
             self.taosync_queue.start()
-            logger.info(f"TaoSync已启用，队列检查间隔: {check_interval}秒")
+            logger.info(f"TaoSync已启用，任务ID: {job_ids}，队列检查间隔: {check_interval}秒")
         
         # 批次汇总相关
         self.batch_files = []  # 批次处理的文件列表

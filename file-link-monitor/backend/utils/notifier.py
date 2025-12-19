@@ -149,3 +149,12 @@ TaoSync同步任务已触发
 正在同步到云盘...
         """.strip()
         self.send_notification(title, content, "TaoSync|批次触发")
+    
+    def notify_info(self, title: str, message: str):
+        """发送通用信息通知
+        
+        Args:
+            title: 通知标题
+            message: 通知内容
+        """
+        self.send_notification(title, message, "信息|通知")

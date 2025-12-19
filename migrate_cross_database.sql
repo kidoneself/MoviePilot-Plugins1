@@ -14,15 +14,19 @@ SET @v2_db = 'file_link_monitor_v2';  -- V2数据库名
 -- 清空V2表数据
 TRUNCATE TABLE file_link_monitor_v2.custom_name_mapping;
 
--- 从V1迁移数据到V2
+-- 从V1迁移数据到V2（支持迅雷字段，如果V1没有则为NULL）
 INSERT INTO file_link_monitor_v2.custom_name_mapping 
-    (original_name, quark_name, baidu_name, quark_link, baidu_link, enabled, note, created_at, updated_at)
+    (original_name, quark_name, baidu_name, xunlei_name, quark_link, baidu_link, xunlei_link, enabled, note, created_at, updated_at)
 SELECT 
     original_name,
     custom_name AS quark_name,
     custom_name AS baidu_name,
+    -- 如果V1有xunlei_name字段则迁移，否则NULL（需要V1表有这个字段，没有则注释掉）
+    NULL AS xunlei_name,  -- 如果V1有xunlei_name字段，改为: xunlei_name
     quark_link,
     baidu_link,
+    -- 如果V1有xunlei_link字段则迁移，否则NULL（需要V1表有这个字段，没有则注释掉）
+    NULL AS xunlei_link,  -- 如果V1有xunlei_link字段，改为: xunlei_link
     enabled,
     note,
     created_at,

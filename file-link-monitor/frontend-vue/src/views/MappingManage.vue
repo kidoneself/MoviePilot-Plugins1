@@ -454,12 +454,6 @@ onMounted(() => {
               </div>
               <div class="show-actions">
                 <el-button size="small" type="success" @click="copyLinks(row)">复制</el-button>
-                <el-button size="small" type="primary" @click="generateSingleLink(row, 'baidu')">获取百度</el-button>
-                <el-button size="small" type="warning" @click="generateSingleLink(row, 'quark')">获取夸克</el-button>
-                <el-button size="small" type="info" @click="generateSingleLink(row, 'xunlei')">获取迅雷</el-button>
-                <el-button size="small" type="primary" plain @click="resyncToTarget(row, 'baidu')">重转百度</el-button>
-                <el-button size="small" type="warning" plain @click="resyncToTarget(row, 'quark')">重转夸克</el-button>
-                <el-button size="small" type="info" plain @click="resyncToTarget(row, 'xunlei')">重转迅雷</el-button>
                 <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
               </div>
             </div>
@@ -476,8 +470,10 @@ onMounted(() => {
                   size="small" 
                   placeholder="原名"
                   @blur="updateMapping(row)" 
-                  class="name-input"
+                  class="name-input-short"
                 />
+                <el-button size="small" type="primary" @click="generateSingleLink(row, 'baidu')">获取</el-button>
+                <el-button size="small" type="primary" plain @click="resyncToTarget(row, 'baidu')">重转</el-button>
               </div>
               <div class="pan-row">
                 <span class="pan-label">链接</span>
@@ -504,8 +500,10 @@ onMounted(() => {
                   size="small" 
                   placeholder="原名"
                   @blur="updateMapping(row)" 
-                  class="name-input"
+                  class="name-input-short"
                 />
+                <el-button size="small" type="warning" @click="generateSingleLink(row, 'quark')">获取</el-button>
+                <el-button size="small" type="warning" plain @click="resyncToTarget(row, 'quark')">重转</el-button>
               </div>
               <div class="pan-row">
                 <span class="pan-label">链接</span>
@@ -532,8 +530,10 @@ onMounted(() => {
                   size="small" 
                   placeholder="原名"
                   @blur="updateMapping(row)" 
-                  class="name-input"
+                  class="name-input-short"
                 />
+                <el-button size="small" type="info" @click="generateSingleLink(row, 'xunlei')">获取</el-button>
+                <el-button size="small" type="info" plain @click="resyncToTarget(row, 'xunlei')">重转</el-button>
               </div>
               <div class="pan-row">
                 <span class="pan-label">链接</span>
@@ -728,6 +728,11 @@ onMounted(() => {
 
 .name-input {
   flex: 1;
+}
+
+.name-input-short {
+  width: 200px;
+  flex-shrink: 0;
 }
 
 .link-text {

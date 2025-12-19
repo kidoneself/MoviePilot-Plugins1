@@ -178,13 +178,25 @@ onMounted(() => {
             <div style="display: flex; flex-direction: column; gap: 2px;">
               <el-tag v-if="row.quark_target_file" type="warning" size="small">夸克</el-tag>
               <el-tag v-if="row.baidu_target_file" type="primary" size="small">百度</el-tag>
+              <el-tag v-if="row.xunlei_target_file" type="info" size="small">迅雷</el-tag>
             </div>
           </template>
         </el-table-column>
         <el-table-column prop="source_file" label="源路径" min-width="200" show-overflow-tooltip />
-        <el-table-column label="目标路径" min-width="200" show-overflow-tooltip>
+        <el-table-column label="目标路径" min-width="250" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ row.quark_target_file || row.baidu_target_file || '-' }}
+            <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px;">
+              <div v-if="row.quark_target_file" style="color: #e6a23c;">
+                <span style="font-weight: 600;">夸克：</span>{{ row.quark_target_file }}
+              </div>
+              <div v-if="row.baidu_target_file" style="color: #409eff;">
+                <span style="font-weight: 600;">百度：</span>{{ row.baidu_target_file }}
+              </div>
+              <div v-if="row.xunlei_target_file" style="color: #909399;">
+                <span style="font-weight: 600;">迅雷：</span>{{ row.xunlei_target_file }}
+              </div>
+              <span v-if="!row.quark_target_file && !row.baidu_target_file && !row.xunlei_target_file" style="color: #909399;">-</span>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="file_size" label="大小" width="100">

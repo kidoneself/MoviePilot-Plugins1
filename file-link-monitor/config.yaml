@@ -20,10 +20,12 @@ monitors:
   obfuscate_enabled: true
   source: /path/to/your/source
   targets:
-  - name: 阿里云盘1
-    path: /path/to/your/target1
-  - name: 115网盘
-    path: /path/to/your/target2
+  - name: 夸克网盘
+    path: /media/夸克网盘
+  - name: 百度网盘
+    path: /media/网盘
+  - name: 迅雷网盘
+    path: /media/迅雷网盘
   template_files_path: /path/to/templates
 notification:
   enabled: true
@@ -36,7 +38,7 @@ server:
 taosync:
   check_interval: 60
   enabled: true
-  job_id: 1
+  job_id: [1, 2]
   password: a123456!@
   url: http://10.10.10.17:8023
   username: admin

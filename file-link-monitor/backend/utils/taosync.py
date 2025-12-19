@@ -20,7 +20,7 @@ class TaoSyncClient:
     # 注意：为了向后兼容，保留原有的trigger_sync()方法返回bool的调用方式
     # 新代码应使用返回Tuple[bool, str]的方式
     
-    def __init__(self, url: str, username: str, password: str, job_id: int):
+    def __init__(self, url: str, username: str, password: str, job_ids: list[int] = None, job_id: int = None):
         """
         初始化TaoSync客户端
         
@@ -28,13 +28,23 @@ class TaoSyncClient:
             url: TaoSync服务地址
             username: 用户名
             password: 密码
-            job_id: 要触发的任务ID
+            job_ids: 要触发的任务ID列表（支持多个）
+            job_id: 单个任务ID（向后兼容，不推荐使用）
         """
         self.url = url.rstrip('/')
         self.username = username
         self.password = password
-        self.job_id = job_id
+        
+        # 支持多个任务ID
+        if job_ids:
+            self.job_ids = job_ids if isinstance(job_ids, list) else [job_ids]
+        elif job_id:
+            self.job_ids = [job_id]
+        else:
+            self.job_ids = []
+            
         self.session: Optional[requests.Session] = None
+        logger.info(f"TaoSync初始化，任务ID: {self.job_ids}")
     
     def login(self) -> bool:
         """
@@ -113,54 +123,76 @@ class TaoSyncClient:
         # 如果查询失败，保守起见认为有任务在执行
         return True
     
-    def trigger_sync(self, check_status: bool = True) -> Tuple[bool, str]:
+    def trigger_sync(self, check_status: bool = True, notifier: Optional[Callable] = None) -> Tuple[bool, str]:
         """
-        触发同步任务
+        触发同步任务（支持多个任务ID）
         
         Args:
             check_status: 是否在触发前检查任务状态
+            notifier: 通知回调函数
         
         Returns:
-            Tuple[bool, str]: (是否成功, 消息)
-                - (True, "success") - 触发成功
-                - (False, "running") - 有任务执行中
-                - (False, "error") - 其他错误
+            Tuple[bool, str]: (是否全部成功, 详细消息)
         """
         if not self.session:
             if not self.login():
                 return False, "login_failed"
         
-        # 先检查是否有任务执行中
-        if check_status and self.is_job_running():
-            logger.warning(f"TaoSync任务 {self.job_id} 正在执行中，跳过触发")
-            return False, "running"
+        if not self.job_ids:
+            return False, "no_job_ids"
         
-        try:
-            exec_url = f"{self.url}/svr/job"
-            exec_data = {
-                'id': self.job_id,
-                'pause': None
-            }
-            
-            response = self.session.put(exec_url, json=exec_data, timeout=10)
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('code') == 200:
-                    logger.info(f"TaoSync任务 {self.job_id} 触发成功")
-                    return True, "success"
-                elif result.get('code') == 500 and '执行中' in result.get('msg', ''):
-                    logger.warning(f"TaoSync任务执行中: {result.get('msg')}")
-                    return False, "running"
+        # 触发所有任务
+        success_count = 0
+        failed_count = 0
+        running_count = 0
+        results = []
+        
+        for job_id in self.job_ids:
+            try:
+                exec_url = f"{self.url}/svr/job"
+                exec_data = {
+                    'id': job_id,
+                    'pause': None
+                }
+                
+                response = self.session.put(exec_url, json=exec_data, timeout=10)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get('code') == 200:
+                        logger.info(f"✅ TaoSync任务 {job_id} 触发成功")
+                        results.append(f"任务{job_id}: 成功")
+                        success_count += 1
+                        if notifier:
+                            notifier(f"TaoSync任务 {job_id} 触发成功")
+                    elif result.get('code') == 500 and '执行中' in result.get('msg', ''):
+                        logger.warning(f"⚠️ TaoSync任务 {job_id} 正在执行中")
+                        results.append(f"任务{job_id}: 执行中")
+                        running_count += 1
+                    else:
+                        logger.error(f"❌ TaoSync任务 {job_id} 触发失败: {result.get('msg')}")
+                        results.append(f"任务{job_id}: 失败")
+                        failed_count += 1
                 else:
-                    logger.error(f"TaoSync任务触发失败: {result.get('msg')}")
-                    return False, "error"
-            else:
-                logger.error(f"TaoSync任务触发失败: {response.text}")
-                return False, "error"
-        except Exception as e:
-            logger.error(f"TaoSync任务触发异常: {e}")
-            return False, "error"
+                    logger.error(f"❌ TaoSync任务 {job_id} 触发失败: {response.text}")
+                    results.append(f"任务{job_id}: 失败")
+                    failed_count += 1
+            except Exception as e:
+                logger.error(f"❌ TaoSync任务 {job_id} 触发异常: {e}")
+                results.append(f"任务{job_id}: 异常")
+                failed_count += 1
+        
+        # 汇总结果
+        summary = f"成功{success_count}个, 执行中{running_count}个, 失败{failed_count}个"
+        detail = ", ".join(results)
+        message = f"{summary} | {detail}"
+        
+        # 发送汇总通知
+        if notifier:
+            notifier(f"TaoSync触发完成: {summary}")
+        
+        # 只要有一个成功就算成功
+        return success_count > 0, message
 
 
 class TaoSyncQueue:
@@ -230,7 +262,7 @@ class TaoSyncQueue:
         Returns:
             Tuple[bool, str]: (是否成功, 消息)
         """
-        success, reason = self.client.trigger_sync(check_status=not force)
+        success, reason = self.client.trigger_sync(check_status=not force, notifier=self.notifier)
         
         if success:
             with self.lock:
@@ -271,7 +303,7 @@ class TaoSyncQueue:
         # 检查任务是否空闲
         if not self.client.is_job_running():
             logger.info("任务空闲，尝试触发待处理的同步任务...")
-            success, reason = self.client.trigger_sync(check_status=False)
+            success, reason = self.client.trigger_sync(check_status=False, notifier=self.notifier)
             
             if success:
                 with self.lock:
