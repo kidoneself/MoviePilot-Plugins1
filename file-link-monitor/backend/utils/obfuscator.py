@@ -259,6 +259,14 @@ class FolderObfuscator:
         if name in self.category_folders:
             return name
         
+        # Season目录不混淆（如 Season 1, Season 2）
+        if re.match(r'^Season\s+\d+$', name, re.IGNORECASE):
+            return name
+        
+        # 常见子目录不混淆（extras, bonus, specials, featurettes等）
+        if name.lower() in ['extras', 'bonus', 'specials', 'featurettes', 'behind the scenes', 'deleted scenes']:
+            return name
+        
         # 1. 优先检查自定义映射
         custom_name = self._get_custom_mapping(name)
         if custom_name:
