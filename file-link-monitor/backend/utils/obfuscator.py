@@ -102,8 +102,14 @@ class FolderObfuscator:
         return Path(file_path).suffix.lower() in FolderObfuscator.VIDEO_EXTENSIONS
     
     @staticmethod
-    def is_media_file(file_path):
-        """检查是否是媒体文件（视频+字幕）"""
+    def is_subtitle_file(file_path) -> bool:
+        """判断是否为字幕文件"""
+        from pathlib import Path
+        return Path(file_path).suffix.lower() in FolderObfuscator.SUBTITLE_EXTENSIONS
+    
+    @staticmethod
+    def is_media_file(file_path) -> bool:
+        """判断是否为媒体文件（视频或字幕）"""
         ext = Path(file_path).suffix.lower()
         return ext in FolderObfuscator.VIDEO_EXTENSIONS or ext in FolderObfuscator.SUBTITLE_EXTENSIONS
     
@@ -120,11 +126,6 @@ class FolderObfuscator:
         if len(parts) >= 3:
             return parts[-3]
         return None
-    
-    @staticmethod
-    def is_media_file(file_path) -> bool:
-        """判断是否为媒体文件（视频或字幕）"""
-        return FolderObfuscator.is_video_file(file_path) or FolderObfuscator.is_subtitle_file(file_path)
     
     @staticmethod
     def rename_video_file(file_name: str) -> str:

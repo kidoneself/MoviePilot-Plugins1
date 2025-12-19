@@ -92,7 +92,6 @@ onMounted(() => {
           <el-tree
             :data="sourceTree"
             v-loading="sourceLoading"
-            default-expand-all
             :props="{ children: 'children', label: 'label' }"
           />
         </el-card>
@@ -129,7 +128,6 @@ onMounted(() => {
             v-else
             :data="targetTree"
             v-loading="targetLoading"
-            default-expand-all
             :props="{ children: 'children', label: 'label' }"
           />
         </el-card>

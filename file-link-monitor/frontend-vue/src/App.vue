@@ -92,6 +92,9 @@ onMounted(() => {
           <el-button v-if="stats.today_count > 0" type="warning" size="small" @click="showTodayDetail = true">
             📊 今日明细
           </el-button>
+          <el-button type="success" @click="syncAll">
+            🔄 全量同步
+          </el-button>
         </el-space>
       </div>
     </el-header>
@@ -120,12 +123,6 @@ onMounted(() => {
             <span>配置</span>
           </el-menu-item>
         </el-menu>
-        
-        <div class="menu-footer">
-          <el-button type="primary" @click="syncAll" style="width: 100%">
-            全量同步
-          </el-button>
-        </div>
       </el-aside>
       
       <el-main class="app-main">

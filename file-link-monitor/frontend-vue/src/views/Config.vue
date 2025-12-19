@@ -177,7 +177,8 @@ onMounted(() => {
             </el-form-item>
             
             <el-form-item label="任务ID">
-              <el-input-number v-model="formData.taosync_job_id" :min="1" />
+              <el-input v-model="formData.taosync_job_id" placeholder="1,2,3 或 [1,2,3]" />
+              <div class="form-tip">支持多个任务ID，用逗号分隔或数组格式：1,2,3 或 [1,2,3]</div>
             </el-form-item>
             
             <el-form-item label="检查间隔">
