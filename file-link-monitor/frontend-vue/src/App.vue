@@ -88,6 +88,42 @@ const batchLinkTemplates = async () => {
   }
 }
 
+const generateShareText = async () => {
+  try {
+    ElMessage.info('正在生成分享文案...')
+    const res = await api.getTodayShareText()
+    if (res.data.success) {
+      const text = res.data.text
+      
+      // 复制到剪贴板
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      textarea.setSelectionRange(0, textarea.value.length)
+      
+      try {
+        const successful = document.execCommand('copy')
+        document.body.removeChild(textarea)
+        if (successful) {
+          ElMessage.success('分享文案已复制到剪贴板')
+        } else {
+          ElMessage.error('复制失败')
+        }
+      } catch (error) {
+        document.body.removeChild(textarea)
+        ElMessage.error('复制失败')
+      }
+    } else {
+      ElMessage.error('生成失败: ' + res.data.message)
+    }
+  } catch (error) {
+    ElMessage.error('请求失败')
+  }
+}
+
 onMounted(() => {
   loadStats()
   loadTodaySync()
@@ -169,6 +205,15 @@ onMounted(() => {
     
     <!-- 今日同步明细弹窗 -->
     <el-dialog v-model="showTodayDetail" title="📊 今日同步明细" width="800px">
+      <template #header>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span>📊 今日同步明细</span>
+          <el-button type="primary" size="small" @click="generateShareText" v-if="Object.keys(todaySync.quark).length > 0 || Object.keys(todaySync.baidu).length > 0 || Object.keys(todaySync.xunlei || {}).length > 0">
+            📋 生成分享文案
+          </el-button>
+        </div>
+      </template>
+      
       <!-- 夸克网盘 -->
       <div v-if="Object.keys(todaySync.quark).length > 0" class="pan-section">
         <h4>📦 夸克网盘</h4>

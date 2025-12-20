@@ -42,3 +42,8 @@ taosync:
   password: a123456!@
   url: http://10.10.10.17:8023
   username: admin
+pansou:
+  enabled: true
+  url: http://10.10.10.17:9978
+  token: ""  # 如果启用了认证，填写token
+  cloud_types: [baidu, quark, xunlei]  # 搜索的网盘类型

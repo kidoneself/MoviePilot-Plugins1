@@ -95,5 +95,15 @@ export default {
   // 获取所有分享链接
   getShareLinks() {
     return api.get('/share-links')
+  },
+
+  // 获取今日更新分享文案
+  getTodayShareText() {
+    return api.get('/today-share-text')
+  },
+
+  // PanSou 搜索
+  pansouSearch(keyword) {
+    return api.post('/pansou-search', { keyword })
   }
 }

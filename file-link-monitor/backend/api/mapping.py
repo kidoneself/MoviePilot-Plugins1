@@ -1,16 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, Response
+"""
+自定义名称映射管理API
+"""
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, and_, distinct
 from pydantic import BaseModel
-from typing import Optional
-import logging
-from io import BytesIO
+from typing import Optional, List
 from datetime import datetime
+import logging
+import shutil
+import subprocess
+import uuid
+import os
+from pathlib import Path
 
 from backend.models import CustomNameMapping, LinkRecord, get_session
+from backend.utils.linker import FileLinker
+from backend.utils.obfuscator import FolderObfuscator
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
 
 def get_db():
     """依赖注入：获取数据库会话"""
@@ -387,6 +396,89 @@ async def export_mappings(
         }
 
 
+def process_anti_ban(target_dir: Path) -> int:
+    """
+    防失效处理：修改目录下所有视频文件的Hash
+    
+    Args:
+        target_dir: 目标目录路径
+        
+    Returns:
+        处理的文件数量
+    """
+    from backend.utils.obfuscator import FolderObfuscator
+    
+    processed_count = 0
+    
+    # 遍历目录下所有文件
+    for file_path in target_dir.rglob('*'):
+        if not file_path.is_file():
+            continue
+        
+        # 只处理视频文件
+        if not FolderObfuscator.is_video_file(str(file_path)):
+            continue
+        
+        # 检查是否为硬链接
+        stat_info = os.stat(file_path)
+        if stat_info.st_nlink <= 1:
+            # 不是硬链接，跳过
+            logger.info(f"跳过非硬链接文件: {file_path.name}")
+            continue
+        
+        # 生成临时文件路径
+        temp_file = file_path.parent / f".{file_path.name}.tmp"
+        
+        try:
+            # 使用ffmpeg修改Hash
+            cmd = [
+                'ffmpeg',
+                '-i', str(file_path),
+                '-map', '0',
+                '-c', 'copy',
+                '-metadata', f'comment={uuid.uuid4()}',
+                '-metadata', f'title={uuid.uuid4()}',
+                str(temp_file),
+                '-y'  # 覆盖已存在的文件
+            ]
+            
+            logger.info(f"正在处理: {file_path.name}")
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=300  # 5分钟超时
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"ffmpeg处理失败 {file_path.name}: {result.stderr}")
+                # 清理临时文件
+                if temp_file.exists():
+                    temp_file.unlink()
+                continue
+            
+            # 删除原硬链接
+            file_path.unlink()
+            
+            # 重命名临时文件
+            temp_file.rename(file_path)
+            
+            processed_count += 1
+            logger.info(f"防失效处理完成: {file_path.name}")
+            
+        except subprocess.TimeoutExpired:
+            logger.error(f"处理超时: {file_path.name}")
+            if temp_file.exists():
+                temp_file.unlink()
+        except Exception as e:
+            logger.error(f"处理失败 {file_path.name}: {e}")
+            if temp_file.exists():
+                temp_file.unlink()
+    
+    return processed_count
+
+
 class ResyncRequest(BaseModel):
     """重转请求"""
     original_name: str
@@ -580,6 +672,39 @@ async def resync_to_target(
                     logger.error(f"删除目录失败 {dir_path}: {e}")
         
         db.commit()
+        
+        # 防失效处理：修改视频文件Hash
+        if success_count > 0:
+            try:
+                # 查找该剧集在目标网盘的目录
+                mapping = db.query(CustomNameMapping).filter(
+                    CustomNameMapping.original_name == request.original_name
+                ).first()
+                
+                if mapping:
+                    # 获取显示名称
+                    if request.target_type == 'quark':
+                        display_name = mapping.quark_name or mapping.original_name
+                    elif request.target_type == 'baidu':
+                        display_name = mapping.baidu_name or mapping.original_name
+                    elif request.target_type == 'xunlei':
+                        display_name = mapping.xunlei_name or mapping.original_name
+                    else:
+                        display_name = mapping.original_name
+                    
+                    # 计算目标目录
+                    target_show_dir = target_base / display_name
+                    
+                    if target_show_dir.exists():
+                        logger.info(f"开始防失效处理: {target_show_dir}")
+                        processed_count = process_anti_ban(target_show_dir)
+                        logger.info(f"防失效处理完成: 处理了 {processed_count} 个视频文件")
+                    else:
+                        logger.warning(f"目标目录不存在: {target_show_dir}")
+            except Exception as e:
+                logger.error(f"防失效处理失败: {e}")
+                import traceback
+                traceback.print_exc()
         
         # 触发TaoSync同步
         if success_count > 0:

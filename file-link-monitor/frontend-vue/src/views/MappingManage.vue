@@ -29,6 +29,18 @@ const cookieDialogTitle = ref('导入Cookie')
 const cookiePanType = ref('baidu')  // baidu/quark
 const cookieText = ref('')
 
+// 盘搜
+const pansouDialogVisible = ref(false)
+const pansouKeyword = ref('')
+const pansouLoading = ref(false)
+const activeTab = ref('baidu')
+const pansouResults = ref({
+  total: 0,
+  baidu: [],
+  quark: [],
+  xunlei: []
+})
+
 
 const loadMappings = async () => {
   loading.value = true
@@ -385,6 +397,42 @@ const generateSingleLink = async (row, panType) => {
   }
 }
 
+// 盘搜
+const handlePanSou = async (keyword) => {
+  pansouKeyword.value = keyword
+  pansouDialogVisible.value = true
+  pansouLoading.value = true
+  
+  try {
+    ElMessage.info('正在搜索网盘资源...')
+    const res = await api.pansouSearch(keyword)
+    
+    if (res.data.success) {
+      const results = res.data.results
+      
+      // 解析结果
+      pansouResults.value = {
+        total: res.data.total,
+        baidu: results.baidu || [],
+        quark: results.quark || [],
+        xunlei: results.xunlei || []
+      }
+      
+      ElMessage.success(`搜索完成！找到 ${res.data.total} 条结果`)
+    } else {
+      ElMessage.error('搜索失败')
+    }
+  } catch (error) {
+    ElMessage.error('搜索失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    pansouLoading.value = false
+  }
+}
+
+const openPanLink = (url) => {
+  window.open(url, '_blank')
+}
+
 const exportMappings = () => {
   const params = {}
   if (searchText.value) {
@@ -441,6 +489,9 @@ onMounted(() => {
             <div class="card-header-content">
               <div class="show-info">
                 <h3>{{ row.original_name }}</h3>
+                <el-button size="small" type="primary" @click="handlePanSou(row.original_name)" style="margin-left: 10px;">
+                  🔍 盘搜
+                </el-button>
                 <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
                   {{ row.enabled ? '启用' : '禁用' }}
                 </el-tag>
@@ -621,6 +672,94 @@ onMounted(() => {
         <el-button type="primary" @click="uploadCookie">上传</el-button>
       </template>
     </el-dialog>
+
+    <!-- 盘搜结果弹窗 -->
+    <el-dialog 
+      v-model="pansouDialogVisible" 
+      :title="`搜索结果：${pansouKeyword}`" 
+      width="900px"
+      :close-on-click-modal="false"
+    >
+      <div v-loading="pansouLoading">
+        <!-- 统计信息 -->
+        <div class="pansou-stats">
+          <span class="stat-item">
+            <span class="stat-label">📊 搜索结果</span>
+            <span class="stat-value">{{ pansouResults.total }}</span>
+          </span>
+          <span class="stat-item">
+            <span class="stat-label">📁 网盘类型</span>
+            <span class="stat-value">{{ (pansouResults.baidu.length > 0 ? 1 : 0) + (pansouResults.quark.length > 0 ? 1 : 0) + (pansouResults.xunlei.length > 0 ? 1 : 0) }}</span>
+          </span>
+        </div>
+
+        <!-- Tab切换 -->
+        <el-tabs v-model="activeTab" class="pansou-tabs">
+          <!-- 百度网盘 -->
+          <el-tab-pane :label="`百度 (${pansouResults.baidu.length})`" name="baidu">
+            <el-scrollbar max-height="500px">
+              <div v-if="pansouResults.baidu.length > 0">
+                <div v-for="(item, idx) in pansouResults.baidu" :key="'baidu-' + idx" class="result-item">
+                  <div class="result-content">
+                    <div class="result-title">{{ item.note || '无标题' }}</div>
+                    <a :href="item.url" target="_blank" class="result-link">{{ item.url }}</a>
+                  </div>
+                  <div class="result-actions">
+                    <span v-if="item.password" class="result-pwd">提取码: {{ item.password }}</span>
+                    <el-button size="small" type="primary" @click="openPanLink(item.url)">
+                      打开链接
+                    </el-button>
+                  </div>
+                </div>
+              </div>
+              <el-empty v-else description="暂无百度网盘资源" />
+            </el-scrollbar>
+          </el-tab-pane>
+
+          <!-- 夸克网盘 -->
+          <el-tab-pane :label="`夸克 (${pansouResults.quark.length})`" name="quark">
+            <el-scrollbar max-height="500px">
+              <div v-if="pansouResults.quark.length > 0">
+                <div v-for="(item, idx) in pansouResults.quark" :key="'quark-' + idx" class="result-item">
+                  <div class="result-content">
+                    <div class="result-title">{{ item.note || '无标题' }}</div>
+                    <a :href="item.url" target="_blank" class="result-link">{{ item.url }}</a>
+                  </div>
+                  <div class="result-actions">
+                    <span v-if="item.password" class="result-pwd">提取码: {{ item.password }}</span>
+                    <el-button size="small" type="success" @click="openPanLink(item.url)">
+                      打开链接
+                    </el-button>
+                  </div>
+                </div>
+              </div>
+              <el-empty v-else description="暂无夸克网盘资源" />
+            </el-scrollbar>
+          </el-tab-pane>
+
+          <!-- 迅雷网盘 -->
+          <el-tab-pane :label="`迅雷 (${pansouResults.xunlei.length})`" name="xunlei">
+            <el-scrollbar max-height="500px">
+              <div v-if="pansouResults.xunlei.length > 0">
+                <div v-for="(item, idx) in pansouResults.xunlei" :key="'xunlei-' + idx" class="result-item">
+                  <div class="result-content">
+                    <div class="result-title">{{ item.note || '无标题' }}</div>
+                    <a :href="item.url" target="_blank" class="result-link">{{ item.url }}</a>
+                  </div>
+                  <div class="result-actions">
+                    <span v-if="item.password" class="result-pwd">提取码: {{ item.password }}</span>
+                    <el-button size="small" type="warning" @click="openPanLink(item.url)">
+                      打开链接
+                    </el-button>
+                  </div>
+                </div>
+              </div>
+              <el-empty v-else description="暂无迅雷网盘资源" />
+            </el-scrollbar>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -780,5 +919,91 @@ onMounted(() => {
   .pan-label {
     min-width: 100%;
   }
+}
+
+/* 盘搜结果样式 */
+.pansou-stats {
+  display: flex;
+  gap: 30px;
+  padding: 15px;
+  background-color: #f7f8fa;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stat-label {
+  color: #606266;
+  font-size: 14px;
+}
+
+.stat-value {
+  color: #303133;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.pansou-tabs {
+  margin-top: 10px;
+}
+
+.result-item {
+  padding: 16px;
+  margin-bottom: 12px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.3s;
+}
+
+.result-item:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 12px rgba(64, 158, 255, 0.15);
+}
+
+.result-content {
+  margin-bottom: 10px;
+}
+
+.result-title {
+  color: #303133;
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  line-height: 1.5;
+}
+
+.result-link {
+  color: #409eff;
+  font-size: 13px;
+  text-decoration: none;
+  word-break: break-all;
+  display: block;
+}
+
+.result-link:hover {
+  text-decoration: underline;
+}
+
+.result-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.result-pwd {
+  color: #f56c6c;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 10px;
+  background-color: #fef0f0;
+  border-radius: 4px;
+  border: 1px solid #fde2e2;
 }
 </style>

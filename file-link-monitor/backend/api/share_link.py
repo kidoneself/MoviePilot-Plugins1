@@ -1,7 +1,7 @@
 """
 分享链接生成API
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
@@ -232,6 +232,222 @@ async def generate_share_link(request: GenerateLinkRequest, db: Session = Depend
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"生成链接失败: {str(e)}")
+
+
+@router.post("/pansou-search")
+async def pansou_search(request: Request, db: Session = Depends(get_db)):
+    """通过 PanSou API 搜索网盘资源"""
+    try:
+        import requests
+        import yaml
+        import os
+        from pathlib import Path
+        
+        # 获取请求参数
+        body = await request.json()
+        keyword = body.get("keyword")
+        
+        if not keyword:
+            raise HTTPException(status_code=400, detail="缺少搜索关键词")
+        
+        # 读取配置文件
+        config_path = os.getenv('CONFIG_PATH', 'config.yaml')
+        if not os.path.isabs(config_path):
+            base_dir = Path(__file__).parent.parent.parent
+            config_path = base_dir / config_path
+        
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        
+        pansou_config = config.get("pansou", {})
+        
+        if not pansou_config.get("enabled"):
+            raise HTTPException(status_code=400, detail="PanSou 功能未启用")
+        
+        pansou_url = pansou_config.get("url", "")
+        pansou_token = pansou_config.get("token", "")
+        cloud_types = pansou_config.get("cloud_types", ["baidu", "quark", "xunlei"])
+        
+        if not pansou_url:
+            raise HTTPException(status_code=400, detail="PanSou API 地址未配置")
+        
+        # 构建 PanSou API 请求
+        api_url = f"{pansou_url}/api/search"
+        payload = {
+            "kw": keyword,
+            "res": "merge",
+            "src": "all",
+            "cloud_types": cloud_types
+        }
+        
+        headers = {"Content-Type": "application/json"}
+        if pansou_token:
+            headers["Authorization"] = f"Bearer {pansou_token}"
+        
+        logger.info(f"搜索关键词: {keyword}, 网盘类型: {cloud_types}")
+        
+        # 第一次搜索：快速返回缓存结果
+        response = requests.post(api_url, json=payload, headers=headers, timeout=10)
+        
+        if response.status_code != 200:
+            logger.error(f"PanSou API 请求失败: {response.status_code}, {response.text}")
+            raise HTTPException(status_code=500, detail=f"搜索失败: {response.text}")
+        
+        data = response.json()
+        result_data = data.get("data", {})
+        first_total = result_data.get("total", 0)
+        
+        logger.info(f"首次搜索: 找到 {first_total} 条缓存结果，等待异步搜索完成...")
+        
+        # 等待3秒，让异步插件搜索完成
+        import time
+        time.sleep(3)
+        
+        # 第二次搜索：获取完整结果
+        response2 = requests.post(api_url, json=payload, headers=headers, timeout=10)
+        
+        if response2.status_code != 200:
+            logger.warning(f"第二次搜索失败，使用首次结果")
+            final_data = data
+        else:
+            final_data = response2.json()
+        
+        # 解析最终结果
+        result_data = final_data.get("data", {})
+        total = result_data.get("total", 0)
+        merged_by_type = result_data.get("merged_by_type", {})
+        
+        logger.info(f"搜索完成: 找到 {total} 条结果（首次 {first_total} 条）")
+        
+        return {
+            "success": True,
+            "total": total,
+            "results": merged_by_type
+        }
+        
+    except requests.exceptions.Timeout:
+        logger.error("PanSou API 请求超时")
+        raise HTTPException(status_code=500, detail="搜索超时")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"PanSou API 请求异常: {e}")
+        raise HTTPException(status_code=500, detail=f"请求异常: {str(e)}")
+    except Exception as e:
+        logger.error(f"PanSou 搜索失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/today-share-text")
+def get_today_share_text(db: Session = Depends(get_db)):
+    """生成今日更新分享文案"""
+    try:
+        from datetime import date
+        from sqlalchemy import func
+        from backend.models import LinkRecord
+        
+        today = date.today()
+        
+        # 查询今日更新的记录，按剧集分组
+        records = db.query(LinkRecord).filter(
+            func.date(LinkRecord.created_at) == today
+        ).order_by(LinkRecord.original_name).all()
+        
+        if not records:
+            return {
+                "success": True,
+                "text": f"【{today.strftime('%Y-%m-%d')} 今日更新】\n\n暂无更新"
+            }
+        
+        # 按剧名分组统计
+        show_updates = {}
+        for record in records:
+            show_name = record.original_name
+            if show_name not in show_updates:
+                show_updates[show_name] = {
+                    "files": [],
+                    "episodes": set()
+                }
+            
+            # 提取集数
+            import re
+            file_name = record.source_file.split('/')[-1]
+            ep_match = re.search(r'[SE](\d+)[E.](\d+)', file_name, re.IGNORECASE)
+            if ep_match:
+                episode = int(ep_match.group(2))
+                show_updates[show_name]["episodes"].add(episode)
+            
+            show_updates[show_name]["files"].append(file_name)
+        
+        # 获取分享链接
+        mappings = db.query(CustomNameMapping).filter(
+            CustomNameMapping.original_name.in_(list(show_updates.keys()))
+        ).all()
+        
+        mapping_dict = {m.original_name: m for m in mappings}
+        
+        # 生成文案
+        import re
+        lines = [f"【{today.strftime('%Y-%m-%d')} 今日更新】\n"]
+        
+        for show_name in sorted(show_updates.keys()):
+            episodes = sorted(show_updates[show_name]["episodes"])
+            mapping = mapping_dict.get(show_name)
+            
+            # 剧名和更新信息
+            if episodes:
+                ep_str = f"更新{episodes[-1]:02d}" if len(episodes) == 1 else f"更新{episodes[0]:02d}-{episodes[-1]:02d}"
+            else:
+                ep_str = f"更新{len(show_updates[show_name]['files'])}个文件"
+            
+            # 是否完结
+            completed_tag = "【完结】" if mapping and mapping.is_completed else ""
+            
+            lines.append(f"{show_name} {ep_str}{completed_tag}")
+            
+            # 分享链接
+            if mapping:
+                # 百度
+                if mapping.baidu_link:
+                    baidu_link = mapping.baidu_link
+                    baidu_pwd = None
+                    if '?pwd=' in baidu_link:
+                        parts = baidu_link.split('?pwd=')
+                        baidu_link = parts[0]
+                        baidu_pwd = parts[1].split()[0]
+                    
+                    pwd_text = f" 提取码: {baidu_pwd}" if baidu_pwd else ""
+                    lines.append(f"BD：{baidu_link}{pwd_text}")
+                
+                # 夸克
+                if mapping.quark_link:
+                    lines.append(f"KK：{mapping.quark_link}")
+                
+                # 迅雷
+                if mapping.xunlei_link:
+                    xunlei_link = mapping.xunlei_link
+                    xunlei_pwd = None
+                    if '?pwd=' in xunlei_link:
+                        parts = xunlei_link.split('?pwd=')
+                        xunlei_link = parts[0]
+                        xunlei_pwd = parts[1].split()[0]
+                    
+                    pwd_text = f" 提取码: {xunlei_pwd}" if xunlei_pwd else ""
+                    lines.append(f"XL：{xunlei_link}{pwd_text}")
+            
+            lines.append("")  # 空行分隔
+        
+        text = "\n".join(lines)
+        
+        return {
+            "success": True,
+            "text": text
+        }
+    except Exception as e:
+        logger.error(f"生成今日分享文案失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/share-links")
