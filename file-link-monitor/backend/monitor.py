@@ -193,12 +193,15 @@ class FileMonitorHandler(FileSystemEventHandler):
                 
                 if success and actual_target:
                     # 根据网盘名称更新对应字段
-                    if '夸克' in target_name or '测试1' in target_name or idx == 0:
+                    if '夸克' in target_name or 'quark' in target_name.lower():
                         record.quark_target_file = str(actual_target)
                         record.quark_synced_at = datetime.now()
-                    else:
+                    elif '百度' in target_name or 'baidu' in target_name.lower():
                         record.baidu_target_file = str(actual_target)
                         record.baidu_synced_at = datetime.now()
+                    elif '迅雷' in target_name or 'xunlei' in target_name.lower():
+                        record.xunlei_target_file = str(actual_target)
+                        record.xunlei_synced_at = datetime.now()
                     
                     record.updated_at = datetime.now()
             
