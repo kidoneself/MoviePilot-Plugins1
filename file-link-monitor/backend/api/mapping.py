@@ -426,8 +426,8 @@ def process_anti_ban(target_dir: Path) -> int:
             logger.info(f"跳过非硬链接文件: {file_path.name}")
             continue
         
-        # 生成临时文件路径
-        temp_file = file_path.parent / f".{file_path.name}.tmp"
+        # 生成临时文件路径（保留扩展名，让ffmpeg能识别格式）
+        temp_file = file_path.parent / f"{file_path.stem}.tmp{file_path.suffix}"
         
         try:
             # 使用ffmpeg修改Hash
