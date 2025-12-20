@@ -678,7 +678,7 @@ async def resync_to_target(
             try:
                 # 从已重转的文件记录中提取实际的剧集根目录
                 sample_record = db.query(LinkRecord).filter(
-                    LinkRecord.mapping_id == mapping_id
+                    LinkRecord.original_name == request.original_name
                 ).first()
                 
                 if sample_record:
