@@ -676,31 +676,39 @@ async def resync_to_target(
         # 防失效处理：修改视频文件Hash
         if success_count > 0:
             try:
-                # 查找该剧集在目标网盘的目录
-                mapping = db.query(CustomNameMapping).filter(
-                    CustomNameMapping.original_name == request.original_name
+                # 从已重转的文件记录中提取实际的剧集根目录
+                sample_record = db.query(LinkRecord).filter(
+                    LinkRecord.mapping_id == mapping_id
                 ).first()
                 
-                if mapping:
-                    # 获取显示名称
+                if sample_record:
+                    # 根据target_type获取对应的target_file
+                    target_file_str = None
                     if request.target_type == 'quark':
-                        display_name = mapping.quark_name or mapping.original_name
+                        target_file_str = sample_record.quark_target_file
                     elif request.target_type == 'baidu':
-                        display_name = mapping.baidu_name or mapping.original_name
+                        target_file_str = sample_record.baidu_target_file
                     elif request.target_type == 'xunlei':
-                        display_name = mapping.xunlei_name or mapping.original_name
-                    else:
-                        display_name = mapping.original_name
+                        target_file_str = sample_record.xunlei_target_file
                     
-                    # 计算目标目录
-                    target_show_dir = target_base / display_name
-                    
-                    if target_show_dir.exists():
-                        logger.info(f"开始防失效处理: {target_show_dir}")
-                        processed_count = process_anti_ban(target_show_dir)
-                        logger.info(f"防失效处理完成: 处理了 {processed_count} 个视频文件")
+                    if target_file_str:
+                        # 例如: /media/夸克网盘/剧集/国产剧集/C钞钞感贡米(2025)/Season 1/S01E01.mkv
+                        # 提取剧集根目录: /media/夸克网盘/剧集/国产剧集/C钞钞感贡米(2025)
+                        target_file_path = Path(target_file_str)
+                        
+                        # 向上找2级：文件 -> Season 1 -> 剧集根目录
+                        if target_file_path.exists():
+                            target_show_dir = target_file_path.parent.parent
+                            
+                            logger.info(f"开始防失效处理: {target_show_dir}")
+                            processed_count = process_anti_ban(target_show_dir)
+                            logger.info(f"防失效处理完成: 处理了 {processed_count} 个视频文件")
+                        else:
+                            logger.warning(f"目标文件不存在: {target_file_path}")
                     else:
-                        logger.warning(f"目标目录不存在: {target_show_dir}")
+                        logger.warning(f"未找到目标文件路径")
+                else:
+                    logger.warning(f"未找到重转记录")
             except Exception as e:
                 logger.error(f"防失效处理失败: {e}")
                 import traceback
