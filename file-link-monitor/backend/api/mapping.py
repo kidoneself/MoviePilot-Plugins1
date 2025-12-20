@@ -621,12 +621,6 @@ async def resync_to_target(
                     if old_path.exists():
                         old_path.unlink()
                         logger.info(f"已删除旧文件: {old_path}")
-                        
-                        # 收集需要删除的空目录
-                        for parent in old_path.parents:
-                            if parent.name.startswith('Season') or parent == old_path.parent.parent:
-                                deleted_dirs.add(parent.parent)
-                                break
                 
                 # 计算新的目标路径
                 relative_path = source_file.relative_to(source_path)
@@ -654,6 +648,13 @@ async def resync_to_target(
                     record.updated_at = datetime.now()
                     success_count += 1
                     logger.info(f"重转成功: {source_file.name} -> {actual_target}")
+                    
+                    # 如果旧文件存在且新旧目录不同，收集旧目录用于删除
+                    if old_target_file:
+                        old_show_dir = Path(old_target_file).parent.parent
+                        new_show_dir = Path(actual_target).parent.parent
+                        if old_show_dir != new_show_dir and old_show_dir.exists():
+                            deleted_dirs.add(old_show_dir)
                 else:
                     failed_count += 1
                     logger.error(f"重转失败: {source_file.name}, 错误: {error}")
@@ -662,12 +663,16 @@ async def resync_to_target(
                 failed_count += 1
                 logger.error(f"处理文件失败 {record.source_file}: {e}")
         
-        # 删除空目录
+        # 删除空目录（只删除真正为空的目录）
         for dir_path in deleted_dirs:
             if dir_path.exists():
                 try:
-                    shutil.rmtree(dir_path)
-                    logger.info(f"已删除目录: {dir_path}")
+                    # 检查目录是否为空
+                    if not any(dir_path.iterdir()):
+                        shutil.rmtree(dir_path)
+                        logger.info(f"已删除空目录: {dir_path}")
+                    else:
+                        logger.info(f"跳过非空目录: {dir_path}")
                 except Exception as e:
                     logger.error(f"删除目录失败 {dir_path}: {e}")
         
