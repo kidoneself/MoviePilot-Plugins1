@@ -6,6 +6,23 @@ const api = axios.create({
 })
 
 export default {
+  // 通用方法
+  get(url, config) {
+    return api.get(url, config)
+  },
+  
+  post(url, data, config) {
+    return api.post(url, data, config)
+  },
+  
+  put(url, data, config) {
+    return api.put(url, data, config)
+  },
+  
+  delete(url, config) {
+    return api.delete(url, config)
+  },
+
   // 统计信息
   getStats() {
     return api.get('/stats')

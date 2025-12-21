@@ -279,6 +279,88 @@ class XunleiAPI:
             logger.error(error_msg)
             return None, error_msg
     
+    def create_folder(self, parent_id: str, folder_name: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        创建文件夹
+        
+        Args:
+            parent_id: 父文件夹ID
+            folder_name: 文件夹名称
+            
+        Returns:
+            (folder_id, error_msg): 成功返回(文件夹ID, None)，失败返回(None, 错误信息)
+        """
+        try:
+            # 获取全局page和auth_info
+            page, auth_info = _browser_manager.run_in_thread(lambda: _browser_manager.get_page(self.cookies))
+            
+            # 获取新token
+            result = _browser_manager.run_in_thread(lambda: self._refresh_token_sync(page, auth_info))
+            if not result:
+                return None, "无法获取认证token"
+            
+            logger.info(f"📁 创建文件夹: {folder_name}")
+            logger.info(f"   父文件夹ID: {parent_id}")
+            
+            headers = {
+                'accept': '*/*',
+                'authorization': auth_info['authorization'],
+                'x-captcha-token': auth_info['x-captcha-token'],
+                'x-client-id': 'Xqp0kJBXWhwaTpB6',
+                'x-device-id': 'd765a49124d0b4c8d593d73daa738f51',
+                'content-type': 'application/json',
+                'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+            }
+            
+            data = {
+                "parent_id": parent_id,
+                "name": folder_name,
+                "kind": "drive#folder",
+                "space": ""
+            }
+            
+            response = requests.post(
+                "https://api-pan.xunlei.com/drive/v1/files",
+                json=data,
+                headers=headers,
+                timeout=30
+            )
+            
+            result = response.json()
+            logger.info(f"   响应状态码: {response.status_code}")
+            logger.info(f"   响应内容: {result}")
+            
+            if response.status_code != 200:
+                error_msg = f"创建文件夹请求失败，状态码: {response.status_code}"
+                error_detail = result.get('error_description', result.get('message', ''))
+                if error_detail:
+                    error_msg += f", 错误: {error_detail}"
+                logger.error(error_msg)
+                return None, error_msg
+            
+            # 提取文件夹信息
+            file_info = result.get('file', {})
+            if not file_info:
+                error_msg = f"创建文件夹失败: {result.get('error_description', result.get('message', '未知错误'))}"
+                logger.error(error_msg)
+                return None, error_msg
+            
+            folder_id = file_info.get('id')
+            logger.info(f"✅ 文件夹创建成功")
+            logger.info(f"   文件夹ID: {folder_id}")
+            logger.info(f"   文件夹名: {file_info.get('name')}")
+            
+            return folder_id, None
+            
+        except requests.RequestException as e:
+            error_msg = f"创建文件夹时网络异常: {str(e)}"
+            logger.error(error_msg)
+            return None, error_msg
+        except Exception as e:
+            error_msg = f"创建文件夹时发生未知错误: {str(e)}"
+            logger.error(error_msg)
+            return None, error_msg
+    
     def create_share_link(self, file_id: str, auth_info: Dict) -> Tuple[Optional[str], Optional[str]]:
         """
         创建分享链接

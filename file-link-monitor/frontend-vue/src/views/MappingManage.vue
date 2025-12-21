@@ -11,11 +11,13 @@ const searchText = ref('')
 const currentPage = ref(1)
 const pageSize = ref(20)
 
+const categories = ref([])
 const dialogVisible = ref(false)
 const dialogTitle = ref('添加映射')
 const formData = ref({
   id: null,
   original_name: '',
+  category: '',
   quark_name: '',
   baidu_name: '',
   xunlei_name: '',
@@ -33,6 +35,7 @@ const cookieText = ref('')
 const pansouDialogVisible = ref(false)
 const pansouKeyword = ref('')
 const pansouLoading = ref(false)
+const currentMapping = ref(null)  // 当前盘搜对应的映射记录
 const activeTab = ref('baidu')
 const pansouResults = ref({
   total: 0,
@@ -41,6 +44,17 @@ const pansouResults = ref({
   xunlei: []
 })
 
+
+const loadCategories = async () => {
+  try {
+    const res = await api.get('/categories')
+    if (res.data.success) {
+      categories.value = res.data.categories || []
+    }
+  } catch (error) {
+    console.error('加载分类失败:', error)
+  }
+}
 
 const loadMappings = async () => {
   loading.value = true
@@ -70,6 +84,7 @@ const handleAdd = () => {
   formData.value = {
     id: null,
     original_name: '',
+    category: '',
     quark_name: '',
     baidu_name: '',
     xunlei_name: '',
@@ -371,6 +386,29 @@ const uploadCookie = async () => {
   }
 }
 
+// 从映射转存
+const transferFromMapping = async (mappingId, panType) => {
+  try {
+    loading.value = true
+    const panNames = {'baidu': '百度', 'quark': '夸克', 'xunlei': '迅雷'}
+    const panName = panNames[panType] || '网盘'
+    
+    ElMessage.info(`正在转存到${panName}...`)
+    
+    const res = await api.post(`/transfer/from_mapping/${mappingId}?pan_type=${panType}`)
+    
+    if (res.data.success) {
+      ElMessage.success(`${panName}转存成功！文件数：${res.data.file_count}`)
+    } else {
+      ElMessage.error(res.data.message || '转存失败')
+    }
+  } catch (error) {
+    ElMessage.error('转存失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    loading.value = false
+  }
+}
+
 // 生成单个分享链接
 const generateSingleLink = async (row, panType) => {
   try {
@@ -398,10 +436,44 @@ const generateSingleLink = async (row, panType) => {
 }
 
 // 盘搜
-const handlePanSou = async (keyword) => {
-  pansouKeyword.value = keyword
-  pansouDialogVisible.value = true
+const handlePanSou = async (mappingOrKeyword) => {
+  // 判断是映射对象还是关键词字符串
+  if (typeof mappingOrKeyword === 'object' && mappingOrKeyword !== null) {
+    // 从列表点击，传入的是映射记录
+    currentMapping.value = mappingOrKeyword
+    pansouKeyword.value = mappingOrKeyword.original_name
+    pansouDialogVisible.value = true
+    await executePanSou(mappingOrKeyword.original_name)
+  } else {
+    // 从顶部盘搜按钮点击，传入的是空字符串
+    currentMapping.value = null
+    pansouKeyword.value = mappingOrKeyword || ''
+    pansouDialogVisible.value = true
+    
+    // 如果有关键词，自动搜索；如果没有，只打开对话框
+    if (mappingOrKeyword) {
+      await executePanSou(mappingOrKeyword)
+    } else {
+      // 清空之前的搜索结果
+      pansouResults.value = {
+        total: 0,
+        baidu: [],
+        quark: [],
+        xunlei: []
+      }
+    }
+  }
+}
+
+// 执行盘搜
+const executePanSou = async (keyword) => {
+  if (!keyword || !keyword.trim()) {
+    ElMessage.warning('请输入搜索关键词')
+    return
+  }
+  
   pansouLoading.value = true
+  pansouKeyword.value = keyword
   
   try {
     ElMessage.info('正在搜索网盘资源...')
@@ -433,6 +505,111 @@ const openPanLink = (url) => {
   window.open(url, '_blank')
 }
 
+// 从盘搜结果转存
+const confirmTransferFromPansou = async (shareUrl, passCode, panType) => {
+  const panNames = {'baidu': '百度', 'quark': '夸克', 'xunlei': '迅雷'}
+  const panName = panNames[panType] || '网盘'
+  
+  // 如果没有提取码，尝试从URL中解析
+  if (!passCode) {
+    const urlMatch = shareUrl.match(/pwd=([a-zA-Z0-9]+)/)
+    if (urlMatch) {
+      passCode = urlMatch[1]
+      console.log('从URL解析提取码:', passCode)
+    }
+  }
+  
+  // 使用搜索关键词作为文件夹名
+  const folderName = pansouKeyword.value || '未命名'
+  
+  try {
+    // 优先使用 currentMapping（从列表点击盘搜时会有）
+    let mapping = currentMapping.value
+    
+    // 如果没有 currentMapping，再去查找匹配
+    if (!mapping) {
+      // 先精确匹配
+      mapping = mappings.value.find(m => m.original_name === folderName)
+      
+      if (!mapping) {
+        // 尝试包含匹配
+        mapping = mappings.value.find(m => 
+          m.original_name.includes(folderName) || folderName.includes(m.original_name)
+        )
+      }
+    }
+    
+    // 构建目标路径
+    const category = mapping?.category || '未分类'
+    const targetPath = `/A-闲鱼影视（自动更新）/${category}/${folderName}`
+    
+    // 显示提示信息
+    let confirmMessage = `将转存到【${panName}网盘】\n\n目标路径：\n${targetPath}`
+    if (mapping) {
+      confirmMessage += `\n\n匹配到映射：${mapping.original_name} (分类: ${mapping.category || '未分类'})`
+    } else {
+      confirmMessage += `\n\n⚠️ 未找到匹配的映射记录，将使用默认分类`
+    }
+    confirmMessage += `\n\n确认转存吗？`
+    
+    // 直接显示路径确认
+    await ElMessageBox.confirm(
+      confirmMessage,
+      '确认转存',
+      {
+        confirmButtonText: '确认转存',
+        cancelButtonText: '取消',
+        type: 'info',
+        dangerouslyUseHTMLString: false
+      }
+    )
+    
+    // 执行转存
+    executeTransferFromPansou(shareUrl, passCode, panType, targetPath)
+    
+  } catch {
+    // 用户取消
+  }
+}
+
+// 执行转存
+const executeTransferFromPansou = async (shareUrl, passCode, panType, targetPath) => {
+  try {
+    loading.value = true
+    const panNames = {'baidu': '百度', 'quark': '夸克', 'xunlei': '迅雷'}
+    const panName = panNames[panType] || '网盘'
+    
+    console.log('开始转存：', {
+      shareUrl,
+      passCode,
+      panType,
+      targetPath
+    })
+    
+    ElMessage.info(`正在转存到${panName}...`)
+    
+    const res = await api.post('/transfer', {
+      share_url: shareUrl,
+      pass_code: passCode,
+      target_path: targetPath,
+      pan_type: panType,
+      use_openlist: true
+    })
+    
+    console.log('转存响应：', res.data)
+    
+    if (res.data.success) {
+      ElMessage.success(`${panName}转存成功！文件数：${res.data.file_count}`)
+    } else {
+      ElMessage.error(res.data.message || '转存失败')
+    }
+  } catch (error) {
+    ElMessage.error('转存失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    loading.value = false
+  }
+}
+
 const exportMappings = () => {
   const params = {}
   if (searchText.value) {
@@ -453,6 +630,7 @@ const exportMappings = () => {
 }
 
 onMounted(() => {
+  loadCategories()
   loadMappings()
 })
 </script>
@@ -472,6 +650,7 @@ onMounted(() => {
               @keyup.enter="loadMappings"
             />
             <el-button type="primary" @click="loadMappings">搜索</el-button>
+            <el-button type="primary" @click="handlePanSou('')">🔍 盘搜</el-button>
             <el-button @click="exportMappings">导出Excel</el-button>
             <el-button type="success" @click="openCookieDialog('baidu')">导入百度Cookie</el-button>
             <el-button type="warning" @click="openCookieDialog('quark')">导入夸克Cookie</el-button>
@@ -489,7 +668,8 @@ onMounted(() => {
             <div class="card-header-content">
               <div class="show-info">
                 <h3>{{ row.original_name }}</h3>
-                <el-button size="small" type="primary" @click="handlePanSou(row.original_name)" style="margin-left: 10px;">
+                <el-tag v-if="row.category" type="info" size="small" style="margin-left: 10px;">{{ row.category }}</el-tag>
+                <el-button size="small" type="primary" @click="handlePanSou(row)" style="margin-left: 10px;">
                   🔍 盘搜
                 </el-button>
                 <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
@@ -505,6 +685,7 @@ onMounted(() => {
               </div>
               <div class="show-actions">
                 <el-button size="small" type="success" @click="copyLinks(row)">复制</el-button>
+                <el-button size="small" @click="handleEdit(row)">编辑</el-button>
                 <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
               </div>
             </div>
@@ -626,6 +807,26 @@ onMounted(() => {
         <el-form-item label="原名称" required>
           <el-input v-model="formData.original_name" placeholder="请输入原名称" />
         </el-form-item>
+        <el-form-item label="分类">
+          <el-select v-model="formData.category" placeholder="请选择分类" clearable filterable style="width: 100%">
+            <el-option-group label="动漫">
+              <el-option v-for="cat in categories.filter(c => c.startsWith('动漫/'))"
+                :key="cat" :label="cat" :value="cat" />
+            </el-option-group>
+            <el-option-group label="电影">
+              <el-option v-for="cat in categories.filter(c => c.startsWith('电影/'))"
+                :key="cat" :label="cat" :value="cat" />
+            </el-option-group>
+            <el-option-group label="剧集">
+              <el-option v-for="cat in categories.filter(c => c.startsWith('剧集/'))"
+                :key="cat" :label="cat" :value="cat" />
+            </el-option-group>
+            <el-option-group label="其他">
+              <el-option v-for="cat in categories.filter(c => c.startsWith('其他/'))"
+                :key="cat" :label="cat" :value="cat" />
+            </el-option-group>
+          </el-select>
+        </el-form-item>
         <el-form-item label="夸克显示名">
           <el-input v-model="formData.quark_name" placeholder="请输入夸克显示名（可选）" />
         </el-form-item>
@@ -676,11 +877,24 @@ onMounted(() => {
     <!-- 盘搜结果弹窗 -->
     <el-dialog 
       v-model="pansouDialogVisible" 
-      :title="`搜索结果：${pansouKeyword}`" 
+      :title="pansouKeyword ? `搜索结果：${pansouKeyword}` : '盘搜'" 
       width="900px"
       :close-on-click-modal="false"
     >
       <div v-loading="pansouLoading">
+        <!-- 搜索输入框 -->
+        <div style="margin-bottom: 20px;">
+          <el-input
+            v-model="pansouKeyword"
+            placeholder="请输入搜索关键词..."
+            style="width: 70%;"
+            @keyup.enter="executePanSou(pansouKeyword)"
+          >
+            <template #prepend>🔍 关键词</template>
+          </el-input>
+          <el-button type="primary" @click="executePanSou(pansouKeyword)" style="margin-left: 10px;">搜索</el-button>
+        </div>
+
         <!-- 统计信息 -->
         <div class="pansou-stats">
           <span class="stat-item">
@@ -709,6 +923,9 @@ onMounted(() => {
                     <el-button size="small" type="primary" @click="openPanLink(item.url)">
                       打开链接
                     </el-button>
+                    <el-button size="small" type="success" @click="confirmTransferFromPansou(item.url, item.password, 'baidu')">
+                      转存
+                    </el-button>
                   </div>
                 </div>
               </div>
@@ -730,6 +947,9 @@ onMounted(() => {
                     <el-button size="small" type="success" @click="openPanLink(item.url)">
                       打开链接
                     </el-button>
+                    <el-button size="small" type="warning" @click="confirmTransferFromPansou(item.url, item.password, 'quark')">
+                      转存
+                    </el-button>
                   </div>
                 </div>
               </div>
@@ -750,6 +970,9 @@ onMounted(() => {
                     <span v-if="item.password" class="result-pwd">提取码: {{ item.password }}</span>
                     <el-button size="small" type="warning" @click="openPanLink(item.url)">
                       打开链接
+                    </el-button>
+                    <el-button size="small" type="info" @click="confirmTransferFromPansou(item.url, item.password, 'xunlei')">
+                      转存
                     </el-button>
                   </div>
                 </div>

@@ -1,0 +1,37 @@
+{
+  "errno": 0,
+  "request_id": 163848737868036274,
+  "server_time": 1766335955,
+  "cfrom_id": 0,
+  "hitrisk": 0,
+  "appeal_status": 0,
+  "is_zombie": 0,
+  "vip_point": 4260,
+  "vip_level": 3,
+  "svip10_id": "",
+  "vip_type": 2,
+  "sharetype": 0,
+  "view_visited": 0,
+  "view_limit": 0,
+  "expired_type": 0,
+  "title": "/电视剧/日韩剧/出租车3",
+  "list": [
+    {
+      "category": "6",
+      "extent_int8": "0",
+      "fs_id": "529723367850139",
+      "isdir": "1",
+      "local_ctime": "1763736850",
+      "local_mtime": "1763736850",
+      "md5": "",
+      "path": "/电视剧/日韩剧/出租车3",
+      "server_ctime": "1763736850",
+      "server_filename": "出租车3",
+      "server_mtime": "1766311385",
+      "size": "0"
+    }
+  ],
+  "share_id": 19377860020,
+  "uk": 1099891027153,
+  "show_msg": "success"
+}

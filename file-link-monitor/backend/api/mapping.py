@@ -34,6 +34,7 @@ def get_db():
 class MappingCreate(BaseModel):
     """创建映射请求"""
     original_name: str
+    category: Optional[str] = None
     quark_name: Optional[str] = None
     baidu_name: Optional[str] = None
     xunlei_name: Optional[str] = None
@@ -45,6 +46,7 @@ class MappingCreate(BaseModel):
 
 class MappingUpdate(BaseModel):
     """更新映射请求"""
+    category: Optional[str] = None
     quark_name: Optional[str] = None
     baidu_name: Optional[str] = None
     xunlei_name: Optional[str] = None
@@ -102,6 +104,7 @@ async def get_mappings(
                 {
                     "id": m.id,
                     "original_name": m.original_name,
+                    "category": m.category,
                     "quark_name": m.quark_name,
                     "baidu_name": m.baidu_name,
                     "xunlei_name": m.xunlei_name,
@@ -149,6 +152,7 @@ async def create_mapping(mapping: MappingCreate, db: Session = Depends(get_db)):
         # 创建映射（自动去除前后空格）
         new_mapping = CustomNameMapping(
             original_name=mapping.original_name,
+            category=mapping.category,
             quark_name=mapping.quark_name.strip() if mapping.quark_name else None,
             baidu_name=mapping.baidu_name.strip() if mapping.baidu_name else None,
             xunlei_name=mapping.xunlei_name.strip() if mapping.xunlei_name else None,
@@ -169,6 +173,7 @@ async def create_mapping(mapping: MappingCreate, db: Session = Depends(get_db)):
             "data": {
                 "id": new_mapping.id,
                 "original_name": new_mapping.original_name,
+                "category": new_mapping.category,
                 "quark_name": new_mapping.quark_name,
                 "baidu_name": new_mapping.baidu_name,
                 "enabled": new_mapping.enabled,
@@ -203,6 +208,8 @@ async def update_mapping(
             return {"success": False, "message": "映射不存在"}
         
         # 更新字段（自动去除前后空格）
+        if mapping.category is not None:
+            existing.category = mapping.category
         if mapping.quark_name is not None:
             existing.quark_name = mapping.quark_name.strip() if mapping.quark_name else None
         if mapping.baidu_name is not None:
@@ -233,6 +240,7 @@ async def update_mapping(
             "data": {
                 "id": existing.id,
                 "original_name": existing.original_name,
+                "category": existing.category,
                 "quark_name": existing.quark_name,
                 "baidu_name": existing.baidu_name,
                 "enabled": existing.enabled,

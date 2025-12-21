@@ -50,6 +50,7 @@ class CustomNameMapping(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     original_name = Column(String(191), nullable=False, unique=True)
+    category = Column(String(100), comment='二级分类：电影/国产电影')
     
     # 三网盘显示名
     quark_name = Column(String(500))
@@ -136,3 +137,13 @@ def get_session(engine):
     """获取数据库会话"""
     Session = sessionmaker(bind=engine)
     return Session()
+
+
+def get_db():
+    """FastAPI依赖注入：获取数据库会话"""
+    from backend.main import db_engine
+    session = get_session(db_engine)
+    try:
+        yield session
+    finally:
+        session.close()

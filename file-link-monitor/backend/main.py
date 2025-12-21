@@ -11,7 +11,7 @@ import uvicorn
 
 from backend.models import init_database
 from backend.monitor import MonitorService
-from backend.api import records, tree, export, mapping, share_link
+from backend.api import records, tree, export, mapping, share_link, transfer, category
 
 # 配置日志
 logging.basicConfig(
@@ -76,6 +76,8 @@ app.include_router(records.router, prefix="/api", tags=["记录"])
 app.include_router(export.router, prefix="/api", tags=["导出"])
 app.include_router(mapping.router, prefix="/api", tags=["映射管理"])
 app.include_router(share_link.router, prefix="/api", tags=["分享链接"])
+app.include_router(transfer.router, prefix="/api", tags=["网盘转存"])
+app.include_router(category.router, prefix="/api", tags=["分类管理"])
 
 # 静态文件
 frontend_path = Path(__file__).parent.parent / "frontend"

@@ -1,0 +1,335 @@
+{
+  "errno": 0,
+  "request_id": 163848866305314311,
+  "server_time": 1766335955,
+  "cfrom_id": 0,
+  "hitrisk": 0,
+  "appeal_status": 0,
+  "is_zombie": 0,
+  "vip_point": 4260,
+  "vip_level": 3,
+  "svip10_id": "",
+  "vip_type": 2,
+  "sharetype": 0,
+  "view_visited": 0,
+  "view_limit": 0,
+  "expired_type": 0,
+  "share_id": 19377860020,
+  "uk": 1099891027153,
+  "list": [
+    {
+      "category": 6,
+      "extent_int8": 0,
+      "fs_id": 324839932737659,
+      "isdir": 1,
+      "local_ctime": 1741599902,
+      "local_mtime": 1741599902,
+      "path": "/电视剧/日韩剧/出租车3/M-模范出租车 1-2季",
+      "server_ctime": 1741599902,
+      "server_filename": "M-模范出租车 1-2季",
+      "server_mtime": 1763737564,
+      "size": 0
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 554275473461702,
+      "isdir": 0,
+      "local_ctime": 1763735738,
+      "local_mtime": 1763735901,
+      "md5": "be8e23f2bt43936a4cae2e0d35220013",
+      "path": "/电视剧/日韩剧/出租车3/01(1).mp4",
+      "server_ctime": 1763735986,
+      "server_filename": "01(1).mp4",
+      "server_mtime": 1763737564,
+      "size": 1604228722,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/be8e23f2bt43936a4cae2e0d35220013?fid=1099891027153-250528-554275473461702&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-sfmDXE79WNnzyoxHAm4sgA%2FIixk%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/be8e23f2bt43936a4cae2e0d35220013?fid=1099891027153-250528-554275473461702&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-sfmDXE79WNnzyoxHAm4sgA%2FIixk%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/be8e23f2bt43936a4cae2e0d35220013?fid=1099891027153-250528-554275473461702&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-sfmDXE79WNnzyoxHAm4sgA%2FIixk%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/be8e23f2bt43936a4cae2e0d35220013?fid=1099891027153-250528-554275473461702&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-sfmDXE79WNnzyoxHAm4sgA%2FIixk%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 773712996646875,
+      "isdir": 0,
+      "local_ctime": 1763738569,
+      "local_mtime": 1763739391,
+      "md5": "cf6d9556aqd28efdf304cc8cd062bc06",
+      "path": "/电视剧/日韩剧/出租车3/01.mp4",
+      "server_ctime": 1763739767,
+      "server_filename": "01.mp4",
+      "server_mtime": 1763769716,
+      "size": 1364654159,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/cf6d9556aqd28efdf304cc8cd062bc06?fid=1099891027153-250528-773712996646875&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-6wH9tcoxmGlBBuRVlCopxZsbDII%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/cf6d9556aqd28efdf304cc8cd062bc06?fid=1099891027153-250528-773712996646875&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-6wH9tcoxmGlBBuRVlCopxZsbDII%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/cf6d9556aqd28efdf304cc8cd062bc06?fid=1099891027153-250528-773712996646875&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-6wH9tcoxmGlBBuRVlCopxZsbDII%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/cf6d9556aqd28efdf304cc8cd062bc06?fid=1099891027153-250528-773712996646875&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-6wH9tcoxmGlBBuRVlCopxZsbDII%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 465519047277992,
+      "isdir": 0,
+      "local_ctime": 1763824926,
+      "local_mtime": 1763824960,
+      "md5": "b2f7c183bs12e21fd6e670e9484c25e9",
+      "path": "/电视剧/日韩剧/出租车3/02.mkv",
+      "server_ctime": 1763825576,
+      "server_filename": "02.mkv",
+      "server_mtime": 1763857985,
+      "size": 1243068176,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/b2f7c183bs12e21fd6e670e9484c25e9?fid=1099891027153-250528-465519047277992&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-I9d3FedK4DtkCEEmffxPmEOwMYg%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/b2f7c183bs12e21fd6e670e9484c25e9?fid=1099891027153-250528-465519047277992&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-I9d3FedK4DtkCEEmffxPmEOwMYg%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/b2f7c183bs12e21fd6e670e9484c25e9?fid=1099891027153-250528-465519047277992&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-I9d3FedK4DtkCEEmffxPmEOwMYg%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/b2f7c183bs12e21fd6e670e9484c25e9?fid=1099891027153-250528-465519047277992&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-I9d3FedK4DtkCEEmffxPmEOwMYg%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 361085652352607,
+      "isdir": 0,
+      "local_ctime": 1764341198,
+      "local_mtime": 1764341225,
+      "md5": "456702e3crd9adb63c298852907e1517",
+      "path": "/电视剧/日韩剧/出租车3/03.mkv",
+      "server_ctime": 1764341422,
+      "server_filename": "03.mkv",
+      "server_mtime": 1764356363,
+      "size": 933234107,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/456702e3crd9adb63c298852907e1517?fid=1099891027153-250528-361085652352607&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-BuwcKG4cwFoXm8CL2w4BS8JF%2FN8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/456702e3crd9adb63c298852907e1517?fid=1099891027153-250528-361085652352607&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-BuwcKG4cwFoXm8CL2w4BS8JF%2FN8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/456702e3crd9adb63c298852907e1517?fid=1099891027153-250528-361085652352607&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-BuwcKG4cwFoXm8CL2w4BS8JF%2FN8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/456702e3crd9adb63c298852907e1517?fid=1099891027153-250528-361085652352607&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-BuwcKG4cwFoXm8CL2w4BS8JF%2FN8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 228171154337208,
+      "isdir": 0,
+      "local_ctime": 1763862351,
+      "local_mtime": 1763863624,
+      "md5": "b93eced7es2c5c169497935f962ddc09",
+      "path": "/电视剧/日韩剧/出租车3/02.mp4",
+      "server_ctime": 1763866069,
+      "server_filename": "02.mp4",
+      "server_mtime": 1764356365,
+      "size": 1673825588,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/b93eced7es2c5c169497935f962ddc09?fid=1099891027153-250528-228171154337208&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-bZg3CSZXAIgY3k7wSQquueqlPT0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/b93eced7es2c5c169497935f962ddc09?fid=1099891027153-250528-228171154337208&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-bZg3CSZXAIgY3k7wSQquueqlPT0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/b93eced7es2c5c169497935f962ddc09?fid=1099891027153-250528-228171154337208&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-bZg3CSZXAIgY3k7wSQquueqlPT0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/b93eced7es2c5c169497935f962ddc09?fid=1099891027153-250528-228171154337208&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-bZg3CSZXAIgY3k7wSQquueqlPT0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 175380481204208,
+      "isdir": 0,
+      "local_ctime": 1764426820,
+      "local_mtime": 1764426969,
+      "md5": "ad801f82cpb1e12c45ee9401b0109a6e",
+      "path": "/电视剧/日韩剧/出租车3/04.mp4",
+      "server_ctime": 1764427049,
+      "server_filename": "04.mp4",
+      "server_mtime": 1764472780,
+      "size": 1455747278,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/ad801f82cpb1e12c45ee9401b0109a6e?fid=1099891027153-250528-175380481204208&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-z0I7nSgfdhIgk1cGX8KXv61vyWw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/ad801f82cpb1e12c45ee9401b0109a6e?fid=1099891027153-250528-175380481204208&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-z0I7nSgfdhIgk1cGX8KXv61vyWw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/ad801f82cpb1e12c45ee9401b0109a6e?fid=1099891027153-250528-175380481204208&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-z0I7nSgfdhIgk1cGX8KXv61vyWw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/ad801f82cpb1e12c45ee9401b0109a6e?fid=1099891027153-250528-175380481204208&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-z0I7nSgfdhIgk1cGX8KXv61vyWw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 947067472013313,
+      "isdir": 0,
+      "local_ctime": 1764946929,
+      "local_mtime": 1764946950,
+      "md5": "61014eefcn344d3d73d1267b4fc5334c",
+      "path": "/电视剧/日韩剧/出租车3/05.mkv",
+      "server_ctime": 1764947187,
+      "server_filename": "05.mkv",
+      "server_mtime": 1764948100,
+      "size": 876014987,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/61014eefcn344d3d73d1267b4fc5334c?fid=1099891027153-250528-947067472013313&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-g5vRn%2BlzM4ZWw8qjNr%2BjHD2p8as%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/61014eefcn344d3d73d1267b4fc5334c?fid=1099891027153-250528-947067472013313&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-g5vRn%2BlzM4ZWw8qjNr%2BjHD2p8as%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/61014eefcn344d3d73d1267b4fc5334c?fid=1099891027153-250528-947067472013313&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-g5vRn%2BlzM4ZWw8qjNr%2BjHD2p8as%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/61014eefcn344d3d73d1267b4fc5334c?fid=1099891027153-250528-947067472013313&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-g5vRn%2BlzM4ZWw8qjNr%2BjHD2p8as%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 624807551458577,
+      "isdir": 0,
+      "local_ctime": 1764947089,
+      "local_mtime": 1764947336,
+      "md5": "b36d9a149u14d3aedc6c4819596fc4b1",
+      "path": "/电视剧/日韩剧/出租车3/05.mp4",
+      "server_ctime": 1764948406,
+      "server_filename": "05.mp4",
+      "server_mtime": 1764987343,
+      "size": 1214330288,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/b36d9a149u14d3aedc6c4819596fc4b1?fid=1099891027153-250528-624807551458577&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-%2Bshq3jAYeSh4N%2F9gdRL1kbDJ%2FEw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/b36d9a149u14d3aedc6c4819596fc4b1?fid=1099891027153-250528-624807551458577&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-%2Bshq3jAYeSh4N%2F9gdRL1kbDJ%2FEw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/b36d9a149u14d3aedc6c4819596fc4b1?fid=1099891027153-250528-624807551458577&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-%2Bshq3jAYeSh4N%2F9gdRL1kbDJ%2FEw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/b36d9a149u14d3aedc6c4819596fc4b1?fid=1099891027153-250528-624807551458577&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-%2Bshq3jAYeSh4N%2F9gdRL1kbDJ%2FEw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 407182202963929,
+      "isdir": 0,
+      "local_ctime": 1765031984,
+      "local_mtime": 1765032242,
+      "md5": "452e8e88am1f593185114808992f5c77",
+      "path": "/电视剧/日韩剧/出租车3/06.mp4",
+      "server_ctime": 1765032507,
+      "server_filename": "06.mp4",
+      "server_mtime": 1765071451,
+      "size": 1034197283,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/452e8e88am1f593185114808992f5c77?fid=1099891027153-250528-407182202963929&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-WJLanQKkjYpu2Eqr%2B7bae149WR8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/452e8e88am1f593185114808992f5c77?fid=1099891027153-250528-407182202963929&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-WJLanQKkjYpu2Eqr%2B7bae149WR8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/452e8e88am1f593185114808992f5c77?fid=1099891027153-250528-407182202963929&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-WJLanQKkjYpu2Eqr%2B7bae149WR8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/452e8e88am1f593185114808992f5c77?fid=1099891027153-250528-407182202963929&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-WJLanQKkjYpu2Eqr%2B7bae149WR8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 8544135853730,
+      "isdir": 0,
+      "local_ctime": 1765550046,
+      "local_mtime": 1765550201,
+      "md5": "e23e81dcai8c4199f4d0f87c2698c8b1",
+      "path": "/电视剧/日韩剧/出租车3/07.mp4",
+      "server_ctime": 1765550298,
+      "server_filename": "07.mp4",
+      "server_mtime": 1765554989,
+      "size": 1512735052,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/e23e81dcai8c4199f4d0f87c2698c8b1?fid=1099891027153-250528-8544135853730&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-RYex3ifZXh8Nqty7q36pzMioSQI%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/e23e81dcai8c4199f4d0f87c2698c8b1?fid=1099891027153-250528-8544135853730&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-RYex3ifZXh8Nqty7q36pzMioSQI%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/e23e81dcai8c4199f4d0f87c2698c8b1?fid=1099891027153-250528-8544135853730&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-RYex3ifZXh8Nqty7q36pzMioSQI%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/e23e81dcai8c4199f4d0f87c2698c8b1?fid=1099891027153-250528-8544135853730&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-RYex3ifZXh8Nqty7q36pzMioSQI%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 792952122892247,
+      "isdir": 0,
+      "local_ctime": 1765596729,
+      "local_mtime": 1765596992,
+      "md5": "696a25275k2a8fcbdb0b486dba77c376",
+      "path": "/电视剧/日韩剧/出租车3/07(1).mp4",
+      "server_ctime": 1765597638,
+      "server_filename": "07(1).mp4",
+      "server_mtime": 1765599478,
+      "size": 1661109020,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/696a25275k2a8fcbdb0b486dba77c376?fid=1099891027153-250528-792952122892247&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-IPnHJuLbdVx2tVDhrDth0ziPMJ8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/696a25275k2a8fcbdb0b486dba77c376?fid=1099891027153-250528-792952122892247&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-IPnHJuLbdVx2tVDhrDth0ziPMJ8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/696a25275k2a8fcbdb0b486dba77c376?fid=1099891027153-250528-792952122892247&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-IPnHJuLbdVx2tVDhrDth0ziPMJ8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/696a25275k2a8fcbdb0b486dba77c376?fid=1099891027153-250528-792952122892247&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-IPnHJuLbdVx2tVDhrDth0ziPMJ8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 743318732879022,
+      "isdir": 0,
+      "local_ctime": 1765642126,
+      "local_mtime": 1765642588,
+      "md5": "d161bccecl82795405dc6de8e16747a4",
+      "path": "/电视剧/日韩剧/出租车3/08.mp4",
+      "server_ctime": 1765643202,
+      "server_filename": "08.mp4",
+      "server_mtime": 1765645446,
+      "size": 1856315934,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/d161bccecl82795405dc6de8e16747a4?fid=1099891027153-250528-743318732879022&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-%2B0iF8uGWNj9yO655PruScNrBCB0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/d161bccecl82795405dc6de8e16747a4?fid=1099891027153-250528-743318732879022&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-%2B0iF8uGWNj9yO655PruScNrBCB0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/d161bccecl82795405dc6de8e16747a4?fid=1099891027153-250528-743318732879022&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-%2B0iF8uGWNj9yO655PruScNrBCB0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/d161bccecl82795405dc6de8e16747a4?fid=1099891027153-250528-743318732879022&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-%2B0iF8uGWNj9yO655PruScNrBCB0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 494663103463726,
+      "isdir": 0,
+      "local_ctime": 1766155188,
+      "local_mtime": 1766155188,
+      "md5": "4bb84757fscbe4373b946794b618ce70",
+      "path": "/电视剧/日韩剧/出租车3/【tvzongheba】E09.mkv",
+      "server_ctime": 1766155289,
+      "server_filename": "【tvzongheba】E09.mkv",
+      "server_mtime": 1766198299,
+      "size": 1333952822,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/4bb84757fscbe4373b946794b618ce70?fid=1099891027153-250528-494663103463726&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-o3MoGZfgX2L12ZzUbzk%2BPxX1LKA%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/4bb84757fscbe4373b946794b618ce70?fid=1099891027153-250528-494663103463726&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-o3MoGZfgX2L12ZzUbzk%2BPxX1LKA%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/4bb84757fscbe4373b946794b618ce70?fid=1099891027153-250528-494663103463726&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-o3MoGZfgX2L12ZzUbzk%2BPxX1LKA%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/4bb84757fscbe4373b946794b618ce70?fid=1099891027153-250528-494663103463726&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-o3MoGZfgX2L12ZzUbzk%2BPxX1LKA%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 735166273972877,
+      "isdir": 0,
+      "local_ctime": 1766206993,
+      "local_mtime": 1766207262,
+      "md5": "ce668f10ai21efd727e248f45ac81e90",
+      "path": "/电视剧/日韩剧/出租车3/09.mp4",
+      "server_ctime": 1766208063,
+      "server_filename": "09.mp4",
+      "server_mtime": 1766223120,
+      "size": 1188047323,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/ce668f10ai21efd727e248f45ac81e90?fid=1099891027153-250528-735166273972877&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-M%2BL8q4%2BRkYITODku4XURo668i3E%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/ce668f10ai21efd727e248f45ac81e90?fid=1099891027153-250528-735166273972877&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-M%2BL8q4%2BRkYITODku4XURo668i3E%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/ce668f10ai21efd727e248f45ac81e90?fid=1099891027153-250528-735166273972877&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-M%2BL8q4%2BRkYITODku4XURo668i3E%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/ce668f10ai21efd727e248f45ac81e90?fid=1099891027153-250528-735166273972877&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-M%2BL8q4%2BRkYITODku4XURo668i3E%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 186902229674269,
+      "isdir": 0,
+      "local_ctime": 1766244253,
+      "local_mtime": 1766244608,
+      "md5": "9ac5fd1c8p368d784e270e198356dbcd",
+      "path": "/电视剧/日韩剧/出租车3/10.mp4",
+      "server_ctime": 1766244902,
+      "server_filename": "10.mp4",
+      "server_mtime": 1766311385,
+      "size": 1586246822,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/9ac5fd1c8p368d784e270e198356dbcd?fid=1099891027153-250528-186902229674269&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-IniLWoNWx2oTIL3yaK19QEAe0C8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/9ac5fd1c8p368d784e270e198356dbcd?fid=1099891027153-250528-186902229674269&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-IniLWoNWx2oTIL3yaK19QEAe0C8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/9ac5fd1c8p368d784e270e198356dbcd?fid=1099891027153-250528-186902229674269&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-IniLWoNWx2oTIL3yaK19QEAe0C8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/9ac5fd1c8p368d784e270e198356dbcd?fid=1099891027153-250528-186902229674269&time=1766332800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-IniLWoNWx2oTIL3yaK19QEAe0C8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=163848866305314311&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    }
+  ],
+  "show_msg": "success"
+}

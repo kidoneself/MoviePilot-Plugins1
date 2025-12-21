@@ -1,0 +1,55 @@
+{
+  "errno": 0,
+  "request_id": 165547669131103089,
+  "server_time": 1766342284,
+  "cfrom_id": 0,
+  "hitrisk": 0,
+  "appeal_status": 0,
+  "is_zombie": 0,
+  "vip_point": 16835,
+  "vip_level": 5,
+  "svip10_id": "",
+  "vip_type": 0,
+  "sharetype": 0,
+  "view_visited": 0,
+  "view_limit": 0,
+  "expired_type": 0,
+  "share_id": 42277662218,
+  "uk": 1099582240310,
+  "list": [
+    {
+      "category": 6,
+      "extent_int8": 0,
+      "fs_id": 762474894250309,
+      "isdir": 1,
+      "local_ctime": 1640072315,
+      "local_mtime": 1640072315,
+      "path": "/0-豆瓣热点剧监控/电影/战马一号  (2023) 1080p/免费热门影视资源搜索",
+      "server_ctime": 1640072315,
+      "server_filename": "免费热门影视资源搜索",
+      "server_mtime": 1702321078,
+      "size": 0
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 289745002093351,
+      "isdir": 0,
+      "local_ctime": 1688861533,
+      "local_mtime": 1688861533,
+      "md5": "e38f3e1a3ud259ebf0baa4192ce8798f",
+      "path": "/0-豆瓣热点剧监控/电影/战马一号  (2023) 1080p/战马一号  (2023) 1080p.mkv",
+      "server_ctime": 1688862045,
+      "server_filename": "战马一号  (2023) 1080p.mkv",
+      "server_mtime": 1688862045,
+      "size": 2280120899,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/e38f3e1a3ud259ebf0baa4192ce8798f?fid=1099582240310-250528-289745002093351&time=1766340000&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-HKDC5tOI%2FbMu3%2FbZeiNjgK4nM%2FQ%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=165547669131103089&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/e38f3e1a3ud259ebf0baa4192ce8798f?fid=1099582240310-250528-289745002093351&time=1766340000&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-HKDC5tOI%2FbMu3%2FbZeiNjgK4nM%2FQ%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=165547669131103089&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/e38f3e1a3ud259ebf0baa4192ce8798f?fid=1099582240310-250528-289745002093351&time=1766340000&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-HKDC5tOI%2FbMu3%2FbZeiNjgK4nM%2FQ%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=165547669131103089&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/e38f3e1a3ud259ebf0baa4192ce8798f?fid=1099582240310-250528-289745002093351&time=1766340000&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-HKDC5tOI%2FbMu3%2FbZeiNjgK4nM%2FQ%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=165547669131103089&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    }
+  ],
+  "show_msg": "success"
+}
