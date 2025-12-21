@@ -9,7 +9,6 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua
 # 复制项目文件
 COPY backend/ /app/backend/
 COPY frontend/ /app/frontend/
-COPY config.yaml /app/config.yaml
 
 # 创建数据目录
 RUN mkdir -p /app/data

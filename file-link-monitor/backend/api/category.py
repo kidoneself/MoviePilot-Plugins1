@@ -15,7 +15,7 @@ async def get_categories():
     """
     try:
         # 读取二级分类配置
-        config_path = Path(__file__).parent.parent.parent / 'categories.yaml'
+        config_path = Path(__file__).parent.parent / 'categories.yaml'
         
         if not config_path.exists():
             return {
