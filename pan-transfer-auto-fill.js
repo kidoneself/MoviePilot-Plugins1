@@ -658,10 +658,38 @@
         }
         
         const pwd_id = match[1];
-        console.log('� 分享ID (pwd_id):', pwd_id);
+        console.log('📋 分享ID (pwd_id):', pwd_id);
+        
+        // 从performance API获取stoken（从已发送的网络请求中提取）
+        let stoken = null;
+        const entries = performance.getEntries();
+        for (const entry of entries) {
+            if (entry.name && entry.name.includes('quark.cn') && entry.name.includes('stoken=')) {
+                const stokenMatch = entry.name.match(/stoken=([^&]+)/);
+                if (stokenMatch) {
+                    stoken = decodeURIComponent(stokenMatch[1]);
+                    console.log('🔑 从performance获取stoken:', stoken);
+                    break;
+                }
+            }
+        }
+        
+        // 如果performance中没有，尝试从URL参数获取
+        if (!stoken) {
+            const urlParams = new URLSearchParams(location.search);
+            stoken = urlParams.get('stoken');
+            if (stoken) {
+                console.log('🔑 从URL参数获取stoken:', stoken);
+            }
+        }
+        
+        if (!stoken) {
+            throw new Error('无法获取stoken，请刷新页面后重试');
+        }
         
         // 调用API获取分享详情
-        const apiUrl = `https://drive-h.quark.cn/1/clouddrive/share/sharepage/detail?pr=ucpro&fr=pc&pwd_id=${pwd_id}&pdir_fid=0&_page=1&_size=50&_fetch_banner=1&_fetch_share=1&_fetch_total=1`;
+        const timestamp = Date.now();
+        const apiUrl = `https://drive-h.quark.cn/1/clouddrive/share/sharepage/detail?pr=ucpro&fr=pc&uc_param_str=&ver=2&pwd_id=${pwd_id}&stoken=${encodeURIComponent(stoken)}&pdir_fid=0&force=0&_page=1&_size=50&_fetch_banner=1&_fetch_share=1&fetch_relate_conversation=1&_fetch_total=1&_sort=file_type:asc,file_name:asc&__dt=${Math.floor(Math.random() * 10000)}&__t=${timestamp}`;
         
         return new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
@@ -669,15 +697,29 @@
                 url: apiUrl,
                 headers: {
                     'accept': 'application/json, text/plain, */*',
+                    'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8,en-US;q=0.7',
+                    'cache-control': 'no-cache',
+                    'origin': 'https://pan.quark.cn',
+                    'pragma': 'no-cache',
+                    'priority': 'u=1, i',
+                    'referer': 'https://pan.quark.cn/',
+                    'sec-ch-ua': '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
+                    'sec-ch-ua-mobile': '?0',
+                    'sec-ch-ua-platform': '"macOS"',
+                    'sec-fetch-dest': 'empty',
+                    'sec-fetch-mode': 'cors',
+                    'sec-fetch-site': 'same-site',
+                    'user-agent': navigator.userAgent
                 },
                 cookie: document.cookie,
                 onload: (response) => {
                     try {
+                        console.log('  API原始响应:', response.responseText.substring(0, 500));
                         const result = JSON.parse(response.responseText);
+                        console.log('  解析后结果:', result);
+                        
                         if (result.status === 200 && result.data) {
-                            // 从URL参数提取stoken（已编码）
-                            const urlParams = new URLSearchParams(location.search);
-                            const stoken = urlParams.get('stoken') || result.data.stoken;
+                            console.log('  share数据:', result.data.share);
                             
                             const params = {
                                 pwd_id: pwd_id,
@@ -687,9 +729,11 @@
                             console.log('✅ 获取分享参数成功:', params);
                             resolve(params);
                         } else {
-                            reject(new Error('获取分享详情失败'));
+                            console.error('  API返回状态异常:', result);
+                            reject(new Error(`获取分享详情失败: status=${result.status}, code=${result.code}`));
                         }
                     } catch (e) {
+                        console.error('  解析响应失败:', e);
                         reject(e);
                     }
                 },
@@ -834,15 +878,22 @@
                 }),
                 onload: (response) => {
                     try {
+                        console.log('  后端响应状态:', response.status);
+                        console.log('  后端响应内容:', response.responseText);
                         const result = JSON.parse(response.responseText);
+                        console.log('  解析后结果:', result);
+                        
                         if (result.success) {
                             console.log('✅ 获取文件夹ID成功:', result.fid);
                             console.log('  OpenList路径:', result.path);
                             resolve(result.fid);
                         } else {
-                            reject(new Error('获取文件夹ID失败'));
+                            console.error('  后端返回失败:', result);
+                            reject(new Error(`获取文件夹ID失败: ${JSON.stringify(result)}`));
                         }
                     } catch (e) {
+                        console.error('  解析响应失败:', e);
+                        console.error('  原始响应:', response.responseText);
                         reject(e);
                     }
                 },
