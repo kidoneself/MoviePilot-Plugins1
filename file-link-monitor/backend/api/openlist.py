@@ -54,45 +54,56 @@ async def get_folder_id(request: GetFolderIdRequest):
             current_path = f"{current_path}/{part}"
             parent_path = "/".join(current_path.split('/')[:-1]) or "/"
             
-            # 列出父目录
+            # 列出父目录（使用POST方法，符合官方API）
             list_url = f"{OPENLIST_URL}/api/fs/list"
-            list_headers = {"Authorization": OPENLIST_TOKEN}
-            list_params = {"path": parent_path, "refresh": "false"}
-            list_response = requests.get(list_url, params=list_params, headers=list_headers)
-            data = list_response.json()
-            content = data.get('content', [])
+            list_headers = {"Authorization": OPENLIST_TOKEN, "Content-Type": "application/json"}
+            list_body = {"path": parent_path, "refresh": False, "page": 1, "per_page": 100}
+            list_response = requests.post(list_url, json=list_body, headers=list_headers)
+            result = list_response.json()
+            
+            if result.get('code') != 200:
+                raise Exception(f"列出目录失败: {result.get('message')}")
+            
+            content = result.get('data', {}).get('content', [])
             
             found = False
             folder_id = None
             
             for item in content:
-                if item.get('name') == part and item.get('is_dir'):
+                # 挂载点有mount_details字段，普通文件夹有is_dir=True
+                is_mount = item.get('mount_details') is not None
+                is_directory = item.get('is_dir') == True
+                
+                if item.get('name') == part and (is_directory or is_mount):
                     folder_id = item.get('id', '')
                     found = True
+                    logger.info(f"找到目录: {part}, id={folder_id}, is_dir={is_directory}, is_mount={is_mount}")
                     break
             
             # 如果不存在，创建目录
             if not found:
                 mkdir_url = f"{OPENLIST_URL}/api/fs/mkdir"
                 mkdir_headers = {"Authorization": OPENLIST_TOKEN, "Content-Type": "application/json"}
-                mkdir_data = {"path": f"{parent_path}/{part}" if parent_path != "/" else f"/{part}"}
-                mkdir_response = requests.post(mkdir_url, json=mkdir_data, headers=mkdir_headers)
+                mkdir_body = {"path": f"{parent_path}/{part}" if parent_path != "/" else f"/{part}"}
+                mkdir_response = requests.post(mkdir_url, json=mkdir_body, headers=mkdir_headers)
                 mkdir_result = mkdir_response.json()
                 
                 if mkdir_result.get('code') != 200:
                     raise Exception(f"创建目录失败: {mkdir_result.get('message')}")
                 
                 # 重新列出父目录，获取新建目录的ID
-                list_response = requests.get(list_url, params=list_params, headers=list_headers)
-                data = list_response.json()
-                content = data.get('content', [])
+                list_response = requests.post(list_url, json=list_body, headers=list_headers)
+                result = list_response.json()
+                content = result.get('data', {}).get('content', [])
                 
                 for item in content:
                     if item.get('name') == part and item.get('is_dir'):
                         folder_id = item.get('id', '')
+                        logger.info(f"创建后找到目录: {part}, id={folder_id}")
                         break
                 
                 if not folder_id:
+                    logger.error(f"创建目录后无法获取ID，目录内容: {[i.get('name') for i in content]}")
                     raise Exception(f"创建目录成功但无法获取ID: {part}")
             
             # 如果是最后一级，返回结果
