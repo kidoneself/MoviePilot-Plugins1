@@ -44,6 +44,14 @@ const pansouResults = ref({
   xunlei: []
 })
 
+// 编辑链接
+const editLinkDialogVisible = ref(false)
+const editLinkData = ref({
+  row: null,
+  panType: '',
+  link: ''
+})
+
 
 const loadCategories = async () => {
   try {
@@ -539,9 +547,16 @@ const confirmTransferFromPansou = async (shareUrl, passCode, panType) => {
       }
     }
     
+    // 确定最终使用的文件夹名称：优先使用对应网盘的自定义名称
+    let finalFolderName = folderName
+    if (mapping) {
+      const panNameField = `${panType}_name`
+      finalFolderName = mapping[panNameField] || mapping.original_name || folderName
+    }
+    
     // 构建目标路径
     const category = mapping?.category || '未分类'
-    const targetPath = `/A-闲鱼影视（自动更新）/${category}/${folderName}`
+    const targetPath = `/A-闲鱼影视（自动更新）/${category}/${finalFolderName}`
     
     // 显示提示信息
     let confirmMessage = `将转存到【${panName}网盘】\n\n目标路径：\n${targetPath}`
@@ -629,6 +644,46 @@ const exportMappings = () => {
   })
 }
 
+// 打开编辑链接对话框
+const openEditLinkDialog = (row, panType) => {
+  const panNames = {'baidu': '百度', 'quark': '夸克', 'xunlei': '迅雷'}
+  const linkField = `${panType}_link`
+  
+  editLinkData.value = {
+    row: row,
+    panType: panType,
+    panName: panNames[panType],
+    link: row[linkField] || ''
+  }
+  editLinkDialogVisible.value = true
+}
+
+// 保存编辑的链接
+const saveEditedLink = async () => {
+  if (!editLinkData.value.link.trim()) {
+    ElMessage.warning('链接不能为空')
+    return
+  }
+  
+  try {
+    const linkField = `${editLinkData.value.panType}_link`
+    const updateData = {}
+    updateData[linkField] = editLinkData.value.link.trim()
+    
+    const res = await api.updateMapping(editLinkData.value.row.id, updateData)
+    
+    if (res.data.success) {
+      ElMessage.success('链接更新成功')
+      editLinkDialogVisible.value = false
+      loadMappings()
+    } else {
+      ElMessage.error(res.data.message)
+    }
+  } catch (error) {
+    ElMessage.error('更新失败: ' + (error.response?.data?.detail || error.message))
+  }
+}
+
 onMounted(() => {
   loadCategories()
   loadMappings()
@@ -706,6 +761,7 @@ onMounted(() => {
                 />
                 <el-button size="small" type="primary" @click="generateSingleLink(row, 'baidu')">获取</el-button>
                 <el-button size="small" type="primary" plain @click="resyncToTarget(row, 'baidu')">重转</el-button>
+                <el-button size="small" @click="openEditLinkDialog(row, 'baidu')">编辑</el-button>
               </div>
               <div class="pan-row">
                 <span class="pan-label">链接</span>
@@ -736,6 +792,7 @@ onMounted(() => {
                 />
                 <el-button size="small" type="warning" @click="generateSingleLink(row, 'quark')">获取</el-button>
                 <el-button size="small" type="warning" plain @click="resyncToTarget(row, 'quark')">重转</el-button>
+                <el-button size="small" @click="openEditLinkDialog(row, 'quark')">编辑</el-button>
               </div>
               <div class="pan-row">
                 <span class="pan-label">链接</span>
@@ -766,6 +823,7 @@ onMounted(() => {
                 />
                 <el-button size="small" type="info" @click="generateSingleLink(row, 'xunlei')">获取</el-button>
                 <el-button size="small" type="info" plain @click="resyncToTarget(row, 'xunlei')">重转</el-button>
+                <el-button size="small" @click="openEditLinkDialog(row, 'xunlei')">编辑</el-button>
               </div>
               <div class="pan-row">
                 <span class="pan-label">链接</span>
@@ -982,6 +1040,32 @@ onMounted(() => {
           </el-tab-pane>
         </el-tabs>
       </div>
+    </el-dialog>
+
+    <!-- 编辑链接对话框 -->
+    <el-dialog 
+      v-model="editLinkDialogVisible" 
+      :title="`编辑${editLinkData.panName}链接`" 
+      width="600px"
+    >
+      <el-form label-width="80px">
+        <el-form-item label="剧集名称">
+          <el-input :value="editLinkData.row?.original_name" disabled />
+        </el-form-item>
+        <el-form-item label="分享链接">
+          <el-input 
+            v-model="editLinkData.link" 
+            type="textarea" 
+            :rows="3"
+            placeholder="请输入分享链接"
+          />
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="editLinkDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveEditedLink">保存</el-button>
+      </template>
     </el-dialog>
   </div>
 </template>

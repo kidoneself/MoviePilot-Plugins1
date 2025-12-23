@@ -198,13 +198,14 @@ class FolderObfuscator:
             logger.error(f"查询自定义映射失败: {e}")
             return None
     
-    def _auto_create_mapping(self, original_name: str, obfuscated_name: str):
+    def _auto_create_mapping(self, original_name: str, obfuscated_name: str, category: str = None):
         """
         自动创建映射记录（如果不存在）
         
         Args:
             original_name: 原始名称
             obfuscated_name: 混淆后的名称
+            category: 分类信息（如"剧集/国产剧集"）
         """
         if not self.db_engine:
             return
@@ -223,6 +224,7 @@ class FolderObfuscator:
                     # 创建新映射（三个网盘都用混淆后的名字）
                     new_mapping = CustomNameMapping(
                         original_name=original_name,
+                        category=category,
                         quark_name=obfuscated_name,
                         baidu_name=obfuscated_name,
                         xunlei_name=obfuscated_name,
@@ -242,12 +244,13 @@ class FolderObfuscator:
             logger = logging.getLogger(__name__)
             logger.error(f"自动创建映射失败: {e}")
     
-    def obfuscate_name(self, name: str) -> str:
+    def obfuscate_name(self, name: str, category: str = None) -> str:
         """
         混淆文件夹名 - 优先使用自定义映射，否则使用同音字替换
         
         Args:
             name: 原始文件夹名
+            category: 分类信息（用于自动创建映射时填充）
             
         Returns:
             混淆后的名称
@@ -279,7 +282,7 @@ class FolderObfuscator:
         obfuscated = self.homophone_obfuscator.obfuscate_with_year(name)
         
         # 3. 自动创建映射记录到数据库（方便在页面上统一管理和修改）
-        self._auto_create_mapping(name, obfuscated)
+        self._auto_create_mapping(name, obfuscated, category)
         
         return obfuscated
     
@@ -495,11 +498,16 @@ class FolderObfuscator:
             return relative_parts
         
         new_parts = []
+        category = None
+        
+        # 提取分类信息（第1层/第2层）
+        if len(relative_parts) >= 2:
+            category = f"{relative_parts[0]}/{relative_parts[1]}"
         
         for i, dir_name in enumerate(relative_parts):
             # 只混淆第3层（索引2）的剧名目录
             if i == 2:
-                obfuscated = self.obfuscate_name(dir_name)
+                obfuscated = self.obfuscate_name(dir_name, category=category)
                 new_parts.append(obfuscated)
             else:
                 # 其他层全部保持原样

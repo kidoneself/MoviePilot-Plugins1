@@ -1,0 +1,342 @@
+{
+  "errno": 0,
+  "request_id": 178054096746446156,
+  "server_time": 1766388874,
+  "cfrom_id": 0,
+  "hitrisk": 0,
+  "appeal_status": 0,
+  "is_zombie": 0,
+  "vip_point": 280,
+  "vip_level": 1,
+  "svip10_id": "",
+  "vip_type": 2,
+  "sharetype": 0,
+  "view_visited": 0,
+  "view_limit": 0,
+  "expired_type": 0,
+  "share_id": 50302306070,
+  "uk": 1100142002923,
+  "list": [
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 47979195822879,
+      "isdir": 0,
+      "local_ctime": 1753324670,
+      "local_mtime": 1753324699,
+      "md5": "49fcb3c39j7f893c7a1aa5e3436c57ca",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E15.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200611,
+      "server_filename": "Taxi.Driver.2023.S02E15.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1468948202,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/49fcb3c39j7f893c7a1aa5e3436c57ca?fid=1100142002923-250528-47979195822879&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-80PlQSmoSzfHCPSU%2FCUZmzJViCo%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/49fcb3c39j7f893c7a1aa5e3436c57ca?fid=1100142002923-250528-47979195822879&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-80PlQSmoSzfHCPSU%2FCUZmzJViCo%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/49fcb3c39j7f893c7a1aa5e3436c57ca?fid=1100142002923-250528-47979195822879&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-80PlQSmoSzfHCPSU%2FCUZmzJViCo%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/49fcb3c39j7f893c7a1aa5e3436c57ca?fid=1100142002923-250528-47979195822879&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-80PlQSmoSzfHCPSU%2FCUZmzJViCo%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 135667548311045,
+      "isdir": 0,
+      "local_ctime": 1753324363,
+      "local_mtime": 1753324391,
+      "md5": "d0cc79987laaa2acc9690c74e317e0c0",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E07.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200490,
+      "server_filename": "Taxi.Driver.2023.S02E07.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1467160959,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/d0cc79987laaa2acc9690c74e317e0c0?fid=1100142002923-250528-135667548311045&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-lSoWpni699FhgX55G8g2Dbnav60%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/d0cc79987laaa2acc9690c74e317e0c0?fid=1100142002923-250528-135667548311045&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-lSoWpni699FhgX55G8g2Dbnav60%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/d0cc79987laaa2acc9690c74e317e0c0?fid=1100142002923-250528-135667548311045&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-lSoWpni699FhgX55G8g2Dbnav60%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/d0cc79987laaa2acc9690c74e317e0c0?fid=1100142002923-250528-135667548311045&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-lSoWpni699FhgX55G8g2Dbnav60%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 144712424315871,
+      "isdir": 0,
+      "local_ctime": 1753324401,
+      "local_mtime": 1753324431,
+      "md5": "ee3a87fe7o42d75e7ba6675a1248a7d0",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E08.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200501,
+      "server_filename": "Taxi.Driver.2023.S02E08.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1524084612,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/ee3a87fe7o42d75e7ba6675a1248a7d0?fid=1100142002923-250528-144712424315871&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-3ByUq0PwqdCe%2ByBhEl2lqwGMP8k%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/ee3a87fe7o42d75e7ba6675a1248a7d0?fid=1100142002923-250528-144712424315871&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-3ByUq0PwqdCe%2ByBhEl2lqwGMP8k%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/ee3a87fe7o42d75e7ba6675a1248a7d0?fid=1100142002923-250528-144712424315871&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-3ByUq0PwqdCe%2ByBhEl2lqwGMP8k%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/ee3a87fe7o42d75e7ba6675a1248a7d0?fid=1100142002923-250528-144712424315871&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-3ByUq0PwqdCe%2ByBhEl2lqwGMP8k%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 148751954788399,
+      "isdir": 0,
+      "local_ctime": 1753324441,
+      "local_mtime": 1753324468,
+      "md5": "3d75ea232q64c81ec43687e64ac34c90",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E09.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200512,
+      "server_filename": "Taxi.Driver.2023.S02E09.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1373055993,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/3d75ea232q64c81ec43687e64ac34c90?fid=1100142002923-250528-148751954788399&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-1yB2XBAxfNiBZOJCraKSiwl0My0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/3d75ea232q64c81ec43687e64ac34c90?fid=1100142002923-250528-148751954788399&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-1yB2XBAxfNiBZOJCraKSiwl0My0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/3d75ea232q64c81ec43687e64ac34c90?fid=1100142002923-250528-148751954788399&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-1yB2XBAxfNiBZOJCraKSiwl0My0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/3d75ea232q64c81ec43687e64ac34c90?fid=1100142002923-250528-148751954788399&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-1yB2XBAxfNiBZOJCraKSiwl0My0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 206276266391733,
+      "isdir": 0,
+      "local_ctime": 1753324288,
+      "local_mtime": 1753324317,
+      "md5": "415359c06p3ab833dacaf01ce1271c69",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E05.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200461,
+      "server_filename": "Taxi.Driver.2023.S02E05.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1482906573,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/415359c06p3ab833dacaf01ce1271c69?fid=1100142002923-250528-206276266391733&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-f8ATVS2zRxxIC4NduDMRdiqfwWw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/415359c06p3ab833dacaf01ce1271c69?fid=1100142002923-250528-206276266391733&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-f8ATVS2zRxxIC4NduDMRdiqfwWw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/415359c06p3ab833dacaf01ce1271c69?fid=1100142002923-250528-206276266391733&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-f8ATVS2zRxxIC4NduDMRdiqfwWw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/415359c06p3ab833dacaf01ce1271c69?fid=1100142002923-250528-206276266391733&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-f8ATVS2zRxxIC4NduDMRdiqfwWw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 370430777079769,
+      "isdir": 0,
+      "local_ctime": 1753324552,
+      "local_mtime": 1753324581,
+      "md5": "0f9e06d35ief7f53b87e8c7c141ea80b",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E12.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200560,
+      "server_filename": "Taxi.Driver.2023.S02E12.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1485426157,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/0f9e06d35ief7f53b87e8c7c141ea80b?fid=1100142002923-250528-370430777079769&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-iYU7jrcuZ6L9q364zvKgZoDSQy4%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/0f9e06d35ief7f53b87e8c7c141ea80b?fid=1100142002923-250528-370430777079769&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-iYU7jrcuZ6L9q364zvKgZoDSQy4%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/0f9e06d35ief7f53b87e8c7c141ea80b?fid=1100142002923-250528-370430777079769&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-iYU7jrcuZ6L9q364zvKgZoDSQy4%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/0f9e06d35ief7f53b87e8c7c141ea80b?fid=1100142002923-250528-370430777079769&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-iYU7jrcuZ6L9q364zvKgZoDSQy4%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 394998282528371,
+      "isdir": 0,
+      "local_ctime": 1753324197,
+      "local_mtime": 1753324229,
+      "md5": "8bb2604bdpd3d66c67d9fcd67edd698f",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E03.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200429,
+      "server_filename": "Taxi.Driver.2023.S02E03.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1634336843,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/8bb2604bdpd3d66c67d9fcd67edd698f?fid=1100142002923-250528-394998282528371&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-%2FWvI7HX6SXOJoUdeTGK9cvoetZk%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/8bb2604bdpd3d66c67d9fcd67edd698f?fid=1100142002923-250528-394998282528371&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-%2FWvI7HX6SXOJoUdeTGK9cvoetZk%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/8bb2604bdpd3d66c67d9fcd67edd698f?fid=1100142002923-250528-394998282528371&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-%2FWvI7HX6SXOJoUdeTGK9cvoetZk%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/8bb2604bdpd3d66c67d9fcd67edd698f?fid=1100142002923-250528-394998282528371&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-%2FWvI7HX6SXOJoUdeTGK9cvoetZk%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 445241808114769,
+      "isdir": 0,
+      "local_ctime": 1753324326,
+      "local_mtime": 1753324353,
+      "md5": "36c284f00g6455b35f98010280c1e2d5",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E06.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200471,
+      "server_filename": "Taxi.Driver.2023.S02E06.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1426689765,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/36c284f00g6455b35f98010280c1e2d5?fid=1100142002923-250528-445241808114769&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-SW6wYn0sPGsK9zTv3mVkevoVT%2Fw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/36c284f00g6455b35f98010280c1e2d5?fid=1100142002923-250528-445241808114769&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-SW6wYn0sPGsK9zTv3mVkevoVT%2Fw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/36c284f00g6455b35f98010280c1e2d5?fid=1100142002923-250528-445241808114769&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-SW6wYn0sPGsK9zTv3mVkevoVT%2Fw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/36c284f00g6455b35f98010280c1e2d5?fid=1100142002923-250528-445241808114769&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-SW6wYn0sPGsK9zTv3mVkevoVT%2Fw%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 631280620660347,
+      "isdir": 0,
+      "local_ctime": 1753324629,
+      "local_mtime": 1753324660,
+      "md5": "035059cd0td0f109be12d53574191466",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E14.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200594,
+      "server_filename": "Taxi.Driver.2023.S02E14.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1574774974,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/035059cd0td0f109be12d53574191466?fid=1100142002923-250528-631280620660347&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-9F5%2B4ArHP6V1Gn5pbaHIplkcKpc%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/035059cd0td0f109be12d53574191466?fid=1100142002923-250528-631280620660347&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-9F5%2B4ArHP6V1Gn5pbaHIplkcKpc%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/035059cd0td0f109be12d53574191466?fid=1100142002923-250528-631280620660347&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-9F5%2B4ArHP6V1Gn5pbaHIplkcKpc%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/035059cd0td0f109be12d53574191466?fid=1100142002923-250528-631280620660347&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-9F5%2B4ArHP6V1Gn5pbaHIplkcKpc%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 855214162502372,
+      "isdir": 0,
+      "local_ctime": 1753324239,
+      "local_mtime": 1753324276,
+      "md5": "4b2bf7207ia3fb5be07b34a5a88273a4",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E04.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200451,
+      "server_filename": "Taxi.Driver.2023.S02E04.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1864497402,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/4b2bf7207ia3fb5be07b34a5a88273a4?fid=1100142002923-250528-855214162502372&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-Pf2pUPGi%2FJxznsSBzCGHMvLT7o8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/4b2bf7207ia3fb5be07b34a5a88273a4?fid=1100142002923-250528-855214162502372&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-Pf2pUPGi%2FJxznsSBzCGHMvLT7o8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/4b2bf7207ia3fb5be07b34a5a88273a4?fid=1100142002923-250528-855214162502372&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-Pf2pUPGi%2FJxznsSBzCGHMvLT7o8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/4b2bf7207ia3fb5be07b34a5a88273a4?fid=1100142002923-250528-855214162502372&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-Pf2pUPGi%2FJxznsSBzCGHMvLT7o8%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 877962294910675,
+      "isdir": 0,
+      "local_ctime": 1753324709,
+      "local_mtime": 1753324739,
+      "md5": "2d78a0fe1r0e75d2e76535d18cc34f0d",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E16.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200628,
+      "server_filename": "Taxi.Driver.2023.S02E16.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1535771257,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/2d78a0fe1r0e75d2e76535d18cc34f0d?fid=1100142002923-250528-877962294910675&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-R462fpZt0IO%2FjezfvW5jP9ZIYRk%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/2d78a0fe1r0e75d2e76535d18cc34f0d?fid=1100142002923-250528-877962294910675&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-R462fpZt0IO%2FjezfvW5jP9ZIYRk%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/2d78a0fe1r0e75d2e76535d18cc34f0d?fid=1100142002923-250528-877962294910675&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-R462fpZt0IO%2FjezfvW5jP9ZIYRk%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/2d78a0fe1r0e75d2e76535d18cc34f0d?fid=1100142002923-250528-877962294910675&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-R462fpZt0IO%2FjezfvW5jP9ZIYRk%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 937601221661118,
+      "isdir": 0,
+      "local_ctime": 1753324108,
+      "local_mtime": 1753324142,
+      "md5": "fb9f000e5i130e4404b68e9060b75293",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E01.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200402,
+      "server_filename": "Taxi.Driver.2023.S02E01.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1725789292,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/fb9f000e5i130e4404b68e9060b75293?fid=1100142002923-250528-937601221661118&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-tZq5Pf0JhEwmihSdaM4xZfv6lGg%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/fb9f000e5i130e4404b68e9060b75293?fid=1100142002923-250528-937601221661118&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-tZq5Pf0JhEwmihSdaM4xZfv6lGg%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/fb9f000e5i130e4404b68e9060b75293?fid=1100142002923-250528-937601221661118&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-tZq5Pf0JhEwmihSdaM4xZfv6lGg%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/fb9f000e5i130e4404b68e9060b75293?fid=1100142002923-250528-937601221661118&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-tZq5Pf0JhEwmihSdaM4xZfv6lGg%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 968184995452994,
+      "isdir": 0,
+      "local_ctime": 1753324513,
+      "local_mtime": 1753324542,
+      "md5": "d8a873d3bofe2f69ca33612aeca4301a",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E11.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200544,
+      "server_filename": "Taxi.Driver.2023.S02E11.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1492015458,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/d8a873d3bofe2f69ca33612aeca4301a?fid=1100142002923-250528-968184995452994&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-DWFCuKw0zZnu6NScS13x%2BSWHru0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/d8a873d3bofe2f69ca33612aeca4301a?fid=1100142002923-250528-968184995452994&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-DWFCuKw0zZnu6NScS13x%2BSWHru0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/d8a873d3bofe2f69ca33612aeca4301a?fid=1100142002923-250528-968184995452994&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-DWFCuKw0zZnu6NScS13x%2BSWHru0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/d8a873d3bofe2f69ca33612aeca4301a?fid=1100142002923-250528-968184995452994&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-DWFCuKw0zZnu6NScS13x%2BSWHru0%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 974787345285402,
+      "isdir": 0,
+      "local_ctime": 1753324477,
+      "local_mtime": 1753324504,
+      "md5": "b329a5d0dnef02c94cb7a0932f87ccef",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E10.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200526,
+      "server_filename": "Taxi.Driver.2023.S02E10.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1379768982,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/b329a5d0dnef02c94cb7a0932f87ccef?fid=1100142002923-250528-974787345285402&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-clI4S7ruCPgrG9KcQSoLvtNWZ5s%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/b329a5d0dnef02c94cb7a0932f87ccef?fid=1100142002923-250528-974787345285402&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-clI4S7ruCPgrG9KcQSoLvtNWZ5s%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/b329a5d0dnef02c94cb7a0932f87ccef?fid=1100142002923-250528-974787345285402&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-clI4S7ruCPgrG9KcQSoLvtNWZ5s%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/b329a5d0dnef02c94cb7a0932f87ccef?fid=1100142002923-250528-974787345285402&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-clI4S7ruCPgrG9KcQSoLvtNWZ5s%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 1038050061200596,
+      "isdir": 0,
+      "local_ctime": 1753324591,
+      "local_mtime": 1753324620,
+      "md5": "5bf2fd4fdh143d21cfab275107909cb7",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E13.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200577,
+      "server_filename": "Taxi.Driver.2023.S02E13.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1489143773,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/5bf2fd4fdh143d21cfab275107909cb7?fid=1100142002923-250528-1038050061200596&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-KZKrCgp9xgs65Mn6Ts8%2BRSdR%2BgQ%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/5bf2fd4fdh143d21cfab275107909cb7?fid=1100142002923-250528-1038050061200596&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-KZKrCgp9xgs65Mn6Ts8%2BRSdR%2BgQ%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/5bf2fd4fdh143d21cfab275107909cb7?fid=1100142002923-250528-1038050061200596&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-KZKrCgp9xgs65Mn6Ts8%2BRSdR%2BgQ%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/5bf2fd4fdh143d21cfab275107909cb7?fid=1100142002923-250528-1038050061200596&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-KZKrCgp9xgs65Mn6Ts8%2BRSdR%2BgQ%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    },
+    {
+      "category": 1,
+      "extent_int8": 0,
+      "fs_id": 1103638212162174,
+      "isdir": 0,
+      "local_ctime": 1753324152,
+      "local_mtime": 1753324187,
+      "md5": "fd350c743g7b5943a84ffbbf09ee5706",
+      "path": "/我的资源/完结电视剧/m模范chuz车2/Taxi.Driver.2023.S02E02.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_ctime": 1754200416,
+      "server_filename": "Taxi.Driver.2023.S02E02.HD1080P.X264.AAC.Korean.CHS.BDYS.mp4",
+      "server_mtime": 1760902971,
+      "size": 1780738545,
+      "thumbs": {
+        "url1": "https://thumbnail0.baidupcs.com/thumbnail/fd350c743g7b5943a84ffbbf09ee5706?fid=1100142002923-250528-1103638212162174&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-clrnoyY0EyZfeO%2BhKhy2dWEtfyE%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c140_u90&quality=100&vuk=-&ft=video",
+        "url2": "https://thumbnail0.baidupcs.com/thumbnail/fd350c743g7b5943a84ffbbf09ee5706?fid=1100142002923-250528-1103638212162174&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-clrnoyY0EyZfeO%2BhKhy2dWEtfyE%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c360_u270&quality=100&vuk=-&ft=video",
+        "url3": "https://thumbnail0.baidupcs.com/thumbnail/fd350c743g7b5943a84ffbbf09ee5706?fid=1100142002923-250528-1103638212162174&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-clrnoyY0EyZfeO%2BhKhy2dWEtfyE%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c850_u580&quality=100&vuk=-&ft=video",
+        "icon": "https://thumbnail0.baidupcs.com/thumbnail/fd350c743g7b5943a84ffbbf09ee5706?fid=1100142002923-250528-1103638212162174&time=1766386800&rt=sh&sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-clrnoyY0EyZfeO%2BhKhy2dWEtfyE%3D&expires=8h&chkv=0&chkbd=0&chkpc=&dp-logid=178054096746446156&dp-callid=0&file_type=0&size=c60_u60&quality=100&vuk=-&ft=video"
+      }
+    }
+  ],
+  "show_msg": "success"
+}

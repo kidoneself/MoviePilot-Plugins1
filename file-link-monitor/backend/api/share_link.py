@@ -459,7 +459,7 @@ def get_all_share_links(db: Session = Depends(get_db)):
             (CustomNameMapping.baidu_link.isnot(None)) |
             (CustomNameMapping.quark_link.isnot(None)) |
             (CustomNameMapping.xunlei_link.isnot(None))
-        ).order_by(CustomNameMapping.original_name).all()
+        ).order_by(CustomNameMapping.updated_at.desc()).all()
         
         result = []
         for mapping in mappings:

@@ -1,0 +1,37 @@
+{
+  "errno": 0,
+  "request_id": 178053740488485177,
+  "server_time": 1766388873,
+  "cfrom_id": 0,
+  "hitrisk": 0,
+  "appeal_status": 0,
+  "is_zombie": 0,
+  "vip_point": 280,
+  "vip_level": 1,
+  "svip10_id": "",
+  "vip_type": 2,
+  "sharetype": 0,
+  "view_visited": 0,
+  "view_limit": 0,
+  "expired_type": 0,
+  "title": "/我的资源/完结电视剧/m模范chuz车2",
+  "list": [
+    {
+      "category": "6",
+      "extent_int8": "0",
+      "fs_id": "838744402052902",
+      "isdir": "1",
+      "local_ctime": "1754200402",
+      "local_mtime": "1754200402",
+      "md5": "",
+      "path": "/我的资源/完结电视剧/m模范chuz车2",
+      "server_ctime": "1754200402",
+      "server_filename": "m模范chuz车2",
+      "server_mtime": "1760902971",
+      "size": "0"
+    }
+  ],
+  "share_id": 50302306070,
+  "uk": 1100142002923,
+  "show_msg": "success"
+}
