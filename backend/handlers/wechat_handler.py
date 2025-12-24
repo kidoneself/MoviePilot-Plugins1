@@ -124,23 +124,22 @@ class WeChatCommandHandler:
             self.wechat.send_text(user_id, f"😔 {mapping.original_name}\n\n暂无分享链接")
             return
         
-        # 构建简洁的文本消息（直接使用数据库存储的完整链接）
-        lines = [f"📺 {mapping.original_name}\n\n"]
-        
-        if mapping.quark_link:
-            lines.append(f"🟡 夸克:\n{mapping.quark_link}\n\n")
-        
-        if mapping.baidu_link:
-            lines.append(f"🔵 百度:\n{mapping.baidu_link}\n\n")
-        
-        if mapping.xunlei_link:
-            lines.append(f"🔴 迅雷:\n{mapping.xunlei_link}\n\n")
+        # 生成短链接
+        from backend.services.wechat_service import WeChatService
+        short_url = f"https://link.frp.naspt.vip/s/{mapping.id}"
         
         # 状态
         status = "✅ 完结" if mapping.is_completed else "📺 更新中"
-        lines.append(status)
         
-        self.wechat.send_text(user_id, "".join(lines))
+        # 发送简洁消息
+        message = f"""📺 {mapping.original_name}
+
+{status}
+
+🔗 点击查看三网盘链接：
+{short_url}"""
+        
+        self.wechat.send_text(user_id, message)
     
     def _handle_number_select(self, user_id: str, num: int):
         """处理数字选择"""

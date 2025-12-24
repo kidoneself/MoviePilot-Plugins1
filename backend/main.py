@@ -11,7 +11,7 @@ import uvicorn
 
 from backend.models import init_database
 from backend.monitor import MonitorService
-from backend.api import records, tree, export, mapping, share_link, transfer, category, openlist, wechat
+from backend.api import records, tree, export, mapping, share_link, transfer, category, openlist, wechat, share_page
 
 # 配置日志
 logging.basicConfig(
@@ -86,6 +86,7 @@ app.include_router(transfer.router, prefix="/api", tags=["网盘转存"])
 app.include_router(category.router, prefix="/api", tags=["分类管理"])
 app.include_router(openlist.router, prefix="/api", tags=["OpenList"])
 app.include_router(wechat.router, prefix="/api", tags=["企业微信"])
+app.include_router(share_page.router, tags=["短链接分享"])
 
 # 静态文件
 frontend_path = Path(__file__).parent.parent / "frontend-vue" / "dist"
