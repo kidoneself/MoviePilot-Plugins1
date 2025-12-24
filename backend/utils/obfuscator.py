@@ -278,21 +278,8 @@ class FolderObfuscator:
             logger.info(f"✓ 使用自定义映射: {name} -> {custom_name}")
             return custom_name
         
-        # 2. 使用同音字混淆（去年份+同音字替换）+ 添加首字母
-        # 去掉年份
-        base_name = re.sub(r'\s*\((\d{4})\)\s*$', '', name).strip()
-        
-        # 提取拼音首字母（只取第一个字）
-        initials = self._get_first_char_initial(base_name)
-        
-        # 执行同音字混淆
-        obfuscated_base = self.homophone_obfuscator.obfuscate(base_name)
-        
-        # 拼接：首字母 + 空格 + 混淆名
-        if initials:
-            obfuscated = f"{initials} {obfuscated_base}"
-        else:
-            obfuscated = obfuscated_base
+        # 2. 使用公共方法：同音字混淆 + 添加首字母
+        obfuscated = self.obfuscate_with_initial(name)
         
         # 3. 自动创建映射记录到数据库（方便在页面上统一管理和修改）
         self._auto_create_mapping(name, obfuscated, category)
@@ -323,6 +310,32 @@ class FolderObfuscator:
         else:
             # 转拼音
             return self.pinyin_map.get(char, char)
+    
+    def obfuscate_with_initial(self, name: str) -> str:
+        """
+        【公共方法】混淆名称并添加首字母
+        统一的混淆逻辑：去年份 + 同音字替换 + 添加首字母
+        
+        Args:
+            name: 原始名称（可能包含年份）
+            
+        Returns:
+            混淆后的名称（格式：首字母 + 空格 + 混淆名）
+        """
+        # 去掉年份
+        base_name = re.sub(r'\s*\((\d{4})\)\s*$', '', name).strip()
+        
+        # 提取拼音首字母（只取第一个字）
+        initials = self._get_first_char_initial(base_name)
+        
+        # 执行同音字混淆
+        obfuscated_base = self.homophone_obfuscator.obfuscate(base_name)
+        
+        # 拼接：首字母 + 空格 + 混淆名
+        if initials:
+            return f"{initials} {obfuscated_base}"
+        else:
+            return obfuscated_base
     
     def _get_first_char_initial(self, text: str) -> str:
         """

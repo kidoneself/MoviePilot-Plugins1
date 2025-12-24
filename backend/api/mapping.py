@@ -582,27 +582,18 @@ async def obfuscate_name(
                 }
             }
         
-        # 2. 新建的映射：混淆 + 加首字母（不保存到数据库，只返回混淆结果）
-        # 直接调用同音字混淆器，不触发自动保存
-        from backend.utils.homophone_obfuscator import HomophoneObfuscator
-        homophone_obf = HomophoneObfuscator()
+        # 2. 新建的映射：调用公共混淆方法（不保存到数据库，只返回混淆结果）
+        from backend.utils.obfuscator import FolderObfuscator
+        obfuscator = FolderObfuscator(enabled=True, db_engine=db_engine)
         
-        # 去掉年份
+        # 使用公共方法：去年份 + 同音字混淆 + 添加首字母
+        obfuscated_name = obfuscator.obfuscate_with_initial(original_name)
+        
+        # 提取首字母用于返回（前端可能需要）
         base_name = re.sub(r'\s*\((\d{4})\)\s*$', '', original_name).strip()
+        initials = obfuscated_name.split()[0] if ' ' in obfuscated_name else ""
         
-        # 提取拼音首字母
-        initials = get_pinyin_initials(base_name)
-        
-        # 执行混淆（不含年份）
-        obfuscated_base = homophone_obf.obfuscate(base_name)
-        
-        # 拼接：首字母 + 空格 + 混淆名
-        if initials:
-            obfuscated_name = f"{initials} {obfuscated_base}"
-        else:
-            obfuscated_name = obfuscated_base
-        
-        logger.info(f"✅ 混淆名称(新建): {original_name} -> {initials} + {obfuscated_base} = {obfuscated_name}")
+        logger.info(f"✅ 混淆名称(新建): {original_name} -> {obfuscated_name}")
         
         return {
             "success": True,
