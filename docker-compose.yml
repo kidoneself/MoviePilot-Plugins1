@@ -8,7 +8,7 @@ services:
       - "9889:8080"
     volumes:
       - ./backend:/app/backend                                             # 后端代码（支持热更新）
-      - ./frontend-vue/dist:/app/frontend                                  # 前端代码（支持热更新）
+      - ./frontend-vue/dist:/app/frontend-vue/dist                         # 前端代码（支持热更新）
       - /vol1/1000/docker/file-link-monitor/config.yaml:/app/config.yaml  # 配置文件
       - /vol1/1000/docker/file-link-monitor/data:/app/data                # 数据库持久化
       - /vol1/1000/media:/media                                            # 映射 NAS 媒体目录
