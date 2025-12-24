@@ -278,8 +278,21 @@ class FolderObfuscator:
             logger.info(f"✓ 使用自定义映射: {name} -> {custom_name}")
             return custom_name
         
-        # 2. 使用同音字混淆（去年份+同音字替换）
-        obfuscated = self.homophone_obfuscator.obfuscate_with_year(name)
+        # 2. 使用同音字混淆（去年份+同音字替换）+ 添加首字母
+        # 去掉年份
+        base_name = re.sub(r'\s*\((\d{4})\)\s*$', '', name).strip()
+        
+        # 提取拼音首字母（只取第一个字）
+        initials = self._get_first_char_initial(base_name)
+        
+        # 执行同音字混淆
+        obfuscated_base = self.homophone_obfuscator.obfuscate(base_name)
+        
+        # 拼接：首字母 + 空格 + 混淆名
+        if initials:
+            obfuscated = f"{initials} {obfuscated_base}"
+        else:
+            obfuscated = obfuscated_base
         
         # 3. 自动创建映射记录到数据库（方便在页面上统一管理和修改）
         self._auto_create_mapping(name, obfuscated, category)
@@ -310,6 +323,29 @@ class FolderObfuscator:
         else:
             # 转拼音
             return self.pinyin_map.get(char, char)
+    
+    def _get_first_char_initial(self, text: str) -> str:
+        """
+        提取文本第一个汉字的拼音首字母（大写）
+        
+        Args:
+            text: 中文文本
+            
+        Returns:
+            大写拼音首字母（单个字母）
+        """
+        # 只提取中文字符
+        chinese_chars = re.findall(r'[\u4e00-\u9fff]', text)
+        if not chinese_chars:
+            return ""
+        
+        # 只取第一个字
+        first_char = chinese_chars[0]
+        pinyin = self.pinyin_map.get(first_char, '')
+        if pinyin:
+            return pinyin[0].upper()
+        
+        return ""
     
     def _get_pinyin_initial(self, char: str) -> str:
         """
