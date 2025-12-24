@@ -11,7 +11,7 @@ import uvicorn
 
 from backend.models import init_database
 from backend.monitor import MonitorService
-from backend.api import records, tree, export, mapping, share_link, transfer, category, openlist
+from backend.api import records, tree, export, mapping, share_link, transfer, category, openlist, wechat
 
 # 配置日志
 logging.basicConfig(
@@ -53,6 +53,12 @@ async def lifespan(app: FastAPI):
     monitor_service.start()
     logger.info("✅ 监控服务已启动")
     
+    # 初始化企业微信功能
+    try:
+        wechat.init_wechat(config, db_engine)
+    except Exception as e:
+        logger.warning(f"⚠️ 企业微信功能初始化失败: {e}")
+    
     yield
     
     # 关闭时
@@ -79,6 +85,7 @@ app.include_router(share_link.router, prefix="/api", tags=["分享链接"])
 app.include_router(transfer.router, prefix="/api", tags=["网盘转存"])
 app.include_router(category.router, prefix="/api", tags=["分类管理"])
 app.include_router(openlist.router, prefix="/api", tags=["OpenList"])
+app.include_router(wechat.router, prefix="/api", tags=["企业微信"])
 
 # 静态文件
 frontend_path = Path(__file__).parent.parent / "frontend-vue" / "dist"
