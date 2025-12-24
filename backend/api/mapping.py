@@ -596,9 +596,9 @@ async def obfuscate_name(
         # 执行混淆（不含年份）
         obfuscated_base = homophone_obf.obfuscate(base_name)
         
-        # 拼接：首字母 + 混淆名
+        # 拼接：首字母 + 空格 + 混淆名
         if initials:
-            obfuscated_name = f"{initials}{obfuscated_base}"
+            obfuscated_name = f"{initials} {obfuscated_base}"
         else:
             obfuscated_name = obfuscated_base
         
