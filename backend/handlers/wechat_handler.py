@@ -24,6 +24,8 @@ class WeChatCommandHandler:
         """
         self.wechat = wechat_service
         self.db_engine = db_engine
+        # 缓存用户搜索结果（key: user_id, value: list of mappings）
+        self.user_search_cache = {}
     
     def handle_message(self, user_id: str, content: str):
         """
@@ -44,6 +46,11 @@ class WeChatCommandHandler:
             self._send_help(user_id)
             return
         
+        # 数字选择（如果用户刚搜索过）
+        if content.isdigit() and user_id in self.user_search_cache:
+            self._handle_number_select(user_id, int(content))
+            return
+        
         # 默认：直接搜索剧名
         self._handle_search(user_id, content)
     
@@ -53,7 +60,11 @@ class WeChatCommandHandler:
 
 🔍 **使用方法**
 直接发送剧名即可搜索
-例：唐朝诡事录
+例：唐朝
+
+📝 **多个结果时**
+1️⃣ 系统返回编号列表
+2️⃣ 回复数字查看对应剧集
 
 💡 **提示**
 - 支持模糊搜索
@@ -88,17 +99,17 @@ class WeChatCommandHandler:
             # 只有一个结果，直接显示详情
             if len(mappings) == 1:
                 self._send_mapping_detail(user_id, mappings[0])
-                return
-            
-            # 多个结果，显示列表
-            result_text = f"🔍 找到 {len(mappings)} 个结果:\n\n"
-            for idx, m in enumerate(mappings, 1):
-                has_links = bool(m.quark_link or m.baidu_link or m.xunlei_link)
-                status = "✅" if has_links else "⏳"
-                result_text += f"{status} {idx}. {m.original_name}\n"
-            
-            result_text += f"\n💡 发送「搜索 完整剧名」查看详情"
-            self.wechat.send_text(user_id, result_text)
+            else:
+                # 多个结果，显示编号列表，缓存结果
+                self.user_search_cache[user_id] = mappings
+                result_text = f"🔍 找到 {len(mappings)} 个结果:\n\n"
+                for idx, m in enumerate(mappings, 1):
+                    has_links = bool(m.quark_link or m.baidu_link or m.xunlei_link)
+                    status = "✅" if has_links else "⏳"
+                    result_text += f"{status} {idx}. {m.original_name}\n"
+                
+                result_text += f"\n💡 回复数字查看对应剧集链接"
+                self.wechat.send_text(user_id, result_text)
             
         except Exception as e:
             logger.error(f"搜索失败: {e}")
@@ -130,6 +141,25 @@ class WeChatCommandHandler:
         lines.append(status)
         
         self.wechat.send_text(user_id, "".join(lines))
+    
+    def _handle_number_select(self, user_id: str, num: int):
+        """处理数字选择"""
+        mappings = self.user_search_cache.get(user_id, [])
+        
+        if not mappings:
+            self.wechat.send_text(user_id, "❌ 没有可选择的搜索结果")
+            return
+        
+        if num < 1 or num > len(mappings):
+            self.wechat.send_text(
+                user_id,
+                f"❌ 请输入 1-{len(mappings)} 之间的数字"
+            )
+            return
+        
+        # 发送选中的剧集详情
+        selected = mappings[num - 1]
+        self._send_mapping_detail(user_id, selected)
     
     def _handle_today_update(self, user_id: str):
         """处理今日更新查询"""
