@@ -134,8 +134,36 @@ class FileMonitorHandler(FileSystemEventHandler):
         last_error = None
         success_targets = []
         
+        # 提取剧名并查询映射
+        from backend.utils.obfuscator import FolderObfuscator
+        from backend.models import CustomNameMapping
+        original_name = FolderObfuscator.extract_show_name(file_path)
+        mapping = None
+        if original_name:
+            mapping = session.query(CustomNameMapping).filter(
+                CustomNameMapping.original_name == original_name
+            ).first()
+        
         try:
             for idx, target_path in enumerate(self.target_paths):
+                # 获取目标网盘名称
+                target_config = self.target_configs[idx]
+                target_name = target_config.get('name', '') if isinstance(target_config, dict) else ''
+                
+                # 检查同步开关
+                should_sync = True
+                if mapping:
+                    if '夸克' in target_name or 'quark' in target_name.lower():
+                        should_sync = getattr(mapping, 'sync_to_quark', True)
+                    elif '百度' in target_name or 'baidu' in target_name.lower():
+                        should_sync = getattr(mapping, 'sync_to_baidu', True)
+                    elif '迅雷' in target_name or 'xunlei' in target_name.lower():
+                        should_sync = getattr(mapping, 'sync_to_xunlei', True)
+                
+                if not should_sync:
+                    logger.info(f"⏭ 跳过同步到 {target_name}（映射已禁用）")
+                    continue
+                
                 target_file = target_path / relative_path
                 
                 logger.info(f"创建链接: {file_path} -> {target_file}")

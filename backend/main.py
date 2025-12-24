@@ -81,7 +81,7 @@ app.include_router(category.router, prefix="/api", tags=["分类管理"])
 app.include_router(openlist.router, prefix="/api", tags=["OpenList"])
 
 # 静态文件
-frontend_path = Path(__file__).parent.parent / "frontend"
+frontend_path = Path(__file__).parent.parent / "frontend-vue" / "dist"
 # 挂载静态资源（CSS/JS等）
 app.mount("/assets", StaticFiles(directory=str(frontend_path / "assets")), name="assets")
 

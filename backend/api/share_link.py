@@ -405,35 +405,16 @@ def get_today_share_text(db: Session = Depends(get_db)):
             
             lines.append(f"{show_name} {ep_str}{completed_tag}")
             
-            # 分享链接
+            # 分享链接（直接使用数据库原始值）
             if mapping:
-                # 百度
                 if mapping.baidu_link:
-                    baidu_link = mapping.baidu_link
-                    baidu_pwd = None
-                    if '?pwd=' in baidu_link:
-                        parts = baidu_link.split('?pwd=')
-                        baidu_link = parts[0]
-                        baidu_pwd = parts[1].split()[0]
-                    
-                    pwd_text = f" 提取码: {baidu_pwd}" if baidu_pwd else ""
-                    lines.append(f"BD：{baidu_link}{pwd_text}")
+                    lines.append(f"BD：{mapping.baidu_link}")
                 
-                # 夸克
                 if mapping.quark_link:
                     lines.append(f"KK：{mapping.quark_link}")
                 
-                # 迅雷
                 if mapping.xunlei_link:
-                    xunlei_link = mapping.xunlei_link
-                    xunlei_pwd = None
-                    if '?pwd=' in xunlei_link:
-                        parts = xunlei_link.split('?pwd=')
-                        xunlei_link = parts[0]
-                        xunlei_pwd = parts[1].split()[0]
-                    
-                    pwd_text = f" 提取码: {xunlei_pwd}" if xunlei_pwd else ""
-                    lines.append(f"XL：{xunlei_link}{pwd_text}")
+                    lines.append(f"XL：{mapping.xunlei_link}")
             
             lines.append("")  # 空行分隔
         
@@ -463,54 +444,13 @@ def get_all_share_links(db: Session = Depends(get_db)):
         
         result = []
         for mapping in mappings:
-            import re
-            
-            # 处理百度链接和提取码
-            baidu_pwd = None
-            baidu_link = mapping.baidu_link
-            
-            # 如果baidu_link包含提取码文本，清理掉
-            if baidu_link:
-                # 移除多余的提取码文本
-                if '提取码:' in baidu_link or '提取码：' in baidu_link:
-                    # 提取URL部分（只保留链接）
-                    url_match = re.search(r'(https://pan\.baidu\.com/s/[^\s]+)', baidu_link)
-                    if url_match:
-                        baidu_link = url_match.group(1)
-                
-                # 从URL参数提取提取码
-                if '?pwd=' in baidu_link:
-                    parts = baidu_link.split('?pwd=')
-                    if len(parts) == 2:
-                        baidu_link = parts[0]  # 只保留链接部分
-                        baidu_pwd = parts[1].split()[0]  # 提取码可能后面还有文字
-            
-            # 处理迅雷链接和提取码
-            xunlei_pwd = None
-            xunlei_link = mapping.xunlei_link
-            
-            if xunlei_link:
-                # 从URL参数提取提取码
-                if '?pwd=' in xunlei_link:
-                    parts = xunlei_link.split('?pwd=')
-                    if len(parts) == 2:
-                        xunlei_link = parts[0]  # 只保留链接部分
-                        xunlei_pwd = parts[1].split()[0]  # 提取码可能后面还有文字
-                
-                # 如果链接中包含"提取码:"文本，也清理
-                if '提取码:' in xunlei_link or '提取码：' in xunlei_link:
-                    url_match = re.search(r'(https://pan\.xunlei\.com/s/[^\s]+)', xunlei_link)
-                    if url_match:
-                        xunlei_link = url_match.group(1)
-            
+            # 直接返回数据库原始值，不做任何处理
             item = {
                 "original_name": mapping.original_name,
                 "is_completed": mapping.is_completed or False,
-                "baidu_link": baidu_link,
-                "baidu_pwd": baidu_pwd,
+                "baidu_link": mapping.baidu_link,
                 "quark_link": mapping.quark_link,
-                "xunlei_link": xunlei_link,
-                "xunlei_pwd": xunlei_pwd
+                "xunlei_link": mapping.xunlei_link
             }
             result.append(item)
         

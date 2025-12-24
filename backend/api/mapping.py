@@ -44,6 +44,9 @@ class MappingCreate(BaseModel):
     baidu_link: Optional[str] = None
     quark_link: Optional[str] = None
     xunlei_link: Optional[str] = None
+    sync_to_quark: Optional[bool] = True
+    sync_to_baidu: Optional[bool] = True
+    sync_to_xunlei: Optional[bool] = True
 
 
 class MappingUpdate(BaseModel):
@@ -58,6 +61,9 @@ class MappingUpdate(BaseModel):
     baidu_link: Optional[str] = None
     quark_link: Optional[str] = None
     xunlei_link: Optional[str] = None
+    sync_to_quark: Optional[bool] = None
+    sync_to_baidu: Optional[bool] = None
+    sync_to_xunlei: Optional[bool] = None
 
 
 @router.get("/mappings")
@@ -116,6 +122,9 @@ async def get_mappings(
                     "baidu_link": m.baidu_link,
                     "quark_link": m.quark_link,
                     "xunlei_link": m.xunlei_link,
+                    "sync_to_quark": m.sync_to_quark if hasattr(m, 'sync_to_quark') else True,
+                    "sync_to_baidu": m.sync_to_baidu if hasattr(m, 'sync_to_baidu') else True,
+                    "sync_to_xunlei": m.sync_to_xunlei if hasattr(m, 'sync_to_xunlei') else True,
                     "created_at": m.created_at.isoformat() if m.created_at else None,
                     "updated_at": m.updated_at.isoformat() if m.updated_at else None
                 }
@@ -161,7 +170,10 @@ async def create_mapping(mapping: MappingCreate, db: Session = Depends(get_db)):
             note=mapping.note,
             baidu_link=mapping.baidu_link,
             quark_link=mapping.quark_link,
-            xunlei_link=mapping.xunlei_link
+            xunlei_link=mapping.xunlei_link,
+            sync_to_quark=mapping.sync_to_quark,
+            sync_to_baidu=mapping.sync_to_baidu,
+            sync_to_xunlei=mapping.sync_to_xunlei
         )
         db.add(new_mapping)
         db.commit()
@@ -178,6 +190,7 @@ async def create_mapping(mapping: MappingCreate, db: Session = Depends(get_db)):
                 "category": new_mapping.category,
                 "quark_name": new_mapping.quark_name,
                 "baidu_name": new_mapping.baidu_name,
+                "xunlei_name": new_mapping.xunlei_name,
                 "enabled": new_mapping.enabled,
                 "note": new_mapping.note
             }
@@ -230,6 +243,12 @@ async def update_mapping(
             existing.quark_link = mapping.quark_link
         if mapping.xunlei_link is not None:
             existing.xunlei_link = mapping.xunlei_link
+        if mapping.sync_to_quark is not None:
+            existing.sync_to_quark = mapping.sync_to_quark
+        if mapping.sync_to_baidu is not None:
+            existing.sync_to_baidu = mapping.sync_to_baidu
+        if mapping.sync_to_xunlei is not None:
+            existing.sync_to_xunlei = mapping.sync_to_xunlei
         
         db.commit()
         db.refresh(existing)
@@ -245,6 +264,7 @@ async def update_mapping(
                 "category": existing.category,
                 "quark_name": existing.quark_name,
                 "baidu_name": existing.baidu_name,
+                "xunlei_name": existing.xunlei_name,
                 "enabled": existing.enabled,
                 "note": existing.note
             }
@@ -549,21 +569,23 @@ async def obfuscate_name(
         ).first()
         
         if existing:
-            # 已存在：返回数据库中的名称（优先返回夸克名，其次百度名）
-            obfuscated_name = existing.quark_name or existing.baidu_name or existing.xunlei_name
-            if obfuscated_name:
-                logger.info(f"✅ 使用已存在映射: {original_name} -> {obfuscated_name}")
-                return {
-                    "success": True,
-                    "data": {
-                        "original_name": original_name,
-                        "obfuscated_name": obfuscated_name,
-                        "is_existing": True
-                    }
+            # 已存在：返回数据库中的三个名称
+            logger.info(f"✅ 使用已存在映射: {original_name}")
+            return {
+                "success": True,
+                "data": {
+                    "original_name": original_name,
+                    "quark_name": existing.quark_name or "",
+                    "baidu_name": existing.baidu_name or "",
+                    "xunlei_name": existing.xunlei_name or "",
+                    "is_existing": True
                 }
+            }
         
-        # 2. 新建的映射：混淆 + 加首字母
-        obfuscator = FolderObfuscator(enabled=True, db_engine=db_engine)
+        # 2. 新建的映射：混淆 + 加首字母（不保存到数据库，只返回混淆结果）
+        # 直接调用同音字混淆器，不触发自动保存
+        from backend.utils.homophone_obfuscator import HomophoneObfuscator
+        homophone_obf = HomophoneObfuscator()
         
         # 去掉年份
         base_name = re.sub(r'\s*\((\d{4})\)\s*$', '', original_name).strip()
@@ -572,7 +594,7 @@ async def obfuscate_name(
         initials = get_pinyin_initials(base_name)
         
         # 执行混淆（不含年份）
-        obfuscated_base = obfuscator.obfuscate_name(base_name)
+        obfuscated_base = homophone_obf.obfuscate(base_name)
         
         # 拼接：首字母 + 混淆名
         if initials:

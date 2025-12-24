@@ -27,6 +27,8 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
+backend/services/logs/
 
 # Docker
 .dockerignore

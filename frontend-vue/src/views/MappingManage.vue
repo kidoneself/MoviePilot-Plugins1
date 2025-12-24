@@ -22,7 +22,10 @@ const formData = ref({
   baidu_name: '',
   xunlei_name: '',
   note: '',
-  enabled: true
+  enabled: true,
+  sync_to_quark: true,
+  sync_to_baidu: true,
+  sync_to_xunlei: true
 })
 
 // Cookie管理
@@ -97,7 +100,10 @@ const handleAdd = () => {
     baidu_name: '',
     xunlei_name: '',
     note: '',
-    enabled: true
+    enabled: true,
+    sync_to_quark: true,
+    sync_to_baidu: true,
+    sync_to_xunlei: true
   }
   dialogVisible.value = true
 }
@@ -184,11 +190,22 @@ const handleAutoObfuscate = async () => {
   try {
     const res = await api.obfuscateName(formData.value.original_name)
     if (res.data.success) {
-      const obfuscatedName = res.data.data.obfuscated_name
-      formData.value.quark_name = obfuscatedName
-      formData.value.baidu_name = obfuscatedName
-      formData.value.xunlei_name = obfuscatedName
-      ElMessage.success(`自动混淆成功: ${obfuscatedName}`)
+      const data = res.data.data
+      
+      if (data.is_existing) {
+        // 已存在：分别填充三个字段
+        formData.value.quark_name = data.quark_name || ''
+        formData.value.baidu_name = data.baidu_name || ''
+        formData.value.xunlei_name = data.xunlei_name || ''
+        ElMessage.success('已自动填充数据库中的映射')
+      } else {
+        // 新建：三个字段填充相同的混淆名
+        const obfuscatedName = data.obfuscated_name
+        formData.value.quark_name = obfuscatedName
+        formData.value.baidu_name = obfuscatedName
+        formData.value.xunlei_name = obfuscatedName
+        ElMessage.success(`自动混淆成功: ${obfuscatedName}`)
+      }
     } else {
       ElMessage.error(res.data.message || '混淆失败')
     }
@@ -198,19 +215,25 @@ const handleAutoObfuscate = async () => {
 }
 
 const handleOriginalNameBlur = async () => {
-  // 只在新增映射且原名称不为空且显示名为空时自动混淆
-  if (!formData.value.id && 
-      formData.value.original_name && 
-      !formData.value.quark_name && 
-      !formData.value.baidu_name && 
-      !formData.value.xunlei_name) {
+  // 只在新增映射且原名称不为空时自动混淆（移除显示名为空的限制）
+  if (!formData.value.id && formData.value.original_name) {
     try {
       const res = await api.obfuscateName(formData.value.original_name)
       if (res.data.success) {
-        const obfuscatedName = res.data.data.obfuscated_name
-        formData.value.quark_name = obfuscatedName
-        formData.value.baidu_name = obfuscatedName
-        formData.value.xunlei_name = obfuscatedName
+        const data = res.data.data
+        
+        if (data.is_existing) {
+          // 已存在：分别填充三个字段
+          formData.value.quark_name = data.quark_name || ''
+          formData.value.baidu_name = data.baidu_name || ''
+          formData.value.xunlei_name = data.xunlei_name || ''
+        } else {
+          // 新建：三个字段填充相同的混淆名
+          const obfuscatedName = data.obfuscated_name
+          formData.value.quark_name = obfuscatedName
+          formData.value.baidu_name = obfuscatedName
+          formData.value.xunlei_name = obfuscatedName
+        }
       }
     } catch (error) {
       console.error('自动混淆失败:', error)
@@ -360,24 +383,28 @@ const resyncToTarget = async (row, targetType) => {
 const copyLinks = async (row) => {
   const links = []
   
+  // 添加标题
+  links.push(`${row.original_name}(尽快保存，以免失效)`)
+  
   if (row.baidu_link) {
-    links.push(`【百度网盘】${row.baidu_link}`)
+    links.push(`BD：${row.baidu_link}`)
   }
   
   if (row.quark_link) {
-    links.push(`【夸克网盘】${row.quark_link}`)
+    links.push(`KK：${row.quark_link}`)
   }
   
   if (row.xunlei_link) {
-    links.push(`【迅雷网盘】${row.xunlei_link}`)
+    links.push(`XL：${row.xunlei_link}`)
   }
   
-  if (links.length === 0) {
+  if (links.length === 1) {
     ElMessage.warning('暂无可复制的链接')
     return
   }
   
-  const text = links.join('  ')
+  // 用换行连接，添加空行
+  const text = links.join('\n')
   
   try {
     // 尝试使用现代 Clipboard API
@@ -951,6 +978,16 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="formData.note" placeholder="备注信息（可选）" type="textarea" />
+        </el-form-item>
+        <el-form-item label="同步设置">
+          <div style="display: flex; gap: 15px;">
+            <el-switch v-model="formData.sync_to_quark" active-text="夸克" inactive-text="夸克" />
+            <el-switch v-model="formData.sync_to_baidu" active-text="百度" inactive-text="百度" />
+            <el-switch v-model="formData.sync_to_xunlei" active-text="迅雷" inactive-text="迅雷" />
+          </div>
+          <div style="font-size: 12px; color: #999; margin-top: 5px;">
+            控制文件监控是否自动同步到对应网盘（默认全开）
+          </div>
         </el-form-item>
         <el-form-item label="状态">
           <el-switch v-model="formData.enabled" active-text="启用" inactive-text="禁用" />

@@ -62,6 +62,11 @@ class CustomNameMapping(Base):
     baidu_link = Column(String(1000))
     xunlei_link = Column(String(1000))
     
+    # 同步开关（控制文件监控是否同步到对应网盘）
+    sync_to_quark = Column(Boolean, default=True, comment='是否同步到夸克')
+    sync_to_baidu = Column(Boolean, default=True, comment='是否同步到百度')
+    sync_to_xunlei = Column(Boolean, default=True, comment='是否同步到迅雷')
+    
     enabled = Column(Boolean, default=True)
     is_completed = Column(Boolean, default=False, comment='是否完结')
     note = Column(String(500))

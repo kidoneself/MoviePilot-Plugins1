@@ -20,19 +20,17 @@
           <div class="links">
             <div v-if="item.baidu_link" class="link-row">
               <span class="link-label">BD：</span>
-              <a :href="item.baidu_link" target="_blank" class="link-url">{{ item.baidu_link }}</a>
-              <span v-if="item.baidu_pwd" class="pwd">提取码: {{ item.baidu_pwd }}</span>
+              <a :href="item.baidu_link.split(' ')[0]" target="_blank" class="link-url">{{ item.baidu_link }}</a>
             </div>
             
             <div v-if="item.quark_link" class="link-row">
               <span class="link-label">KK：</span>
-              <a :href="item.quark_link" target="_blank" class="link-url">{{ item.quark_link }}</a>
+              <a :href="item.quark_link.split(' ')[0]" target="_blank" class="link-url">{{ item.quark_link }}</a>
             </div>
             
             <div v-if="item.xunlei_link" class="link-row">
               <span class="link-label">XL：</span>
-              <a :href="item.xunlei_link" target="_blank" class="link-url">{{ item.xunlei_link }}</a>
-              <span v-if="item.xunlei_pwd" class="pwd">提取码: {{ item.xunlei_pwd }}</span>
+              <a :href="item.xunlei_link.split(' ')[0]" target="_blank" class="link-url">{{ item.xunlei_link }}</a>
             </div>
           </div>
           
@@ -68,14 +66,10 @@ const loadShareLinks = async () => {
 }
 
 const formatItemText = (item) => {
-  let text = `${item.original_name}\n`
+  let text = `${item.original_name}(尽快保存，以免失效)\n`
   
   if (item.baidu_link) {
-    text += `BD：${item.baidu_link}`
-    if (item.baidu_pwd) {
-      text += ` 提取码: ${item.baidu_pwd}`
-    }
-    text += '\n'
+    text += `BD：${item.baidu_link}\n`
   }
   
   if (item.quark_link) {
@@ -83,11 +77,7 @@ const formatItemText = (item) => {
   }
   
   if (item.xunlei_link) {
-    text += `XL：${item.xunlei_link}`
-    if (item.xunlei_pwd) {
-      text += ` 提取码: ${item.xunlei_pwd}`
-    }
-    text += '\n'
+    text += `XL：${item.xunlei_link}\n`
   }
   
   return text
