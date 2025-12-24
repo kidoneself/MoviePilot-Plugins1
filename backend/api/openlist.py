@@ -57,7 +57,7 @@ async def get_folder_id(request: GetFolderIdRequest):
             # 列出父目录（使用POST方法，符合官方API）
             list_url = f"{OPENLIST_URL}/api/fs/list"
             list_headers = {"Authorization": OPENLIST_TOKEN, "Content-Type": "application/json"}
-            list_body = {"path": parent_path, "refresh": False, "page": 1, "per_page": 100}
+            list_body = {"path": parent_path, "refresh": False, "page": 1, "per_page": 1000}
             list_response = requests.post(list_url, json=list_body, headers=list_headers)
             result = list_response.json()
             
@@ -66,6 +66,10 @@ async def get_folder_id(request: GetFolderIdRequest):
             
             content = result.get('data', {}).get('content', [])
             
+            # 记录父目录下所有文件夹（调试用）
+            existing_folders = [item.get('name') for item in content if item.get('is_dir') or item.get('mount_details')]
+            logger.info(f"第{idx}层检查: 目标={part}, 父目录={parent_path}, 现有文件夹={existing_folders}")
+            
             found = False
             folder_id = None
             
@@ -73,23 +77,33 @@ async def get_folder_id(request: GetFolderIdRequest):
                 # 挂载点有mount_details字段，普通文件夹有is_dir=True
                 is_mount = item.get('mount_details') is not None
                 is_directory = item.get('is_dir') == True
+                item_name = item.get('name', '').strip()
                 
-                if item.get('name') == part and (is_directory or is_mount):
+                # 标准化比对：去除首尾空格
+                if item_name == part.strip() and (is_directory or is_mount):
                     folder_id = item.get('id', '')
                     found = True
-                    logger.info(f"找到目录: {part}, id={folder_id}, is_dir={is_directory}, is_mount={is_mount}")
+                    logger.info(f"✅ 第{idx}层找到目录: {part}, id={folder_id}, path={current_path}")
                     break
+            
+            if not found:
+                logger.warning(f"❌ 第{idx}层未找到目录: {part}, 将创建新目录")
             
             # 如果不存在，创建目录
             if not found:
+                mkdir_path = f"{parent_path}/{part}" if parent_path != "/" else f"/{part}"
+                logger.info(f"📁 创建第{idx}层目录: {mkdir_path}")
+                
                 mkdir_url = f"{OPENLIST_URL}/api/fs/mkdir"
                 mkdir_headers = {"Authorization": OPENLIST_TOKEN, "Content-Type": "application/json"}
-                mkdir_body = {"path": f"{parent_path}/{part}" if parent_path != "/" else f"/{part}"}
+                mkdir_body = {"path": mkdir_path}
                 mkdir_response = requests.post(mkdir_url, json=mkdir_body, headers=mkdir_headers)
                 mkdir_result = mkdir_response.json()
                 
                 if mkdir_result.get('code') != 200:
                     raise Exception(f"创建目录失败: {mkdir_result.get('message')}")
+                
+                logger.info(f"✅ 创建成功，重新获取ID")
                 
                 # 重新列出父目录，获取新建目录的ID
                 list_response = requests.post(list_url, json=list_body, headers=list_headers)
@@ -97,13 +111,14 @@ async def get_folder_id(request: GetFolderIdRequest):
                 content = result.get('data', {}).get('content', [])
                 
                 for item in content:
-                    if item.get('name') == part and item.get('is_dir'):
+                    item_name = item.get('name', '').strip()
+                    if item_name == part.strip() and item.get('is_dir'):
                         folder_id = item.get('id', '')
-                        logger.info(f"创建后找到目录: {part}, id={folder_id}")
+                        logger.info(f"✅ 创建后找到目录: {part}, id={folder_id}")
                         break
                 
                 if not folder_id:
-                    logger.error(f"创建目录后无法获取ID，目录内容: {[i.get('name') for i in content]}")
+                    logger.error(f"❌ 创建目录后无法获取ID，父目录={parent_path}，目标={part}，现有内容: {[i.get('name') for i in content]}")
                     raise Exception(f"创建目录成功但无法获取ID: {part}")
             
             # 如果是最后一级，返回结果

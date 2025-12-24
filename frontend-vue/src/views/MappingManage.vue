@@ -175,6 +175,49 @@ const handleClearRecords = async (row) => {
   }
 }
 
+const handleAutoObfuscate = async () => {
+  if (!formData.value.original_name) {
+    ElMessage.warning('请先输入原名称')
+    return
+  }
+  
+  try {
+    const res = await api.obfuscateName(formData.value.original_name)
+    if (res.data.success) {
+      const obfuscatedName = res.data.data.obfuscated_name
+      formData.value.quark_name = obfuscatedName
+      formData.value.baidu_name = obfuscatedName
+      formData.value.xunlei_name = obfuscatedName
+      ElMessage.success(`自动混淆成功: ${obfuscatedName}`)
+    } else {
+      ElMessage.error(res.data.message || '混淆失败')
+    }
+  } catch (error) {
+    ElMessage.error('混淆失败')
+  }
+}
+
+const handleOriginalNameBlur = async () => {
+  // 只在新增映射且原名称不为空且显示名为空时自动混淆
+  if (!formData.value.id && 
+      formData.value.original_name && 
+      !formData.value.quark_name && 
+      !formData.value.baidu_name && 
+      !formData.value.xunlei_name) {
+    try {
+      const res = await api.obfuscateName(formData.value.original_name)
+      if (res.data.success) {
+        const obfuscatedName = res.data.data.obfuscated_name
+        formData.value.quark_name = obfuscatedName
+        formData.value.baidu_name = obfuscatedName
+        formData.value.xunlei_name = obfuscatedName
+      }
+    } catch (error) {
+      console.error('自动混淆失败:', error)
+    }
+  }
+}
+
 const copyLink = (link) => {
   try {
     // 尝试使用现代API
@@ -863,7 +906,11 @@ onMounted(() => {
     >
       <el-form :model="formData" label-width="100px">
         <el-form-item label="原名称" required>
-          <el-input v-model="formData.original_name" placeholder="请输入原名称" />
+          <el-input 
+            v-model="formData.original_name" 
+            placeholder="请输入原名称（输入后自动混淆）" 
+            @blur="handleOriginalNameBlur"
+          />
         </el-form-item>
         <el-form-item label="分类">
           <el-select v-model="formData.category" placeholder="请选择分类" clearable filterable style="width: 100%">
@@ -885,14 +932,22 @@ onMounted(() => {
             </el-option-group>
           </el-select>
         </el-form-item>
-        <el-form-item label="夸克显示名">
-          <el-input v-model="formData.quark_name" placeholder="请输入夸克显示名（可选）" />
-        </el-form-item>
-        <el-form-item label="百度显示名">
-          <el-input v-model="formData.baidu_name" placeholder="请输入百度显示名（可选）" />
-        </el-form-item>
-        <el-form-item label="迅雷显示名">
-          <el-input v-model="formData.xunlei_name" placeholder="请输入迅雷显示名（可选）" />
+        <el-form-item label="显示名">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <el-button type="primary" size="small" @click="handleAutoObfuscate">自动混淆</el-button>
+            <span style="font-size: 12px; color: #909399;">点击后自动填充混淆后的名称到下方三个网盘</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <el-input v-model="formData.quark_name" placeholder="夸克显示名（可选）">
+              <template #prepend>夸克</template>
+            </el-input>
+            <el-input v-model="formData.baidu_name" placeholder="百度显示名（可选）">
+              <template #prepend>百度</template>
+            </el-input>
+            <el-input v-model="formData.xunlei_name" placeholder="迅雷显示名（可选）">
+              <template #prepend>迅雷</template>
+            </el-input>
+          </div>
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="formData.note" placeholder="备注信息（可选）" type="textarea" />

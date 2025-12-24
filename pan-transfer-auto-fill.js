@@ -8,9 +8,12 @@
 // @match        https://pan.xunlei.com/s/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
+// @grant        unsafeWindow
+// @run-at       document-start
 // @connect      10.10.10.17
 // @connect      drive-h.quark.cn
 // @connect      drive-pc.quark.cn
+// @connect      api-pan.xunlei.com
 // ==/UserScript==
 
 (function() {
@@ -18,8 +21,201 @@
     
     const API_BASE = 'http://10.10.10.17:9889/api';
     let mappingsCache = null; // 缓存映射列表
+    let xunleiCaptchaToken = ''; // 缓存迅雷captcha token
+    let xunleiClientId = ''; // 缓存迅雷client id
+    let xunleiDeviceId = ''; // 缓存迅雷device id
+    let xunleiParentId = ''; // 缓存迅雷当前文件夹ID
+    let xunleiAuthorization = ''; // 缓存迅雷authorization token
+    let xunleiFilesCache = null; // 缓存迅雷文件列表
+    let xunleiPassCodeToken = ''; // 缓存迅雷pass_code_token
     
     console.log('🎬 网盘转存路径自动填充脚本已启动');
+    
+    // 拦截迅雷API请求，获取captcha token
+    if (location.hostname.includes('xunlei')) {
+        console.log('🔧 启动迅雷API拦截器');
+        
+        // 注入页面脚本 - 劫持fetch来获取captcha token
+        const script = document.createElement('script');
+        script.textContent = `
+            (function() {
+                console.log('[注入脚本] 劫持Fetch获取参数和响应');
+                
+                const originalFetch = window.fetch;
+                window.fetch = function(...args) {
+                    const promise = originalFetch.apply(this, args);
+                    
+                    // 检查URL
+                    const url = typeof args[0] === 'string' ? args[0] : args[0]?.url;
+                    if (url && url.includes('api-pan.xunlei.com')) {
+                        console.log('[注入脚本] 拦截到迅雷API请求:', url);
+                        
+                        // 提取headers中的关键参数
+                        if (args[1]?.headers) {
+                            const headers = args[1].headers;
+                            let captchaToken = null;
+                            let clientId = null;
+                            let deviceId = null;
+                            let authorization = null;
+                            
+                            if (headers instanceof Headers) {
+                                captchaToken = headers.get('x-captcha-token');
+                                clientId = headers.get('x-client-id');
+                                deviceId = headers.get('x-device-id');
+                                authorization = headers.get('authorization');
+                            } else if (typeof headers === 'object') {
+                                captchaToken = headers['x-captcha-token'] || headers['X-Captcha-Token'];
+                                clientId = headers['x-client-id'] || headers['X-Client-Id'];
+                                deviceId = headers['x-device-id'] || headers['X-Device-Id'];
+                                authorization = headers['authorization'] || headers['Authorization'];
+                            }
+                            
+                            if (captchaToken) {
+                                window.__xunlei_captcha_token = captchaToken;
+                                console.log('[注入脚本] ✅ 捕获到captcha token:', captchaToken.substring(0, 50) + '...');
+                            }
+                            if (clientId) {
+                                window.__xunlei_client_id = clientId;
+                                console.log('[注入脚本] ✅ 捕获到client id:', clientId);
+                            }
+                            if (deviceId) {
+                                window.__xunlei_device_id = deviceId;
+                                console.log('[注入脚本] ✅ 捕获到device id:', deviceId);
+                            }
+                            if (authorization) {
+                                window.__xunlei_authorization = authorization;
+                                console.log('[注入脚本] ✅ 捕获到authorization');
+                            }
+                        }
+                        
+                        // 从URL中提取parent_id（如果在子文件夹中）
+                        if (url.includes('/share/detail') && url.includes('parent_id=')) {
+                            const match = url.match(/parent_id=([^&]+)/);
+                            if (match && match[1]) {
+                                window.__xunlei_parent_id = decodeURIComponent(match[1]);
+                                console.log('[注入脚本] ✅ 捕获到parent id:', match[1]);
+                            }
+                        }
+                        
+                        // 拦截响应，缓存文件列表和pass_code_token
+                        if (url.includes('/share/detail') || url.includes('/drive/v1/share?')) {
+                            promise.then(response => {
+                                // 克隆响应以避免消费原始响应体
+                                response.clone().json().then(data => {
+                                    if (data && data.files) {
+                                        window.__xunlei_files_cache = data.files;
+                                        console.log('[注入脚本] ✅ 缓存文件列表，数量:', data.files.length);
+                                        
+                                        if (data.pass_code_token) {
+                                            window.__xunlei_pass_code_token = data.pass_code_token;
+                                            console.log('[注入脚本] ✅ 缓存pass_code_token');
+                                        }
+                                    }
+                                }).catch(e => {
+                                    // 忽略非JSON响应
+                                });
+                            }).catch(e => {
+                                console.error('[注入脚本] 拦截响应失败:', e);
+                            });
+                        }
+                    }
+                    
+                    return promise;
+                };
+                
+                console.log('[注入脚本] Fetch劫持完成');
+            })();
+        `;
+        (document.head || document.documentElement).appendChild(script);
+        script.remove();
+        
+        // 定期从页面变量获取参数
+        setInterval(() => {
+            if (unsafeWindow.__xunlei_captcha_token && unsafeWindow.__xunlei_captcha_token !== xunleiCaptchaToken) {
+                xunleiCaptchaToken = unsafeWindow.__xunlei_captcha_token;
+                console.log('✅ [Userscript] 同步到captcha token');
+            }
+            if (unsafeWindow.__xunlei_client_id && unsafeWindow.__xunlei_client_id !== xunleiClientId) {
+                xunleiClientId = unsafeWindow.__xunlei_client_id;
+                console.log('✅ [Userscript] 同步到client id:', xunleiClientId);
+            }
+            if (unsafeWindow.__xunlei_device_id && unsafeWindow.__xunlei_device_id !== xunleiDeviceId) {
+                xunleiDeviceId = unsafeWindow.__xunlei_device_id;
+                console.log('✅ [Userscript] 同步到device id:', xunleiDeviceId);
+            }
+            if (unsafeWindow.__xunlei_parent_id && unsafeWindow.__xunlei_parent_id !== xunleiParentId) {
+                xunleiParentId = unsafeWindow.__xunlei_parent_id;
+                console.log('✅ [Userscript] 同步到parent id:', xunleiParentId);
+            }
+            if (unsafeWindow.__xunlei_authorization && unsafeWindow.__xunlei_authorization !== xunleiAuthorization) {
+                xunleiAuthorization = unsafeWindow.__xunlei_authorization;
+                console.log('✅ [Userscript] 同步到authorization');
+            }
+            if (unsafeWindow.__xunlei_files_cache) {
+                xunleiFilesCache = unsafeWindow.__xunlei_files_cache;
+                console.log('✅ [Userscript] 同步到文件列表，数量:', xunleiFilesCache.length);
+            }
+            if (unsafeWindow.__xunlei_pass_code_token && unsafeWindow.__xunlei_pass_code_token !== xunleiPassCodeToken) {
+                xunleiPassCodeToken = unsafeWindow.__xunlei_pass_code_token;
+                console.log('✅ [Userscript] 同步到pass_code_token');
+            }
+        }, 500);
+        
+        // 拦截fetch
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+            const url = args[0];
+            if (url && url.includes('api-pan.xunlei.com')) {
+                console.log('[Fetch] 拦截到请求:', url);
+                if (args[1] && args[1].headers) {
+                    const headers = args[1].headers;
+                    let token = '';
+                    
+                    if (headers instanceof Headers) {
+                        token = headers.get('x-captcha-token');
+                    } else if (typeof headers === 'object') {
+                        token = headers['x-captcha-token'] || headers['X-Captcha-Token'];
+                    }
+                    
+                    if (token) {
+                        console.log('[Fetch] 请求头中的token:', token.substring(0, 50) + '...');
+                        if (token !== xunleiCaptchaToken) {
+                            xunleiCaptchaToken = token;
+                            console.log('✅ [Fetch] 拦截到captcha token');
+                        }
+                    }
+                }
+            }
+            return originalFetch.apply(this, args);
+        };
+        
+        // 拦截XMLHttpRequest
+        const originalOpen = XMLHttpRequest.prototype.open;
+        const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
+        
+        XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+            this._url = url;
+            this._headers = {};
+            if (url && url.includes('api-pan.xunlei.com')) {
+                console.log('[XHR] 拦截到请求:', url);
+            }
+            return originalOpen.call(this, method, url, ...rest);
+        };
+        
+        XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+            if (this._url && this._url.includes('api-pan.xunlei.com')) {
+                this._headers[name] = value;
+                console.log('[XHR] 请求头:', name, '=', value ? value.substring(0, 50) + '...' : 'null');
+                if (name.toLowerCase() === 'x-captcha-token' && value) {
+                    if (value !== xunleiCaptchaToken) {
+                        xunleiCaptchaToken = value;
+                        console.log('✅ [XHR] 拦截到captcha token');
+                    }
+                }
+            }
+            return originalSetRequestHeader.call(this, name, value);
+        };
+    }
     
     // 检测当前网盘类型
     function detectPanType() {
@@ -631,22 +827,38 @@
     
     // ==================== 夸克网盘功能 ====================
     
-    // 获取夸克勾选的文件ID
-    function getQuarkSelectedFileIds() {
-        const selectedRows = document.querySelectorAll('tr.ant-table-row-selected');
-        console.log('📝 找到选中文件:', selectedRows.length, '个');
+    // 获取夸克未勾选的文件ID（用于排除）
+    function getQuarkExcludeFileIds() {
+        // 获取所有文件行
+        const allRows = document.querySelectorAll('tr.ant-table-row[data-row-key]');
+        // 获取已勾选的文件行
+        const selectedRows = document.querySelectorAll('tr.ant-table-row-selected[data-row-key]');
         
-        const fileIds = [];
+        const selectedCount = selectedRows.length;
+        const totalCount = allRows.length;
+        
+        console.log('📝 全部文件:', totalCount, '个');
+        console.log('✅ 已勾选（将保存）:', selectedCount, '个');
+        console.log('❌ 未勾选（将排除）:', (totalCount - selectedCount), '个');
+        
+        // 已勾选的文件ID
+        const selectedIds = new Set();
         selectedRows.forEach(row => {
             const fid = row.getAttribute('data-row-key');
-            if (fid) {
-                fileIds.push(fid);
-                console.log('  ✅ 找到文件ID:', fid);
+            if (fid) selectedIds.add(fid);
+        });
+        
+        // 未勾选的文件ID（排除列表）
+        const excludeIds = [];
+        allRows.forEach(row => {
+            const fid = row.getAttribute('data-row-key');
+            if (fid && !selectedIds.has(fid)) {
+                excludeIds.push(fid);
             }
         });
         
-        console.log('🎯 勾选文件ID列表:', fileIds);
-        return fileIds;
+        console.log('🎯 实际操作: 保存', selectedCount, '个文件，排除', excludeIds.length, '个文件');
+        return excludeIds;
     }
     
     // 获取夸克分享页参数
@@ -714,20 +926,30 @@
                 cookie: document.cookie,
                 onload: (response) => {
                     try {
-                        console.log('  API原始响应:', response.responseText.substring(0, 500));
+                        console.log('  API原始响应:', response.responseText.substring(0, 500) + '...');
                         const result = JSON.parse(response.responseText);
                         console.log('  解析后结果:', result);
                         
-                        if (result.status === 200 && result.data) {
-                            console.log('  share数据:', result.data.share);
+                        if (result.status === 200 && result.code === 0) {
+                            const data = result.data;
+                            console.log('  share数据:', data.share);
                             
-                            const params = {
+                            // 从URL hash获取当前文件夹ID（如果在子文件夹中）
+                            // URL格式：https://pan.quark.cn/s/xxx#/list/share/当前文件夹ID
+                            let pdir_fid = data.share.first_fid;  // 默认用根目录
+                            const hashMatch = location.hash.match(/\/list\/share\/([^/?]+)/);
+                            if (hashMatch) {
+                                pdir_fid = hashMatch[1];
+                                console.log('  📁 当前在子文件夹:', pdir_fid);
+                            } else {
+                                console.log('  📁 当前在根目录:', pdir_fid);
+                            }
+                            
+                            resolve({
                                 pwd_id: pwd_id,
                                 stoken: stoken,
-                                pdir_fid: result.data.share.first_fid
-                            };
-                            console.log('✅ 获取分享参数成功:', params);
-                            resolve(params);
+                                pdir_fid: pdir_fid
+                            });
                         } else {
                             console.error('  API返回状态异常:', result);
                             reject(new Error(`获取分享详情失败: status=${result.status}, code=${result.code}`));
@@ -907,7 +1129,8 @@
     // 夸克转存文件
     async function callQuarkTransferAPI(fileIds, targetPath) {
         console.log('🚀 调用夸克网盘API转存');
-        console.log('  文件ID:', fileIds);
+        console.log('  排除文件ID（未勾选的）:', fileIds);
+        console.log('  排除文件数量:', fileIds.length);
         console.log('  目标路径:', targetPath);
         
         // 清理路径
@@ -926,19 +1149,22 @@
         // 确保目标文件夹存在，获取最终fid
         const targetFid = await ensureQuarkFolderExists(cleanPath);
         
-        // 调用转存API
-        const saveUrl = 'https://drive-pc.quark.cn/1/clouddrive/share/sharepage/save?pr=ucpro&fr=pc';
+        // 调用转存API（注意：夸克使用排除逻辑，exclude_fids是未勾选的文件）
+        const timestamp = Date.now();
+        const saveUrl = `https://drive-pc.quark.cn/1/clouddrive/share/sharepage/save?pr=ucpro&fr=pc&uc_param_str=&__dt=${Math.floor(Math.random() * 10000)}&__t=${timestamp}`;
         const saveData = {
             pwd_id: shareParams.pwd_id,
             stoken: shareParams.stoken,
             pdir_fid: shareParams.pdir_fid,
             to_pdir_fid: targetFid,
-            pdir_save_all: false,
-            exclude_fids: fileIds,
+            pdir_save_all: true,  // 保存全部
+            exclude_fids: fileIds,  // 排除未勾选的
             scene: 'link'
         };
         
         console.log('  转存参数:', saveData);
+        console.log('  ⚠️ exclude_fids详情:', saveData.exclude_fids);
+        console.log('  ⚠️ exclude_fids数量:', saveData.exclude_fids.length);
         
         const taskId = await new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
@@ -1021,22 +1247,418 @@
         throw new Error('转存超时');
     }
     
-    // 迅雷网盘：填充路径
-    function fillXunleiPath(path) {
-        console.log('🔧 [迅雷网盘] 开始填充路径:', path);
+    // ==================== 迅雷网盘功能 ====================
+    
+    // 获取迅雷勾选的文件名列表
+    function getXunleiSelectedFileNames() {
+        const selectedCheckboxes = document.querySelectorAll('.FileCheckBox__checkbox--HYwz8.is-checked');
+        const fileNames = [];
         
-        const pathInput = document.querySelector('input[placeholder*="保存"]');
+        selectedCheckboxes.forEach(checkbox => {
+            const item = checkbox.closest('.SourceListItem__main--c9HnH');
+            if (item) {
+                const nameElement = item.querySelector('.SourceListItem__name--y6dVw a');
+                if (nameElement) {
+                    const fileName = nameElement.getAttribute('title') || nameElement.textContent.trim();
+                    if (fileName) {
+                        fileNames.push(fileName);
+                    }
+                }
+            }
+        });
         
-        if (pathInput) {
-            pathInput.value = path;
-            pathInput.dispatchEvent(new Event('input', { bubbles: true }));
-            pathInput.dispatchEvent(new Event('change', { bubbles: true }));
-            console.log('✅ 路径已填充');
-            return true;
-        } else {
-            console.error('❌ 未找到路径输入框');
-            return false;
+        console.log('📝 已勾选文件:', fileNames.length, '个');
+        fileNames.forEach(name => console.log('  ✅', name));
+        
+        return fileNames;
+    }
+    
+    // 获取迅雷分享参数和文件映射
+    async function getXunleiShareParams() {
+        console.log('📊 获取迅雷分享参数');
+        
+        // 优先使用拦截到的缓存数据
+        if (xunleiFilesCache && xunleiFilesCache.length > 0) {
+            console.log('✅ 使用拦截到的文件列表缓存，数量:', xunleiFilesCache.length);
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const share_id = location.pathname.match(/\/s\/([^\/]+)/)?.[1];
+            
+            // 构建文件映射
+            const fileMap = new Map();
+            for (const file of xunleiFilesCache) {
+                fileMap.set(file.name, file.id);
+                console.log('   📄 文件映射:', file.name, '→', file.id);
+            }
+            
+            return {
+                share_id,
+                pass_code_token: xunleiPassCodeToken,
+                fileMap,
+                current_folder_id: xunleiParentId || '',
+                deviceId: xunleiDeviceId,
+                clientId: xunleiClientId
+            };
         }
+        
+        console.log('⚠️ 未找到缓存，需要调用API获取');
+        const url = location.href;
+        const match = url.match(/\/s\/([^?]+)/);
+        if (!match) {
+            throw new Error('无法从URL获取share_id');
+        }
+        
+        const share_id = match[1];
+        const urlParams = new URLSearchParams(location.search);
+        const pass_code = urlParams.get('pwd');
+        const path = urlParams.get('path');  // 可能在子文件夹
+        
+        console.log('� 分享ID:', share_id);
+        console.log('🔑 密码:', pass_code);
+        console.log('📁 当前路径:', path || '根目录');
+        
+        // 从cookie获取必要参数
+        const cookieObj = {};
+        document.cookie.split(';').forEach(c => {
+            const [key, value] = c.trim().split('=');
+            cookieObj[key] = value;
+        });
+        
+        // 使用拦截器获取的参数（与 captcha token 一起从请求中拦截）
+        const deviceId = xunleiDeviceId;
+        const clientId = xunleiClientId;
+        
+        if (!deviceId || !clientId) {
+            throw new Error('未拦截到设备信息，请先刷新页面或浏览文件列表');
+        }
+        
+        console.log('📱 Device ID:', deviceId);
+        console.log('🆔 Client ID:', clientId);
+        
+        // 根据URL判断是在根目录还是子文件夹
+        const decodedPath = path ? decodeURIComponent(path) : '';
+        console.log('📂 当前路径:', decodedPath || '根目录');
+        
+        let parent_id = '';
+        let pass_code_token = '';
+        
+        // 如果在子文件夹中，需要先获取文件夹ID
+        if (decodedPath) {
+            console.log('🔍 在子文件夹中，需要先获取文件夹ID...');
+            
+            // 1. 先调用根目录API获取文件夹列表
+            const rootApiUrl = `https://api-pan.xunlei.com/drive/v1/share?share_id=${share_id}&pass_code=${pass_code}&limit=100&pass_code_token=&page_token=&thumbnail_size=SIZE_SMALL`;
+            
+            const rootResult = await new Promise((resolve, reject) => {
+                GM_xmlhttpRequest({
+                    method: 'GET',
+                    url: rootApiUrl,
+                    headers: {
+                        'accept': '*/*',
+                        'content-type': 'application/json',
+                        'x-captcha-token': xunleiCaptchaToken,
+                        'x-client-id': clientId,
+                        'x-device-id': deviceId
+                    },
+                    cookie: document.cookie,
+                    onload: (response) => {
+                        try {
+                            const result = JSON.parse(response.responseText);
+                            resolve(result);
+                        } catch (e) {
+                            reject(e);
+                        }
+                    },
+                    onerror: () => reject(new Error('获取根目录失败'))
+                });
+            });
+            
+            console.log('   根目录API响应:', rootResult);
+            pass_code_token = rootResult.pass_code_token;
+            
+            // 2. 从文件夹列表中找到当前path对应的文件夹ID
+            const folderName = decodedPath.replace(/^\//, ''); // 去掉开头的/
+            const folder = rootResult.files?.find(f => f.name === folderName && f.kind === 'drive#folder');
+            
+            if (!folder) {
+                throw new Error(`未找到文件夹: ${folderName}`);
+            }
+            
+            parent_id = folder.id;
+            console.log('   ✅ 找到文件夹ID:', parent_id);
+        }
+        
+        // 调用分享API获取文件列表
+        let apiUrl;
+        if (parent_id) {
+            // 在子文件夹中，使用detail API
+            apiUrl = `https://api-pan.xunlei.com/drive/v1/share/detail?share_id=${share_id}&parent_id=${parent_id}&pass_code_token=${encodeURIComponent(pass_code_token)}&limit=100&page_token=&thumbnail_size=SIZE_SMALL`;
+        } else {
+            // 根目录，使用share API
+            apiUrl = `https://api-pan.xunlei.com/drive/v1/share?share_id=${share_id}&pass_code=${pass_code}&limit=100&pass_code_token=&page_token=&thumbnail_size=SIZE_SMALL`;
+        }
+        
+        // 使用拦截到的captcha token
+        console.log('🔐 准备调用分享API');
+        console.log('   captcha token状态:', xunleiCaptchaToken ? '已获取' : '未获取');
+        console.log('   captcha token完整值:', xunleiCaptchaToken);
+        console.log('   Client ID:', clientId);
+        console.log('   Device ID:', deviceId);
+        console.log('   API URL:', apiUrl);
+        
+        const headers = {
+            'accept': '*/*',
+            'content-type': 'application/json',
+            'x-client-id': clientId,
+            'x-device-id': deviceId
+        };
+        
+        // 添加captcha token
+        if (xunleiCaptchaToken) {
+            headers['x-captcha-token'] = xunleiCaptchaToken;
+            console.log('✅ 已添加captcha token到分享API请求');
+        } else {
+            console.warn('⚠️ 缺少captcha token');
+        }
+        
+        console.log('   完整请求头:', headers);
+        
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: apiUrl,
+                headers: headers,
+                cookie: document.cookie,
+                onload: (response) => {
+                    try {
+                        console.log('📥 分享API响应状态:', response.status);
+                        console.log('   原始响应:', response.responseText.substring(0, 500));
+                        const result = JSON.parse(response.responseText);
+                        console.log('   解析后结果:', result);
+                        
+                        if (result.files) {
+                            const pass_code_token = result.pass_code_token;
+                            const files = result.files;
+                            
+                            console.log('   📂 文件列表:', files);
+                            console.log('   文件数量:', files.length);
+                            
+                            // 构建文件名→ID映射
+                            const fileMap = new Map();
+                            files.forEach(file => {
+                                fileMap.set(file.name, file.id);
+                                console.log('   📄 文件映射:', file.name, '→', file.id);
+                            });
+                            
+                            // 获取当前文件夹ID（如果在子文件夹中）
+                            let current_folder_id = parent_id;
+                            if (result.parent && result.parent.id) {
+                                current_folder_id = result.parent.id;
+                            }
+                            
+                            resolve({
+                                share_id,
+                                pass_code_token,
+                                fileMap,
+                                current_folder_id,
+                                deviceId,
+                                clientId
+                            });
+                        } else {
+                            reject(new Error('API返回数据格式异常'));
+                        }
+                    } catch (e) {
+                        console.error('  解析响应失败:', e);
+                        reject(e);
+                    }
+                },
+                onerror: (error) => {
+                    reject(new Error('网络请求失败'));
+                }
+            });
+        });
+    }
+    
+    // 获取迅雷用户网盘根目录ID（或指定文件夹ID）
+    async function getXunleiTargetFolderId(path) {
+        // 调用我们自己的后端API（后端再调用OpenList服务）
+        const BACKEND_BASE = API_BASE.replace('/api', '');  // http://10.10.10.17:9889
+        const OPENLIST_TOKEN = 'openlist-1e33e197-915f-4894-adfb-514387a5054dLjiXDkXmIe21Yub5F9g9b6REyJLNVuB2DxV9vc4fnDcKiZwLMbivLsN7y8K2oum4';
+        
+        console.log('📂 获取迅雷目标文件夹ID:', path);
+        
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'POST',
+                url: `${BACKEND_BASE}/api/openlist/get-folder-id`,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${OPENLIST_TOKEN}`
+                },
+                data: JSON.stringify({
+                    path: path,
+                    pan_type: 'xunlei'
+                }),
+                onload: (response) => {
+                    console.log('📥 后端OpenList响应状态:', response.status);
+                    console.log('   响应内容:', response.responseText.substring(0, 500));
+                    
+                    if (response.status !== 200) {
+                        console.error('❌ 后端返回非200状态:', response.status);
+                        reject(new Error(`后端OpenList API错误: HTTP ${response.status}`));
+                        return;
+                    }
+                    
+                    try {
+                        const result = JSON.parse(response.responseText);
+                        console.log('   解析后结果:', result);
+                        
+                        if (result.success) {
+                            console.log('✅ 获取文件夹ID成功:', result.fid);
+                            resolve(result.fid);
+                        } else {
+                            reject(new Error(`获取文件夹ID失败: ${JSON.stringify(result)}`));
+                        }
+                    } catch (e) {
+                        console.error('❌ 解析JSON失败，可能后端返回了HTML错误页面');
+                        console.error('   错误:', e.message);
+                        console.error('   响应内容（前200字符）:', response.responseText.substring(0, 200));
+                        reject(new Error('后端OpenList服务异常，请检查服务是否正常运行'));
+                    }
+                },
+                onerror: (error) => {
+                    reject(new Error('请求后端失败'));
+                }
+            });
+        });
+    }
+    
+    // 调用迅雷转存API
+    async function callXunleiTransferAPI(fileNames, targetPath) {
+        console.log('🚀 调用迅雷网盘API转存');
+        console.log('  目标路径:', targetPath);
+        console.log('  勾选文件:', fileNames);
+        
+        // 1. 获取分享参数和文件映射
+        const shareParams = await getXunleiShareParams();
+        console.log('✅ 分享参数获取成功');
+        console.log('   完整分享参数:', shareParams);
+        console.log('   📝 pass_code_token:', shareParams.pass_code_token);
+        
+        // 2. 将文件名转换为ID
+        const fileIds = [];
+        for (const fileName of fileNames) {
+            const fileId = shareParams.fileMap.get(fileName);
+            if (fileId) {
+                fileIds.push(fileId);
+                console.log('  📄', fileName, '→', fileId);
+            } else {
+                console.warn('  ⚠️ 未找到文件ID:', fileName);
+            }
+        };
+        
+        if (fileIds.length === 0) {
+            throw new Error('没有找到有效的文件ID');
+        }
+        
+        console.log('📋 实际转存文件ID:', fileIds);
+        
+        // 3. 获取目标文件夹ID
+        const targetFid = await getXunleiTargetFolderId(targetPath);
+        console.log('✅ 目标文件夹ID:', targetFid);
+        
+        // 4. 调用转存API
+        const restoreUrl = 'https://api-pan.xunlei.com/drive/v1/share/restore';
+        
+        // 从URL提取pass_code
+        const urlParams = new URLSearchParams(window.location.search);
+        const pass_code = urlParams.get('pwd') || '';
+        
+        const restoreData = {
+            parent_id: targetFid,
+            share_id: shareParams.share_id,
+            pass_code: pass_code,  // 添加密码
+            pass_code_token: shareParams.pass_code_token || '',
+            ancestor_ids: [],
+            file_ids: fileIds,
+            specify_parent_id: true
+        };
+        
+        console.log('📤 准备发送转存请求');
+        console.log('   转存URL:', restoreUrl);
+        console.log('   转存数据:', JSON.stringify(restoreData, null, 2));
+        
+        // 使用拦截器获取的authorization token、captcha token、client id、device id
+        const authorization = xunleiAuthorization;
+        const captchaToken = xunleiCaptchaToken;
+        const clientId = xunleiClientId;
+        const deviceId = xunleiDeviceId;
+        
+        if (!authorization || !captchaToken || !clientId || !deviceId) {
+            throw new Error('未拦截到必要参数，请先刷新页面或浏览文件列表');
+        }
+        
+        console.log('🔐 准备调用转存API');
+        console.log('   captcha token状态:', captchaToken ? '已获取' : '未获取');
+        console.log('   captcha token完整值:', captchaToken);
+        console.log('   authorization完整值:', authorization);
+        console.log('   Client ID:', shareParams.clientId);
+        console.log('   Device ID:', shareParams.deviceId);
+        
+        if (!captchaToken) {
+            console.warn('⚠️ 未拦截到captcha token，请先刷新页面或浏览文件列表');
+        }
+        
+        const headers = {
+            'accept': '*/*',
+            'content-type': 'application/json',
+            'authorization': authorization,
+            'x-client-id': shareParams.clientId,
+            'x-device-id': shareParams.deviceId
+        };
+        
+        // 如果有captcha token，添加到headers
+        if (captchaToken) {
+            headers['x-captcha-token'] = captchaToken;
+            console.log('✅ 已添加captcha token到转存请求头');
+        } else {
+            console.warn('⚠️ 缺少captcha token，请求可能失败');
+        }
+        
+        console.log('   完整请求头:', JSON.stringify(headers, null, 2));
+        
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'POST',
+                url: restoreUrl,
+                headers: headers,
+                data: JSON.stringify(restoreData),
+                cookie: document.cookie,
+                onload: (response) => {
+                    try {
+                        console.log('📥 转存API响应状态:', response.status);
+                        console.log('   完整响应内容:', response.responseText);
+                        const result = JSON.parse(response.responseText);
+                        
+                        if (result.share_status === 'OK' && result.restore_status) {
+                            console.log('✅ 转存成功！');
+                            console.log('  状态:', result.restore_status);
+                            console.log('  任务ID:', result.restore_task_id);
+                            resolve(result);
+                        } else {
+                            console.error('  转存失败:', result);
+                            reject(new Error(`转存失败: ${JSON.stringify(result)}`));
+                        }
+                    } catch (e) {
+                        console.error('  解析响应失败:', e);
+                        reject(e);
+                    }
+                },
+                onerror: (error) => {
+                    reject(new Error('转存请求失败'));
+                }
+            });
+        });
     }
     
     // 劫持"保存到网盘"按钮
@@ -1058,6 +1680,9 @@
             } else if (panType === 'quark') {
                 // 夸克网盘的"保存到网盘"按钮
                 saveButton = document.querySelector('button.share-save');
+            } else if (panType === 'xunlei') {
+                // 迅雷网盘的"转存到云盘"按钮
+                saveButton = document.querySelector('button.saveToCloud');
             }
             
             if (saveButton && !saveButton.dataset.hijacked) {
@@ -1077,17 +1702,23 @@
                     console.log('🚫 拦截保存按钮点击');
                     
                     try {
-                        // 1. 获取勾选的文件ID
-                        let fileIds;
+                        // 1. 获取文件ID/名称（百度：ID；夸克：排除ID；迅雷：文件名）
+                        let fileData;
                         if (panType === 'baidu') {
-                            fileIds = getSelectedFileIds();
+                            fileData = getSelectedFileIds();
+                            if (!fileData || fileData.length === 0) {
+                                showToast('⚠️ 请先勾选要转存的文件', 'warning');
+                                return;
+                            }
                         } else if (panType === 'quark') {
-                            fileIds = getQuarkSelectedFileIds();
-                        }
-                        
-                        if (!fileIds || fileIds.length === 0) {
-                            showToast('⚠️ 请先勾选要转存的文件', 'warning');
-                            return;
+                            fileData = getQuarkExcludeFileIds();
+                            // 夸克不需要检查fileData，可以全选（exclude为空）
+                        } else if (panType === 'xunlei') {
+                            fileData = getXunleiSelectedFileNames();
+                            if (!fileData || fileData.length === 0) {
+                                showToast('⚠️ 请先勾选要转存的文件', 'warning');
+                                return;
+                            }
                         }
                         
                         // 2. 弹出映射选择
@@ -1099,12 +1730,15 @@
                         
                         let result;
                         if (panType === 'baidu') {
-                            result = await callBaiduTransferAPI(fileIds, path);
+                            result = await callBaiduTransferAPI(fileData, path);
+                            showToast(`✅ 转存成功！已保存 ${fileData.length} 个文件`, 'success');
                         } else if (panType === 'quark') {
-                            result = await callQuarkTransferAPI(fileIds, path);
+                            result = await callQuarkTransferAPI(fileData, path);
+                            showToast(`✅ 转存成功！`, 'success');
+                        } else if (panType === 'xunlei') {
+                            result = await callXunleiTransferAPI(fileData, path);
+                            showToast(`✅ 转存成功！已保存 ${fileData.length} 个文件`, 'success');
                         }
-                        
-                        showToast(`✅ 转存成功！已保存 ${fileIds.length} 个文件`, 'success');
                         
                     } catch (error) {
                         if (error.message !== '用户取消') {

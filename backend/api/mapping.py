@@ -2,11 +2,13 @@
 自定义名称映射管理API
 """
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, and_, distinct
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
+from io import BytesIO
 import logging
 import shutil
 import subprocess
@@ -491,6 +493,112 @@ class ResyncRequest(BaseModel):
     """重转请求"""
     original_name: str
     target_type: str  # 'quark', 'baidu' 或 'xunlei'
+
+
+def get_pinyin_initials(text: str) -> str:
+    """
+    提取中文文本第一个字的拼音首字母
+    
+    Args:
+        text: 中文文本
+        
+    Returns:
+        大写拼音首字母（单个字母）
+    """
+    import re
+    from backend.utils.pinyin_map import PINYIN_MAP
+    
+    # 只提取中文字符
+    chinese_chars = re.findall(r'[\u4e00-\u9fff]', text)
+    if not chinese_chars:
+        return ""
+    
+    # 只取第一个字
+    first_char = chinese_chars[0]
+    pinyin = PINYIN_MAP.get(first_char, '')
+    if pinyin:
+        return pinyin[0].upper()
+    
+    return ""
+
+
+@router.post("/mappings/obfuscate")
+async def obfuscate_name(
+    original_name: str,
+    db: Session = Depends(get_db)
+):
+    """
+    混淆名称接口 - 返回混淆后的名称
+    
+    已存在的映射：返回数据库中的名称（保持原样）
+    新建的映射：在混淆名称前加首字母缩写
+    
+    Args:
+        original_name: 原始名称
+        
+    Returns:
+        混淆后的名称
+    """
+    try:
+        from backend.main import db_engine
+        import re
+        
+        # 1. 检查数据库是否已存在该映射
+        existing = db.query(CustomNameMapping).filter(
+            CustomNameMapping.original_name == original_name
+        ).first()
+        
+        if existing:
+            # 已存在：返回数据库中的名称（优先返回夸克名，其次百度名）
+            obfuscated_name = existing.quark_name or existing.baidu_name or existing.xunlei_name
+            if obfuscated_name:
+                logger.info(f"✅ 使用已存在映射: {original_name} -> {obfuscated_name}")
+                return {
+                    "success": True,
+                    "data": {
+                        "original_name": original_name,
+                        "obfuscated_name": obfuscated_name,
+                        "is_existing": True
+                    }
+                }
+        
+        # 2. 新建的映射：混淆 + 加首字母
+        obfuscator = FolderObfuscator(enabled=True, db_engine=db_engine)
+        
+        # 去掉年份
+        base_name = re.sub(r'\s*\((\d{4})\)\s*$', '', original_name).strip()
+        
+        # 提取拼音首字母
+        initials = get_pinyin_initials(base_name)
+        
+        # 执行混淆（不含年份）
+        obfuscated_base = obfuscator.obfuscate_name(base_name)
+        
+        # 拼接：首字母 + 混淆名
+        if initials:
+            obfuscated_name = f"{initials}{obfuscated_base}"
+        else:
+            obfuscated_name = obfuscated_base
+        
+        logger.info(f"✅ 混淆名称(新建): {original_name} -> {initials} + {obfuscated_base} = {obfuscated_name}")
+        
+        return {
+            "success": True,
+            "data": {
+                "original_name": original_name,
+                "obfuscated_name": obfuscated_name,
+                "is_existing": False,
+                "initials": initials
+            }
+        }
+    except Exception as e:
+        logger.error(f"混淆名称失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "message": f"混淆失败: {str(e)}"
+        }
 
 
 @router.post("/mappings/resync")

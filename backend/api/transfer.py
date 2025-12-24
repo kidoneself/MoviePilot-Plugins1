@@ -234,14 +234,27 @@ async def transfer_from_mapping(
         if not share_url:
             raise HTTPException(status_code=400, detail=f"未配置{pan_type}分享链接")
         
-        # 3. 构建目标路径
+        # 3. 构建目标路径（使用各网盘对应的映射名）
         base_path = "/A-闲鱼影视（自动更新）"
-        if mapping.category:
-            # 有分类：/A-闲鱼影视（自动更新）/剧集/国产剧集/剧名
-            target_path = f"{base_path}/{mapping.category}/{mapping.original_name}"
+        
+        # 获取对应网盘的显示名，如果没有则用原名
+        if pan_type == 'quark':
+            folder_name = mapping.quark_name or mapping.original_name
+        elif pan_type == 'baidu':
+            folder_name = mapping.baidu_name or mapping.original_name
+        elif pan_type == 'xunlei':
+            folder_name = mapping.xunlei_name or mapping.original_name
         else:
-            # 无分类：/A-闲鱼影视（自动更新）/未分类/剧名
-            target_path = f"{base_path}/未分类/{mapping.original_name}"
+            folder_name = mapping.original_name
+        
+        if mapping.category:
+            # 有分类：/A-闲鱼影视（自动更新）/剧集/国产剧集/映射名
+            target_path = f"{base_path}/{mapping.category}/{folder_name}"
+        else:
+            # 无分类：/A-闲鱼影视（自动更新）/未分类/映射名
+            target_path = f"{base_path}/未分类/{folder_name}"
+        
+        logger.info(f"转存到{pan_type}: 原名={mapping.original_name}, 映射名={folder_name}, 路径={target_path}")
         
         # 4. 检查目录是否存在（OpenList）
         openlist_url = "http://10.10.10.17:5255"

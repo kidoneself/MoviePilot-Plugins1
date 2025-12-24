@@ -49,6 +49,10 @@ export default {
     return api.post('/mappings/resync', data)
   },
   
+  obfuscateName(originalName) {
+    return api.post('/mappings/obfuscate', null, { params: { original_name: originalName } })
+  },
+  
   exportMappings(params) {
     return api.get('/export/mappings', { params, responseType: 'blob' })
   },
