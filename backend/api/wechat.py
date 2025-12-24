@@ -4,9 +4,8 @@
 import logging
 from fastapi import APIRouter, Request, Response
 from wechatpy.enterprise.crypto import WeChatCrypto
-from wechatpy.enterprise.exceptions import InvalidSignatureException, InvalidCorpIdException
 from wechatpy.enterprise import parse_message
-from wechatpy.exceptions import WeChatException
+from wechatpy.exceptions import InvalidSignatureException, InvalidCorpIdException
 from backend.services.wechat_service import WeChatService
 from backend.handlers.wechat_handler import WeChatCommandHandler
 
@@ -144,9 +143,6 @@ async def wechat_callback(request: Request):
     except InvalidCorpIdException:
         logger.error("❌ CorpId验证失败")
         return Response(content="Invalid CorpId", status_code=403)
-    except WeChatException as e:
-        logger.error(f"❌ 企业微信异常: {e}")
-        return Response(content=str(e), status_code=500)
     except Exception as e:
         logger.error(f"❌ 处理消息异常: {e}")
         import traceback
