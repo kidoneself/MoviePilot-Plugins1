@@ -24,7 +24,7 @@ _global_headless: bool = True
 _browser_lock = threading.Lock()
 
 
-def get_global_browser(headless: bool = True, cookies: list = None) -> tuple[Browser, BrowserContext]:
+def get_global_browser(headless: bool = True) -> tuple[Browser, BrowserContext]:
     """获取全局浏览器实例（单例模式，保持会话）"""
     global _global_playwright, _global_browser, _global_context, _global_headless
     
@@ -52,24 +52,10 @@ def get_global_browser(headless: bool = True, cookies: list = None) -> tuple[Bro
             ]
         )
         
-        # 创建上下文，支持持久化存储
-        storage_state_path = '/tmp/xianyu_storage_state.json'
-        context_options = {
-            'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'viewport': {'width': 1920, 'height': 1080}
-        }
-        
-        # 如果存在持久化的登录状态，加载它
-        if Path(storage_state_path).exists():
-            logger.info(f"📦 加载持久化登录状态: {storage_state_path}")
-            context_options['storage_state'] = storage_state_path
-        
-        _global_context = _global_browser.new_context(**context_options)
-        
-        # 如果提供了 cookies，添加它们
-        if cookies:
-            logger.info(f"🍪 添加 {len(cookies)} 个 Cookie")
-            _global_context.add_cookies(cookies)
+        _global_context = _global_browser.new_context(
+            user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            viewport={'width': 1920, 'height': 1080}
+        )
         
         _global_headless = headless
         logger.info(f"✅ 全局Playwright浏览器启动成功（{mode}模式）")
@@ -139,80 +125,35 @@ class KamiAutomation:
     def _get_page(self) -> Page:
         """获取浏览器页面实例（使用全局单例）"""
         if self.page is None:
-            self.browser, self.context = get_global_browser(self.headless, cookies=None)
+            self.browser, self.context = get_global_browser(self.headless)
             self.page = self.context.new_page()
         return self.page
     
-    def _save_login_state(self):
-        """保存登录状态（持久化Cookie和localStorage）"""
-        try:
-            storage_state_path = '/tmp/xianyu_storage_state.json'
-            self.context.storage_state(path=storage_state_path)
-            logger.info(f"✅ 登录状态已保存: {storage_state_path}")
-        except Exception as e:
-            logger.error(f"保存登录状态失败: {e}")
-    
     def _login(self) -> bool:
-        """自动登录"""
+        """自动登录（和 Selenium 版本逻辑一致）"""
         try:
             page = self._get_page()
-            self._send_step("准备登录流程...", "loading")
+            self._send_step("检测是否需要登录...", "loading")
+            time.sleep(3)
             
-            # 访问淘宝登录页（闲鱼使用淘宝账号）
-            self._send_step("跳转到登录页...", "loading")
-            try:
-                page.goto('https://login.taobao.com/member/login.jhtml?redirectURL=https://www.xianyu.com', timeout=60000)
-                time.sleep(3)
-            except Exception as e:
-                logger.error(f"访问登录页失败: {e}")
-                self._send_step(f"访问登录页超时，请检查网络", "error")
-                return False
-            
-            # 检查是否已登录（重定向到了目标页）
-            current_url = page.url
-            logger.info(f"登录页当前URL: {current_url}")
-            if 'xianyu.com' in current_url and 'login' not in current_url:
-                self._send_step("检测到已登录", "success")
-                self._save_login_state()
+            # 检查是否在登录页面
+            if 'login' not in page.url:
+                self._send_step("已登录", "success")
                 return True
             
             self._send_step("获取登录二维码...", "loading")
             
-            # 等待二维码出现（多种选择器尝试）
-            qr_selectors = [
-                "//div[contains(@class,'qrcode')]//img",
-                "//div[contains(@class,'scan')]//img",
-                "img[alt*='二维码']",
-                ".qrcode-img"
-            ]
-            
-            qr_img = None
-            for selector in qr_selectors:
-                try:
-                    qr_img = page.wait_for_selector(selector, timeout=5000)
-                    if qr_img:
-                        logger.info(f"找到二维码元素: {selector}")
-                        break
-                except:
-                    continue
-            
-            if not qr_img:
-                logger.error("未找到二维码元素")
-                self._send_step("未找到二维码，请手动登录", "error")
-                # 给用户30秒手动登录
-                time.sleep(30)
-                if 'xianyu.com' in page.url and 'login' not in page.url:
-                    self._send_step("检测到登录成功", "success")
-                    self._save_login_state()
-                    return True
-                return False
-            
+            # 获取二维码
             try:
+                qr_img = page.wait_for_selector("//div[contains(@class,'bind-code-scan')]//img", timeout=10000)
                 qr_base64 = qr_img.get_attribute('src')
+                
                 if self.step_callback:
                     self.step_callback(f"QRCODE:{qr_base64}", "qrcode")
+                
                 logger.info("二维码已获取，等待扫码...")
                 self._send_step("请扫码登录（120秒）", "loading")
+                
             except Exception as e:
                 logger.error(f"获取二维码失败: {e}")
                 self._send_step(f"获取二维码失败: {e}", "error")
@@ -221,31 +162,25 @@ class KamiAutomation:
             # 等待登录成功
             for i in range(120):
                 time.sleep(1)
-                current_url = page.url
-                # 检查是否跳转到了闲鱼
-                if 'xianyu.com' in current_url and 'login' not in current_url:
+                if 'login' not in page.url:
                     self._send_step("✓ 登录成功！", "success")
                     logger.info("登录成功")
-                    time.sleep(2)  # 等待页面稳定
-                    # 保存登录状态
-                    self._save_login_state()
                     return True
                 
                 if i > 0 and i % 15 == 0:
                     self._send_step(f"等待扫码中... 已等待{i}秒", "loading")
-                    logger.info(f"等待扫码中... 当前URL: {current_url}")
             
             self._send_step("登录超时（120秒）", "error")
             return False
             
         except Exception as e:
             self._send_step(f"登录过程出错: {e}", "error")
-            logger.error(f"登录过程出错: {e}", exc_info=True)
+            logger.error(f"登录过程出错: {e}")
             return False
     
     def create_kami_kind(self, kind_name: str, category_id: Optional[int] = None) -> bool:
         """
-        创建卡密类型
+        创建卡密类型（和 Selenium 版本逻辑完全一致）
         
         Args:
             kind_name: 卡种名称
@@ -258,88 +193,81 @@ class KamiAutomation:
             page = self._get_page()
             self._send_step(f"开始创建卡种: {kind_name}", "loading")
             
-            # 1. 先访问闲鱼首页，检查登录状态
-            self._send_step("检查登录状态...", "loading")
-            try:
-                page.goto('https://www.xianyu.com', timeout=60000)
-                time.sleep(3)
-            except Exception as e:
-                logger.error(f"访问闲鱼首页失败: {e}")
-                self._send_step(f"访问闲鱼首页失败: {e}", "error")
-                return False
+            # 访问卡密类型添加页面（和 Selenium 版本一样）
+            add_url = "https://www.goofish.pro/kam/kind/add"
+            page.goto(add_url, timeout=30000)
+            self._send_step("访问卡密类型添加页面", "loading")
             
-            # 2. 检查是否需要登录
-            current_url = page.url
-            logger.info(f"当前URL: {current_url}")
+            time.sleep(2)
             
-            if 'login' in current_url or not page.locator("text=我的").count():
-                self._send_step("需要登录", "loading")
+            # 检查是否需要登录
+            if 'login' in page.url:
+                self._send_step("需要登录，等待扫码...", "loading")
                 if not self._login():
+                    self._send_step("登录失败", "error")
                     return False
-            else:
-                self._send_step("已登录", "success")
-                # 更新登录状态
-                self._save_login_state()
+                # 重新访问添加页面
+                page.goto(add_url, timeout=30000)
             
-            # 3. 访问闲鱼发布页
-            self._send_step("访问闲鱼发布页...", "loading")
-            try:
-                page.goto('https://publish.xianyu.com', timeout=60000)
-                time.sleep(3)
-            except Exception as e:
-                logger.error(f"访问发布页失败: {e}")
-                self._send_step(f"访问发布页失败: {e}", "error")
-                return False
+            time.sleep(2)
             
-            # 3. 选择卡密类型商品
-            self._send_step("选择卡密类型商品...", "loading")
+            # 1. 选择卡种分类
             try:
-                # 查找并点击卡密选项
-                kami_btn = page.wait_for_selector("text=卡密", timeout=5000)
-                kami_btn.click()
-                time.sleep(1)
-            except Exception as e:
-                logger.error(f"选择卡密类型失败: {e}")
-                self._send_step(f"选择卡密类型失败", "error")
-                return False
-            
-            # 4. 填写卡种信息
-            self._send_step(f"填写卡种名称: {kind_name}", "loading")
-            try:
-                # 查找卡种名称输入框
-                name_input = page.wait_for_selector("input[placeholder*='卡种名称']", timeout=5000)
-                name_input.fill(kind_name)
+                self._send_step("选择卡种分类", "loading")
+                category_select = page.locator("//label[contains(text(),'卡种分类')]/..//input[@placeholder='请选择']").first
+                category_select.click()
+                time.sleep(0.5)
+                
+                category_option = page.locator("//div[contains(@class,'el-select-dropdown')]//li[contains(.,'影视')]").first
+                category_option.click()
+                self._send_step("已选择卡种分类: 影视", "success")
                 time.sleep(0.5)
             except Exception as e:
-                logger.error(f"填写卡种名称失败: {e}")
-                self._send_step(f"填写卡种名称失败", "error")
-                return False
+                logger.warning(f"卡种分类选择失败: {e}")
             
-            # 5. 选择分类（如果提供）
-            if category_id:
-                self._send_step(f"选择分类...", "loading")
-                try:
-                    category_btn = page.wait_for_selector(f"//div[@data-category-id='{category_id}']", timeout=5000)
-                    category_btn.click()
-                    time.sleep(0.5)
-                except Exception as e:
-                    logger.warning(f"选择分类失败: {e}，继续...")
+            # 2. 填写卡种名称
+            self._send_step(f"填写卡种名称: {kind_name}", "loading")
+            name_input = page.locator("//label[contains(text(),'卡种名称')]/..//input").first
+            name_input.fill("")  # 先清空
+            name_input.fill(kind_name)
             
-            # 6. 提交创建
-            self._send_step("提交创建...", "loading")
+            # 3. 填写卡号前缀
             try:
-                submit_btn = page.wait_for_selector("button:has-text('确定')", timeout=5000)
-                submit_btn.click()
-                time.sleep(2)
-                
-                # 检查是否创建成功
-                # 这里需要根据实际页面反馈判断
-                self._send_step(f"✓ 卡种创建成功: {kind_name}", "success")
+                card_prefix = page.locator("//label[contains(text(),'卡号前缀')]/..//input").first
+                card_prefix.fill("  ")
+            except:
+                pass
+            
+            # 4. 填写密码前缀
+            try:
+                pwd_prefix = page.locator("//label[contains(text(),'密码前缀')]/..//input").first
+                pwd_prefix.fill("  ")
+            except:
+                pass
+            
+            # 5. 填写库存预警
+            try:
+                stock_input = page.locator("//label[contains(text(),'库存预警')]/..//input").first
+                stock_input.fill("1")
+            except:
+                pass
+            
+            time.sleep(1)
+            
+            # 6. 点击创建按钮
+            create_button = page.locator("//button[contains(.,'创建')]").first
+            create_button.click()
+            self._send_step("提交创建请求", "loading")
+            
+            time.sleep(2)
+            
+            # 检查是否成功
+            current_url = page.url
+            if '/list' in current_url or '/add' not in current_url:
+                self._send_step(f"卡种创建成功: {kind_name}", "success")
                 return True
-                
-            except Exception as e:
-                logger.error(f"提交创建失败: {e}")
-                self._send_step(f"提交创建失败", "error")
+            else:
+                self._send_step("卡种创建失败", "error")
                 return False
             
         except Exception as e:
