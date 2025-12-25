@@ -133,50 +133,101 @@ def _create_driver(headless: bool) -> webdriver.Chrome:
     if headless:
         chrome_options.add_argument('--headless=new')
     
-    # Docker 容器必需的选项
+    # Docker 容器必需的选项（增强版）
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--disable-gpu')  # Docker 中必须禁用 GPU
+    chrome_options.add_argument('--disable-gpu')
     chrome_options.add_argument('--disable-software-rasterizer')
     chrome_options.add_argument('--disable-setuid-sandbox')
-    chrome_options.add_argument('--remote-debugging-port=0')  # 使用随机端口，避免端口冲突
+    
+    # 调试和稳定性选项
+    chrome_options.add_argument('--remote-debugging-port=9222')
+    chrome_options.add_argument('--remote-debugging-address=0.0.0.0')
+    chrome_options.add_argument('--disable-web-security')
+    
+    # 性能和兼容性选项
+    chrome_options.add_argument('--single-process')  # 单进程模式，避免共享内存问题
+    chrome_options.add_argument('--disable-background-networking')
+    chrome_options.add_argument('--disable-background-timer-throttling')
+    chrome_options.add_argument('--disable-backgrounding-occluded-windows')
+    chrome_options.add_argument('--disable-breakpad')
+    chrome_options.add_argument('--disable-component-extensions-with-background-pages')
+    chrome_options.add_argument('--disable-features=TranslateUI,BlinkGenPropertyTrees')
+    chrome_options.add_argument('--disable-ipc-flooding-protection')
+    chrome_options.add_argument('--disable-renderer-backgrounding')
+    chrome_options.add_argument('--enable-features=NetworkService,NetworkServiceInProcess')
+    chrome_options.add_argument('--force-color-profile=srgb')
+    chrome_options.add_argument('--hide-scrollbars')
+    chrome_options.add_argument('--metrics-recording-only')
+    chrome_options.add_argument('--mute-audio')
+    
+    # 窗口和显示
     chrome_options.add_argument('--window-size=1920,1080')
+    chrome_options.add_argument('--start-maximized')
     chrome_options.add_argument('--disable-extensions')
-    chrome_options.add_argument('--disable-features=VizDisplayCompositor')
+    
+    # 用户数据目录
+    chrome_options.add_argument('--user-data-dir=/tmp/chrome-user-data')
+    chrome_options.add_argument('--data-path=/tmp/chrome-data')
+    chrome_options.add_argument('--disk-cache-dir=/tmp/chrome-cache')
+    chrome_options.add_argument('--homedir=/tmp')
     
     # 反自动化检测
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-    chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
+    chrome_options.add_experimental_option('excludeSwitches', ['enable-automation', 'enable-logging'])
     chrome_options.add_experimental_option('useAutomationExtension', False)
+    
+    # Chrome preferences
+    prefs = {
+        'profile.default_content_setting_values': {
+            'notifications': 2,  # 禁用通知
+            'popups': 2,  # 禁用弹窗
+        },
+        'profile.managed_default_content_settings': {
+            'images': 2  # 禁用图片加载（可选，提高速度）
+        }
+    }
+    chrome_options.add_experimental_option('prefs', prefs)
     
     # 禁用日志
     chrome_options.add_argument('--log-level=3')
     chrome_options.add_argument('--silent')
     
+    # 环境变量
+    import os
+    os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
+    
     logger.info(f"Chrome 选项: headless={headless}, no-sandbox=True, binary={chrome_binary}")
+    logger.info(f"Chrome 启动参数: {chrome_options.arguments}")
     
     # 创建 Service
     service = None
     if driver_path:
-        service = Service(executable_path=str(driver_path))
+        service = Service(
+            executable_path=str(driver_path),
+            log_path='/tmp/chromedriver.log'  # Chrome 驱动日志
+        )
+        logger.info(f"使用 ChromeDriver: {driver_path}")
+    else:
+        service = Service(log_path='/tmp/chromedriver.log')
+        logger.info("使用 Selenium Manager 自动下载 ChromeDriver")
     
     logger.info("创建 ChromeDriver 实例...")
     try:
-        if service:
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-        else:
-            # Selenium 4.6+ 会自动使用 Selenium Manager 下载 ChromeDriver
-            driver = webdriver.Chrome(options=chrome_options)
+        driver = webdriver.Chrome(service=service, options=chrome_options)
         
         # 隐藏 webdriver 属性
         driver.execute_script(
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
         
-        logger.info("浏览器驱动创建成功")
+        logger.info("✅ 浏览器驱动创建成功")
         return driver
     except Exception as e:
-        logger.error(f"创建驱动失败: {e}")
+        logger.error(f"❌ 创建驱动失败: {e}")
+        logger.error(f"Chrome 二进制: {chrome_binary}")
+        logger.error(f"ChromeDriver: {driver_path}")
+        logger.error("尝试手动检查 Chrome 是否可以启动：docker exec <container> google-chrome-stable --version")
         raise
 
 
