@@ -52,8 +52,8 @@ pansou:
 wechat:
   enabled: true
   corp_id: "wwdf6106d7f613ab4d"
-  agent_id: 1000002
-  secret: "wwiLdw2Lcc6JBAhO3unzswP3GgJ3G4Ttf6nN9NQvtCw"
+  agent_id: 1000004
+  secret: "81qGwjsand45s-UluYPA16hroksblUVZ6d5w8eVXEkw"
   token: "zFYzEyQDonVV"
   encoding_aes_key: "SsZwYFgwmDOfAKIqqQ6GEPjU1ohLVLK2rNcISxYzbOn"
   callback_url: "https://link.frp.naspt.vip/api/wechat/callback"

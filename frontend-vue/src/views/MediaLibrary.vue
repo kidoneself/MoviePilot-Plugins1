@@ -106,7 +106,7 @@
             </template>
           </el-image>
           
-          <!-- 状态标签 -->
+          <!-- 状态标签 - 右上角 -->
           <div class="status-badges">
             <el-tag v-if="item.is_completed" type="success" size="small">完结</el-tag>
             <el-tag v-else type="warning" size="small">更新中</el-tag>
@@ -114,33 +114,16 @@
             <el-tag v-if="item.media_type === 'movie'" type="info" size="small">电影</el-tag>
             <el-tag v-else-if="item.media_type === 'tv'" type="primary" size="small">剧集</el-tag>
           </div>
+          
+          <!-- 分类标签 - 左下角 -->
+          <div class="category-badge">
+            <el-tag size="small" effect="dark">{{ item.category || '未分类' }}</el-tag>
+          </div>
         </div>
 
         <!-- 信息 -->
         <div class="media-info">
           <div class="title">{{ item.original_name }}</div>
-          <div class="category">
-            <el-tag size="small" effect="plain">{{ item.category || '未分类' }}</el-tag>
-          </div>
-          
-          <!-- 网盘链接状态 -->
-          <div class="link-status">
-            <el-tooltip content="夸克" placement="top">
-              <el-icon :color="item.quark_link ? '#67C23A' : '#DCDFE6'" size="16"><Link /></el-icon>
-            </el-tooltip>
-            <el-tooltip content="百度" placement="top">
-              <el-icon :color="item.baidu_link ? '#67C23A' : '#DCDFE6'" size="16"><Link /></el-icon>
-            </el-tooltip>
-            <el-tooltip content="迅雷" placement="top">
-              <el-icon :color="item.xunlei_link ? '#67C23A' : '#DCDFE6'" size="16"><Link /></el-icon>
-            </el-tooltip>
-          </div>
-
-          <!-- 操作按钮 -->
-          <div class="actions" @click.stop>
-            <el-button size="small" text @click="editMapping(item)">编辑</el-button>
-            <el-button size="small" text type="primary" @click="viewDetails(item)">详情</el-button>
-          </div>
         </div>
       </el-card>
 
@@ -636,8 +619,8 @@ onMounted(() => {
 
 .media-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
   min-height: 400px;
 }
 
@@ -654,10 +637,10 @@ onMounted(() => {
 .poster-wrapper {
   position: relative;
   width: 100%;
-  height: 280px;
+  height: 240px;
   overflow: hidden;
   border-radius: 4px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .poster {
@@ -685,37 +668,28 @@ onMounted(() => {
   gap: 4px;
 }
 
+.category-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 10;
+}
+
 .media-info {
-  padding: 0 4px;
+  padding: 8px 4px 4px;
 }
 
 .title {
-  font-size: 14px;
-  font-weight: bold;
-  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   line-height: 1.4;
-  min-height: 40px;
-}
-
-.category {
-  margin-bottom: 8px;
-}
-
-.link-status {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-  align-items: center;
-}
-
-.actions {
-  display: flex;
-  justify-content: space-between;
+  min-height: 36px;
+  color: #303133;
 }
 
 .details-content {
