@@ -125,6 +125,11 @@ async def get_mappings(
                     "sync_to_quark": m.sync_to_quark if hasattr(m, 'sync_to_quark') else True,
                     "sync_to_baidu": m.sync_to_baidu if hasattr(m, 'sync_to_baidu') else True,
                     "sync_to_xunlei": m.sync_to_xunlei if hasattr(m, 'sync_to_xunlei') else True,
+                    # TMDb 元数据
+                    "tmdb_id": m.tmdb_id if hasattr(m, 'tmdb_id') else None,
+                    "poster_url": m.poster_url if hasattr(m, 'poster_url') else None,
+                    "overview": m.overview if hasattr(m, 'overview') else None,
+                    "media_type": m.media_type if hasattr(m, 'media_type') else None,
                     "created_at": m.created_at.isoformat() if m.created_at else None,
                     "updated_at": m.updated_at.isoformat() if m.updated_at else None
                 }
@@ -198,6 +203,56 @@ async def create_mapping(mapping: MappingCreate, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"创建映射失败: {e}")
+        return {"success": False, "message": str(e)}
+
+
+@router.get("/mappings/{mapping_id}")
+async def get_mapping(
+    mapping_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    获取单个映射详情
+    
+    Args:
+        mapping_id: 映射ID
+    """
+    try:
+        mapping = db.query(CustomNameMapping).filter(
+            CustomNameMapping.id == mapping_id
+        ).first()
+        
+        if not mapping:
+            return {"success": False, "message": "映射不存在"}
+        
+        return {
+            "success": True,
+            "data": {
+                "id": mapping.id,
+                "original_name": mapping.original_name,
+                "category": mapping.category,
+                "quark_name": mapping.quark_name,
+                "baidu_name": mapping.baidu_name,
+                "xunlei_name": mapping.xunlei_name,
+                "enabled": mapping.enabled,
+                "is_completed": mapping.is_completed,
+                "created_at": mapping.created_at.isoformat() if mapping.created_at else None,
+                "updated_at": mapping.updated_at.isoformat() if mapping.updated_at else None,
+                "note": mapping.note,
+                "baidu_link": mapping.baidu_link,
+                "quark_link": mapping.quark_link,
+                "xunlei_link": mapping.xunlei_link,
+                "sync_to_quark": mapping.sync_to_quark,
+                "sync_to_baidu": mapping.sync_to_baidu,
+                "sync_to_xunlei": mapping.sync_to_xunlei,
+                "tmdb_id": mapping.tmdb_id,
+                "media_type": mapping.media_type,
+                "poster_url": mapping.poster_url,
+                "overview": mapping.overview
+            }
+        }
+    except Exception as e:
+        logger.error(f"获取映射失败: {e}")
         return {"success": False, "message": str(e)}
 
 

@@ -15,6 +15,10 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - CONFIG_PATH=/app/config.yaml
+      # BASE_URL: 图片上传服务的访问地址（用于生成图片URL）
+      # 本地访问：使用默认值或设置为 http://localhost:9889
+      # 外网访问：设置为你的外网地址，如 https://your-domain.com
+      # - BASE_URL=http://localhost:9889
     restart: unless-stopped
     logging:
       driver: "json-file"

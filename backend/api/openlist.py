@@ -67,8 +67,9 @@ async def get_folder_id(request: GetFolderIdRequest):
             content = result.get('data', {}).get('content', [])
             
             # 记录父目录下所有文件夹（调试用）
-            existing_folders = [item.get('name') for item in content if item.get('is_dir') or item.get('mount_details')]
-            logger.info(f"第{idx}层检查: 目标={part}, 父目录={parent_path}, 现有文件夹={existing_folders}")
+            existing_folders = [(item.get('name'), item.get('is_dir'), item.get('mount_details') is not None) for item in content]
+            logger.info(f"第{idx}层检查: 目标='{part}', 父目录={parent_path}")
+            logger.info(f"  现有内容: {existing_folders}")
             
             found = False
             folder_id = None
@@ -77,13 +78,21 @@ async def get_folder_id(request: GetFolderIdRequest):
                 # 挂载点有mount_details字段，普通文件夹有is_dir=True
                 is_mount = item.get('mount_details') is not None
                 is_directory = item.get('is_dir') == True
-                item_name = item.get('name', '').strip()
+                item_name = item.get('name', '')
                 
-                # 标准化比对：去除首尾空格
-                if item_name == part.strip() and (is_directory or is_mount):
+                # 标准化比对：去除首尾空格，并且不区分大小写
+                item_name_clean = item_name.strip() if item_name else ''
+                part_clean = part.strip()
+                
+                # 详细日志
+                if item_name_clean:
+                    logger.info(f"  对比: '{item_name_clean}' == '{part_clean}' ? {item_name_clean == part_clean}, is_dir={is_directory}, is_mount={is_mount}")
+                
+                # 匹配条件：名称相同 且 （是目录 或 是挂载点）
+                if item_name_clean == part_clean and (is_directory or is_mount):
                     folder_id = item.get('id', '')
                     found = True
-                    logger.info(f"✅ 第{idx}层找到目录: {part}, id={folder_id}, path={current_path}")
+                    logger.info(f"✅ 第{idx}层找到目录: '{part}', id={folder_id}, path={current_path}")
                     break
             
             if not found:

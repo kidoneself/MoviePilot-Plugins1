@@ -1,0 +1,36 @@
+movie:
+  动漫/动画电影:
+    genre_ids: "16"
+  电影/港台电影:
+    origin_country: "TW,HK"
+  电影/国产电影:
+    origin_country: "CN"
+  电影/日韩电影:
+    origin_country: "JP,KP,KR"
+  电影/欧美电影:
+    origin_country: null
+
+tv:
+  动漫/国产动漫:
+    genre_ids: "16"
+    origin_country: "CN,TW,HK"
+  动漫/欧美动漫:
+    genre_ids: "16"
+    origin_country: "US,FR,GB,DE,ES,IT,NL,PT,RU,UK"
+  动漫/日本番剧:
+    genre_ids: "16"
+    origin_country: "JP"
+  其他/纪录影片:
+    genre_ids: "99"
+  其他/综艺节目:
+    genre_ids: "10764,10767"
+  剧集/港台剧集:
+    origin_country: "TW,HK"
+  剧集/国产剧集:
+    origin_country: "CN"
+  剧集/日韩剧集:
+    origin_country: "JP,KP,KR"
+  剧集/南亚剧集:
+    origin_country: "TH,IN,SG"
+  剧集/欧美剧集:
+    origin_country: null

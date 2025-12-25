@@ -126,5 +126,22 @@ export default {
   // PanSou 搜索
   pansouSearch(keyword) {
     return api.post('/pansou-search', { keyword })
+  },
+
+  // TMDb 搜索
+  searchTmdb(params) {
+    return api.get('/tmdb/search', { params })
+  },
+
+  getTmdbDetails(mediaType, mediaId, params = {}) {
+    return api.get(`/tmdb/details/${mediaType}/${mediaId}`, { params })
+  },
+
+  getTmdbImages(mediaType, mediaId) {
+    return api.get(`/tmdb/images/${mediaType}/${mediaId}`)
+  },
+
+  getTmdbCategories() {
+    return api.get('/tmdb/categories')
   }
 }

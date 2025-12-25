@@ -140,9 +140,20 @@ class UnifiedTransfer:
             folder_id = None
             
             for item in content:
-                if item.get('name') == part and item.get('is_dir'):
+                # 挂载点有mount_details字段，普通文件夹有is_dir=True
+                is_mount = item.get('mount_details') is not None
+                is_directory = item.get('is_dir') == True
+                item_name = item.get('name', '')
+                
+                # 标准化比对：去除首尾空格
+                item_name_clean = item_name.strip() if item_name else ''
+                part_clean = part.strip()
+                
+                # 匹配条件：名称相同 且 （是目录 或 是挂载点）
+                if item_name_clean == part_clean and (is_directory or is_mount):
                     folder_id = item.get('id', '')
                     found = True
+                    print(f"   ✅ 找到目录: {part} (id={folder_id})")
                     break
             
             # 如果不存在，创建目录
@@ -203,7 +214,15 @@ class UnifiedTransfer:
         content = list_data.get('content', [])
         
         for item in content:
-            if item.get('name') == name and item.get('is_dir'):
+            # 标准化比对
+            item_name = item.get('name', '').strip()
+            name_clean = name.strip()
+            
+            # 新建的目录肯定有is_dir=True，但为了一致性也检查mount_details
+            is_directory = item.get('is_dir') == True
+            is_mount = item.get('mount_details') is not None
+            
+            if item_name == name_clean and (is_directory or is_mount):
                 return item.get('id', '')
         
         raise Exception(f"创建目录成功但无法获取ID: {name}")

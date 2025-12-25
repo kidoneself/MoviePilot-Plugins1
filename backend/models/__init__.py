@@ -70,6 +70,13 @@ class CustomNameMapping(Base):
     enabled = Column(Boolean, default=True)
     is_completed = Column(Boolean, default=False, comment='是否完结')
     note = Column(String(500))
+    
+    # TMDb 元数据
+    tmdb_id = Column(Integer, comment='TMDb媒体ID')
+    poster_url = Column(String(500), comment='海报链接')
+    overview = Column(Text, comment='剧情简介')
+    media_type = Column(String(20), comment='媒体类型: movie/tv')
+    
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     

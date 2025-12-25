@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Document, List, Folder, Share, Setting } from '@element-plus/icons-vue'
+import { Document, List, Folder, Share, Setting, Film, Collection, MagicStick } from '@element-plus/icons-vue'
 import api from './api'
 
 const router = useRouter()
@@ -19,7 +19,7 @@ const todaySync = ref({
   baidu: {}
 })
 const showTodayDetail = ref(false)
-const activeMenu = ref('mappings')
+const activeMenu = ref('media')
 
 const loadStats = async () => {
   try {
@@ -134,7 +134,7 @@ onMounted(() => {
   
   // 根据当前路由设置active菜单
   const path = router.currentRoute.value.path
-  activeMenu.value = path.substring(1) || 'mappings'
+  activeMenu.value = path.substring(1) || 'media'
 })
 </script>
 
@@ -175,6 +175,22 @@ onMounted(() => {
           class="app-menu"
           @select="handleMenuSelect"
         >
+          <el-menu-item index="media">
+            <el-icon><Collection /></el-icon>
+            <span>媒体库</span>
+          </el-menu-item>
+          <el-menu-item index="tmdb">
+            <el-icon><Film /></el-icon>
+            <span>添加媒体</span>
+          </el-menu-item>
+          <el-menu-item index="config">
+            <el-icon><Setting /></el-icon>
+            <span>系统设置</span>
+          </el-menu-item>
+          
+          <el-divider style="margin: 10px 0;" />
+          <div style="padding: 0 20px; font-size: 12px; color: #909399; margin-bottom: 8px;">高级功能</div>
+          
           <el-menu-item index="mappings">
             <el-icon><Document /></el-icon>
             <span>映射管理</span>
@@ -191,9 +207,21 @@ onMounted(() => {
             <el-icon><Share /></el-icon>
             <span>分享链接</span>
           </el-menu-item>
-          <el-menu-item index="config">
-            <el-icon><Setting /></el-icon>
-            <span>系统配置</span>
+          
+          <el-divider style="margin: 10px 0;" />
+          <div style="padding: 0 20px; font-size: 12px; color: #909399; margin-bottom: 8px;">🐟 闲鱼管家</div>
+          
+          <el-menu-item index="xianyu/auto-workflow">
+            <el-icon><MagicStick /></el-icon>
+            <span>🤖 自动化工作流</span>
+          </el-menu-item>
+          <el-menu-item index="xianyu/products">
+            <el-icon><Document /></el-icon>
+            <span>商品管理</span>
+          </el-menu-item>
+          <el-menu-item index="xianyu/kami">
+            <el-icon><List /></el-icon>
+            <span>卡密管理</span>
           </el-menu-item>
         </el-menu>
       </el-aside>

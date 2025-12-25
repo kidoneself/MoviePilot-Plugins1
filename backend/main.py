@@ -11,7 +11,8 @@ import uvicorn
 
 from backend.models import init_database
 from backend.monitor import MonitorService
-from backend.api import records, tree, export, mapping, share_link, transfer, category, openlist, wechat, share_page
+from backend.api import records, tree, export, mapping, share_link, transfer, category, openlist, wechat, share_page, tmdb, media, xianyu
+from backend.api import config as config_api
 
 # 配置日志
 logging.basicConfig(
@@ -59,12 +60,31 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ 企业微信功能初始化失败: {e}")
     
+    # 启动闲鱼定时任务调度器
+    try:
+        from backend.services.xianyu_scheduler import get_scheduler
+        scheduler = get_scheduler()
+        await scheduler.start()
+        logger.info("✅ 闲鱼定时任务调度器已启动")
+    except Exception as e:
+        logger.warning(f"⚠️ 闲鱼调度器启动失败: {e}")
+    
     yield
     
     # 关闭时
-    logger.info("⏹ 停止监控服务...")
+    logger.info("⏹ 停止服务...")
     if monitor_service:
         monitor_service.stop()
+    
+    # 停止闲鱼调度器
+    try:
+        from backend.services.xianyu_scheduler import get_scheduler
+        scheduler = get_scheduler()
+        await scheduler.stop()
+        logger.info("✅ 闲鱼调度器已停止")
+    except:
+        pass
+    
     logger.info("👋 系统已关闭")
 
 
@@ -87,11 +107,28 @@ app.include_router(category.router, prefix="/api", tags=["分类管理"])
 app.include_router(openlist.router, prefix="/api", tags=["OpenList"])
 app.include_router(wechat.router, prefix="/api", tags=["企业微信"])
 app.include_router(share_page.router, tags=["短链接分享"])
+app.include_router(tmdb.router, prefix="/api", tags=["TMDb搜索"])
+app.include_router(media.router, prefix="/api", tags=["媒体管理"])
+app.include_router(xianyu.router, prefix="/api", tags=["闲鱼管家"])
+app.include_router(config_api.router, prefix="/api", tags=["配置管理"])
 
 # 静态文件
 frontend_path = Path(__file__).parent.parent / "frontend-vue" / "dist"
 # 挂载静态资源（CSS/JS等）
 app.mount("/assets", StaticFiles(directory=str(frontend_path / "assets")), name="assets")
+
+# 挂载上传文件目录
+uploads_path = Path(__file__).parent.parent / "uploads"
+uploads_path.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
+
+# 挂载SVG文件目录（网盘Logo等）
+svg_path = frontend_path / "svg"
+if svg_path.exists():
+    app.mount("/svg", StaticFiles(directory=str(svg_path)), name="svg")
+    logger.info(f"✅ SVG目录已挂载: {svg_path}")
+else:
+    logger.warning(f"⚠️ SVG目录不存在: {svg_path}")
 
 
 @app.get("/health")
@@ -352,14 +389,35 @@ async def batch_link_templates():
         return {"success": False, "message": str(e)}
 
 
-# 通配符路由放在最后，作为fallback处理Vue Router
-@app.get("/{full_path:path}")
-async def serve_frontend(full_path: str):
-    """
-    提供前端页面，支持Vue Router
-    所有非API请求返回index.html
-    """
+# 根路径
+@app.get("/")
+async def root():
+    """返回前端首页"""
     return FileResponse(str(frontend_path / "index.html"))
+
+# 前端路由 - 明确指定所有前端页面路径
+frontend_routes = [
+    "/media",
+    "/mappings",
+    "/records",
+    "/tree",
+    "/share-links",
+    "/tmdb",
+    "/config",
+    "/xianyu/products",
+    "/xianyu/kami",
+    "/xianyu/create-product",
+    "/xianyu/auto-workflow"
+]
+
+for route in frontend_routes:
+    # 为每个前端路由创建一个处理函数
+    def make_handler(r=route):
+        async def handler():
+            return FileResponse(str(frontend_path / "index.html"))
+        return handler
+    
+    app.get(route)(make_handler())
 
 
 if __name__ == "__main__":
