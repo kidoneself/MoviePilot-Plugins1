@@ -125,14 +125,14 @@ case $BUILD_MODE in
             fi
         else
             echo "❌ 未找到容器，尝试首次启动..."
-            docker-compose up -d
+            docker compose up -d
         fi
         ;;
     
     build)
         echo "🏗️  模式：重新构建镜像"
         echo ""
-        docker-compose up -d --build
+        docker compose up -d --build
         
         if [ $? -eq 0 ]; then
             echo "✅ 构建并启动成功"
@@ -145,9 +145,9 @@ case $BUILD_MODE in
     rebuild)
         echo "🔨 模式：清除缓存重新构建"
         echo ""
-        docker-compose down
-        docker-compose build --no-cache
-        docker-compose up -d
+        docker compose down
+        docker compose build --no-cache
+        docker compose up -d
         
         if [ $? -eq 0 ]; then
             echo "✅ 完全重建成功"

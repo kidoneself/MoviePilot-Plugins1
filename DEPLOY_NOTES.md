@@ -58,13 +58,13 @@ cd /path/to/file-link-monitor
 git pull
 
 # 3. 停止并删除旧容器
-docker-compose down
+docker compose down
 
 # 4. 重新构建镜像（这会安装 Chrome 和 ChromeDriver）
-docker-compose build --no-cache
+docker compose build --no-cache
 
 # 5. 启动新容器
-docker-compose up -d
+docker compose up -d
 
 # 6. 查看启动日志
 docker logs -f file-link-monitor
@@ -75,7 +75,7 @@ docker logs -f file-link-monitor
 ```bash
 cd /path/to/file-link-monitor
 git pull
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 ### 方式3：使用部署脚本（需要更新）
@@ -85,9 +85,9 @@ docker-compose up -d --build
 
 ```bash
 # 首次部署（安装 Chrome）
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 
 # 之后的代码更新可以使用
 ./deploy.sh
@@ -161,14 +161,14 @@ A:
 git checkout HEAD~1
 
 # 2. 重新构建
-docker-compose down
-docker-compose build
-docker-compose up -d
+docker compose down
+docker compose build
+docker compose up -d
 
 # 或者使用之前的镜像（如果有保存）
-docker-compose down
+docker compose down
 docker pull your-registry/file-link-monitor:previous-tag
-docker-compose up -d
+docker compose up -d
 ```
 
 ---
