@@ -817,7 +817,7 @@ async def create_kami_kind(request: KamiKindRequest):
     """创建卡种（异步任务）"""
     try:
         from backend.utils.task_manager import get_task_manager
-        from backend.utils.xianyu_selenium import KamiAutomation
+        from backend.utils.xianyu_playwright import KamiAutomation
         import threading
         
         # 创建任务
@@ -904,7 +904,7 @@ async def add_kami_cards(request: AddKamiRequest):
     """添加卡密（异步任务）"""
     try:
         from backend.utils.task_manager import get_task_manager
-        from backend.utils.xianyu_selenium import KamiAutomation
+        from backend.utils.xianyu_playwright import KamiAutomation
         import threading
         
         # 创建任务
@@ -995,9 +995,9 @@ async def setup_auto_shipping(request: AutoShippingRequest):
 async def close_browser():
     """手动关闭浏览器会话"""
     try:
-        from backend.utils.xianyu_selenium import close_global_driver
+        from backend.utils.xianyu_playwright import close_global_browser
         
-        close_global_driver()
+        close_global_browser()
         
         return {
             'success': True,
