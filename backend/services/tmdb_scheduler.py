@@ -83,33 +83,43 @@ class TmdbUpdateChecker:
             
             if not tv_shows:
                 logger.info("📺 没有需要检查的未完结剧集")
+                # 即使没有剧集也发送通知
+                if self.wechat_service:
+                    try:
+                        from backend.main import app_config
+                        wechat_config = app_config.get('wechat', {})
+                        default_user = wechat_config.get('default_user', '@all')
+                        message = f"📺 TMDB剧集检查完成\n\n当前没有未完结的剧集需要监控\n\n检查时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                        self.wechat_service.send_text(default_user, message)
+                    except Exception as e:
+                        logger.error(f"发送通知失败: {e}")
                 return
             
             logger.info(f"📺 开始检查 {len(tv_shows)} 部未完结剧集")
             
-            updates = []
             completed_shows = []
+            checked_shows = []
             
             for show in tv_shows:
                 try:
+                    logger.info(f"  🔍 检查: {show.original_name}")
                     update_info = await self._check_single_show(show, session)
-                    if update_info:
-                        if update_info['type'] == 'completed':
-                            completed_shows.append(update_info)
-                        else:
-                            updates.append(update_info)
+                    
+                    if update_info and update_info['type'] == 'completed':
+                        completed_shows.append(update_info)
+                        logger.info(f"    ✅ 已完结")
+                    else:
+                        checked_shows.append(show.original_name)
+                        logger.info(f"    📺 仍在更新中")
                     
                     # 避免请求过快
                     await asyncio.sleep(0.5)
                     
                 except Exception as e:
-                    logger.error(f"检查剧集 {show.original_name} 失败: {e}")
+                    logger.error(f"  ❌ 检查失败: {e}")
             
-            # 发送通知
-            if updates or completed_shows:
-                await self._send_notification(updates, completed_shows)
-            else:
-                logger.info("✅ 所有剧集无更新")
+            # 无论有没有变化都发送通知
+            await self._send_notification(checked_shows, completed_shows, len(tv_shows))
         
         finally:
             session.close()
@@ -160,15 +170,16 @@ class TmdbUpdateChecker:
             logger.error(f"检查 {show.original_name} 异常: {e}")
             return None
     
-    async def _send_notification(self, updates: list, completed_shows: list):
-        """发送微信通知"""
+    async def _send_notification(self, checked_shows: list, completed_shows: list, total_count: int):
+        """发送微信通知（无论有无更新都发送）"""
         if not self.wechat_service:
             logger.warning("微信服务未配置，跳过通知")
             return
         
         try:
             # 构建通知内容
-            content_parts = ["📺 TMDB剧集更新提醒\n"]
+            content_parts = ["📺 TMDB剧集检查完成\n"]
+            content_parts.append(f"本次检查了 {total_count} 部未完结剧集\n")
             
             if completed_shows:
                 content_parts.append("🎉 以下剧集已完结：")
@@ -180,14 +191,20 @@ class TmdbUpdateChecker:
                         f"  共{show['seasons']}季 {show['episodes']}集"
                     )
                 content_parts.append("")
+            else:
+                content_parts.append("✅ 所有剧集状态正常，暂无完结")
+                content_parts.append("")
             
-            if updates:
-                content_parts.append("🔔 以下剧集有更新：")
-                for update in updates:
-                    content_parts.append(f"• {update['title']}")
+            if checked_shows and not completed_shows:
+                content_parts.append("📺 仍在更新中的剧集：")
+                for show_name in checked_shows[:5]:  # 最多显示5个
+                    content_parts.append(f"• {show_name}")
+                if len(checked_shows) > 5:
+                    content_parts.append(f"... 还有 {len(checked_shows) - 5} 部")
                 content_parts.append("")
             
             content_parts.append(f"检查时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+            content_parts.append("\n💡 注意：目前只检测完结状态，新季/新集检测需要保存历史数据")
             
             message = "\n".join(content_parts)
             

@@ -16,8 +16,11 @@
 """
 import re
 import requests
+import logging
 from typing import Dict, Optional
 from .pan_transfer_api import PanTransferAPI
+
+logger = logging.getLogger(__name__)
 
 
 class UnifiedTransfer:
@@ -136,6 +139,11 @@ class UnifiedTransfer:
             data = self._list_directory(parent_path)
             content = data.get('content', [])
             
+            # 记录父目录下所有文件夹（调试用）
+            existing_folders = [(item.get('name'), item.get('is_dir'), item.get('mount_details') is not None) for item in content]
+            logger.info(f"第{idx}层检查: 目标='{part}', 父目录={parent_path}")
+            logger.info(f"  现有内容: {existing_folders}")
+            
             found = False
             folder_id = None
             
@@ -149,18 +157,25 @@ class UnifiedTransfer:
                 item_name_clean = item_name.strip() if item_name else ''
                 part_clean = part.strip()
                 
+                # 详细日志
+                if item_name_clean:
+                    logger.info(f"  对比: '{item_name_clean}' == '{part_clean}' ? {item_name_clean == part_clean}, is_dir={is_directory}, is_mount={is_mount}")
+                
                 # 匹配条件：名称相同 且 （是目录 或 是挂载点）
                 if item_name_clean == part_clean and (is_directory or is_mount):
                     folder_id = item.get('id', '')
                     found = True
-                    print(f"   ✅ 找到目录: {part} (id={folder_id})")
+                    logger.info(f"✅ 第{idx}层找到目录: '{part}', id={folder_id}, path={current_path}")
                     break
+            
+            if not found:
+                logger.warning(f"❌ 第{idx}层未找到目录: {part}, 将创建新目录")
             
             # 如果不存在，创建目录
             if not found:
-                print(f"   ⚠️  目录不存在，正在创建: {current_path}")
+                logger.info(f"📁 创建第{idx}层目录: {current_path}")
                 folder_id = self._create_directory(parent_path, part)
-                print(f"   ✅ 创建成功")
+                logger.info(f"✅ 创建成功")
             
             # 如果是最后一级，返回结果
             if idx == len(parts):
@@ -207,7 +222,11 @@ class UnifiedTransfer:
         result = response.json()
         
         if result.get('code') != 200:
-            raise Exception(f"创建目录失败: {result.get('message')}")
+            error_msg = f"创建目录失败: {result.get('message')}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
+        
+        logger.info(f"✅ 创建API调用成功，重新获取ID")
         
         # 重新列出父目录，获取新建目录的ID
         list_data = self._list_directory(parent_path)
@@ -223,9 +242,13 @@ class UnifiedTransfer:
             is_mount = item.get('mount_details') is not None
             
             if item_name == name_clean and (is_directory or is_mount):
-                return item.get('id', '')
+                folder_id = item.get('id', '')
+                logger.info(f"✅ 创建后找到目录: {name}, id={folder_id}")
+                return folder_id
         
-        raise Exception(f"创建目录成功但无法获取ID: {name}")
+        error_msg = f"创建目录后无法获取ID，父目录={parent_path}，目标={name}，现有内容: {[i.get('name') for i in content]}"
+        logger.error(f"❌ {error_msg}")
+        raise Exception(error_msg)
     
     def detect_pan_type(self, share_url: str) -> str:
         """自动检测网盘类型"""
@@ -266,23 +289,22 @@ class UnifiedTransfer:
             if not pan_type:
                 pan_type = self.detect_pan_type(share_url)
             
-            print(f"\n{'='*60}")
-            print(f"统一转存")
-            print(f"{'='*60}")
-            print(f"网盘类型: {pan_type.upper()}")
-            print(f"分享链接: {share_url}")
-            print(f"目标路径: {target_path}")
+            logger.info(f"\n{'='*60}")
+            logger.info(f"统一转存 - {pan_type.upper()}")
+            logger.info(f"{'='*60}")
+            logger.info(f"分享链接: {share_url}")
+            logger.info(f"目标路径: {target_path}")
             
             # 2. 获取转存参数
-            print(f"\n🔍 通过OpenList获取转存参数...")
+            logger.info(f"🔍 通过OpenList获取转存参数...")
             transfer_param = self.get_transfer_param(target_path, pan_type)
-            print(f"   ✅ 获取成功")
+            logger.info(f"✅ 获取成功")
             
             if pan_type == 'baidu':
-                print(f"   参数类型: 路径")
+                logger.info(f"参数类型: 路径")
             else:
-                print(f"   参数类型: 文件夹ID")
-            print(f"   参数值: {transfer_param}")
+                logger.info(f"参数类型: 文件夹ID")
+            logger.info(f"参数值: {transfer_param}")
             
             # 3. 检查认证信息
             credentials = self.pan_credentials.get(pan_type)
@@ -291,7 +313,7 @@ class UnifiedTransfer:
             
             # 3.5. 迅雷网盘自动刷新token
             if pan_type == 'xunlei':
-                print(f"\n🔄 刷新迅雷token...")
+                logger.info(f"🔄 刷新迅雷token...")
                 try:
                     from backend.utils.xunlei_api import XunleiAPI, _browser_manager
                     import json
@@ -305,20 +327,20 @@ class UnifiedTransfer:
                     if isinstance(credentials, list):
                         # 情况1：整个credentials就是cookie数组
                         cookie_data = json.dumps(credentials)
-                        print("   检测到浏览器cookie数组格式")
+                        logger.info("   检测到浏览器cookie数组格式")
                     elif isinstance(credentials, dict) and credentials.get('browser_cookie'):
                         # 情况2：字典中有browser_cookie字段
                         cookie_data = credentials.get('browser_cookie')
-                        print("   使用browser_cookie字段")
+                        logger.info("   使用browser_cookie字段")
                     
                     if cookie_data:
-                        print("   启动浏览器自动获取token...")
+                        logger.info("   启动浏览器自动获取token...")
                         xunlei_api = XunleiAPI(cookie=cookie_data)
                         
                         # 在浏览器线程中执行刷新操作
                         def refresh_in_thread():
                             page, auth_info = _browser_manager.get_page(xunlei_api.cookies)
-                            print("   刷新页面捕获token...")
+                            logger.info("   刷新页面捕获token...")
                             return xunlei_api._refresh_token_sync(page, auth_info), auth_info
                         
                         success, auth_info = _browser_manager.run_in_thread(refresh_in_thread)
@@ -331,22 +353,22 @@ class UnifiedTransfer:
                             credentials['x_captcha_token'] = auth_info['x-captcha-token']
                             credentials['x_client_id'] = 'Xqp0kJBXWhwaTpB6'
                             credentials['x_device_id'] = 'd765a49124d0b4c8d593d73daa738f51'
-                            print(f"   ✅ Token刷新成功")
-                            print(f"   authorization: {auth_info['authorization'][:50]}...")
-                            print(f"   x_captcha_token: {auth_info['x-captcha-token'][:50]}...")
+                            logger.info(f"   ✅ Token刷新成功")
+                            logger.info(f"   authorization: {auth_info['authorization'][:50]}...")
+                            logger.info(f"   x_captcha_token: {auth_info['x-captcha-token'][:50]}...")
                         else:
-                            print("   ⚠️  Token未捕获")
+                            logger.warning("   ⚠️  Token未捕获")
                             raise Exception("无法获取迅雷token，请检查浏览器cookie是否有效")
                     else:
-                        print("   ⚠️  未找到浏览器cookie")
+                        logger.warning("   ⚠️  未找到浏览器cookie")
                         raise Exception("需要浏览器cookie才能自动获取token")
                         
                 except Exception as e:
-                    print(f"   ❌ Token刷新失败: {str(e)}")
+                    logger.error(f"   ❌ Token刷新失败: {str(e)}")
                     raise Exception(f"迅雷token获取失败: {str(e)}")
             
             # 4. 创建转存API实例
-            print(f"\n📤 开始转存...")
+            logger.info(f"📤 开始转存...")
             api = PanTransferAPI(pan_type=pan_type, credentials=credentials)
             
             # 5. 执行转存
@@ -361,10 +383,10 @@ class UnifiedTransfer:
             result['actual_param'] = transfer_param
             
             if result['success']:
-                print(f"\n✅ 转存成功！")
-                print(f"   文件数量: {result['file_count']}")
+                logger.info(f"✅ 转存成功！")
+                logger.info(f"   文件数量: {result['file_count']}")
             else:
-                print(f"\n❌ 转存失败: {result['message']}")
+                logger.error(f"❌ 转存失败: {result['message']}")
             
             return result
             

@@ -6,6 +6,7 @@
 import logging
 import time
 import platform
+import shutil
 from pathlib import Path
 from typing import Optional, Callable
 from selenium import webdriver
@@ -109,13 +110,39 @@ def _create_driver(headless: bool) -> webdriver.Chrome:
     # 配置 Chrome 选项
     chrome_options = Options()
     
+    # 显式指定 Chrome 二进制路径（Docker 容器中）
+    import shutil
+    chrome_paths = [
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/google-chrome',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser'
+    ]
+    chrome_binary = None
+    for path in chrome_paths:
+        if shutil.which(path) or Path(path).exists():
+            chrome_binary = path
+            logger.info(f"找到 Chrome 二进制文件: {chrome_binary}")
+            break
+    
+    if chrome_binary:
+        chrome_options.binary_location = chrome_binary
+    else:
+        logger.warning("未找到 Chrome 二进制文件，使用默认路径")
+    
     if headless:
         chrome_options.add_argument('--headless=new')
-        chrome_options.add_argument('--disable-gpu')
     
+    # Docker 容器必需的选项
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-gpu')  # Docker 中必须禁用 GPU
+    chrome_options.add_argument('--disable-software-rasterizer')
+    chrome_options.add_argument('--disable-setuid-sandbox')
+    chrome_options.add_argument('--remote-debugging-port=0')  # 使用随机端口，避免端口冲突
     chrome_options.add_argument('--window-size=1920,1080')
+    chrome_options.add_argument('--disable-extensions')
+    chrome_options.add_argument('--disable-features=VizDisplayCompositor')
     
     # 反自动化检测
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
@@ -125,6 +152,8 @@ def _create_driver(headless: bool) -> webdriver.Chrome:
     # 禁用日志
     chrome_options.add_argument('--log-level=3')
     chrome_options.add_argument('--silent')
+    
+    logger.info(f"Chrome 选项: headless={headless}, no-sandbox=True, binary={chrome_binary}")
     
     # 创建 Service
     service = None
