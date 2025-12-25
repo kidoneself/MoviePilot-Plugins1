@@ -844,7 +844,10 @@ async def create_kami_kind(request: KamiKindRequest):
                 logger.info(f"🚀 开始执行任务 {task_id}")
                 task_manager.add_step(task_id, "正在启动浏览器", "loading")
                 
-                automation = KamiAutomation(headless=False)
+                # Docker 容器中必须使用无头模式
+                import os
+                headless = os.getenv('XIANYU_HEADLESS', 'true').lower() == 'true'
+                automation = KamiAutomation(headless=headless)
                 automation.set_step_callback(step_callback)
                 
                 task_manager.add_step(task_id, "浏览器已启动，开始创建卡种", "loading")
@@ -922,7 +925,10 @@ async def add_kami_cards(request: AddKamiRequest):
         # 后台线程执行
         def run_automation():
             try:
-                automation = KamiAutomation(headless=False)
+                # Docker 容器中必须使用无头模式
+                import os
+                headless = os.getenv('XIANYU_HEADLESS', 'true').lower() == 'true'
+                automation = KamiAutomation(headless=headless)
                 automation.set_step_callback(step_callback)
                 success = automation.add_kami_cards(request.kind_name, request.kami_data, request.repeat_count)
                 
@@ -969,7 +975,10 @@ async def setup_auto_shipping(request: AutoShippingRequest):
         # 后台线程执行
         def run_automation():
             try:
-                automation = KamiAutomation(headless=False)
+                # Docker 容器中必须使用无头模式
+                import os
+                headless = os.getenv('XIANYU_HEADLESS', 'true').lower() == 'true'
+                automation = KamiAutomation(headless=headless)
                 automation.set_step_callback(step_callback)
                 success = automation.setup_auto_shipping(request.kind_name, request.product_title)
                 
