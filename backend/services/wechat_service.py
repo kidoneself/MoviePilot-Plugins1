@@ -25,6 +25,16 @@ class WeChatService:
         self.token = config.get('token')
         self.encoding_aes_key = config.get('encoding_aes_key')
         
+        # 代理配置
+        proxy_config = config.get('proxy', {})
+        self.proxies = None
+        if proxy_config.get('enabled'):
+            self.proxies = {
+                'http': proxy_config.get('http'),
+                'https': proxy_config.get('https')
+            }
+            logger.info(f"✅ 企业微信代理已启用: {self.proxies}")
+        
         # Access Token缓存
         self._access_token = None
         self._token_expires_at = None
@@ -51,7 +61,7 @@ class WeChatService:
         }
         
         try:
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, proxies=self.proxies, timeout=10)
             data = response.json()
             
             if data.get('errcode') == 0:
@@ -94,7 +104,7 @@ class WeChatService:
         }
         
         try:
-            response = requests.post(url, json=data, timeout=10)
+            response = requests.post(url, json=data, proxies=self.proxies, timeout=10)
             result = response.json()
             
             if result.get('errcode') == 0:
@@ -131,7 +141,7 @@ class WeChatService:
         }
         
         try:
-            response = requests.post(url, json=data, timeout=10)
+            response = requests.post(url, json=data, proxies=self.proxies, timeout=10)
             result = response.json()
             
             if result.get('errcode') == 0:
@@ -179,7 +189,7 @@ class WeChatService:
         }
         
         try:
-            response = requests.post(api_url, json=data, timeout=10)
+            response = requests.post(api_url, json=data, proxies=self.proxies, timeout=10)
             result = response.json()
             
             if result.get('errcode') == 0:

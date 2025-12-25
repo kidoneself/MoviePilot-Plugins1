@@ -4,7 +4,17 @@
       <template #header>
         <div class="card-header">
           <span>🎬 TMDb 影视搜索</span>
-          <el-tag type="info" size="small">根据 cat.yaml 自动分类</el-tag>
+          <div class="header-right">
+            <el-button 
+              type="warning" 
+              size="small" 
+              :loading="checkingUpdates"
+              @click="handleCheckUpdates"
+            >
+              🔔 检查剧集更新
+            </el-button>
+            <el-tag type="info" size="small">根据 cat.yaml 自动分类</el-tag>
+          </div>
         </div>
       </template>
 
@@ -245,6 +255,7 @@ const detailsVisible = ref(false)
 const currentDetails = ref(null)
 const loadingDetails = ref(false)
 const creatingMapping = ref(false)
+const checkingUpdates = ref(false)
 
 // 搜索
 const handleSearch = async () => {
@@ -356,6 +367,30 @@ const handleCreateMapping = async () => {
     creatingMapping.value = false
   }
 }
+
+// 检查剧集更新
+const handleCheckUpdates = async () => {
+  checkingUpdates.value = true
+  
+  try {
+    const res = await api.checkTmdbUpdates()
+    
+    if (res.data.success) {
+      ElMessage.success({
+        message: '🔔 已触发剧集更新检查！\n检查结果将通过企业微信通知您',
+        duration: 5000,
+        showClose: true
+      })
+    } else {
+      ElMessage.error(res.data.message || '触发失败')
+    }
+  } catch (error) {
+    console.error('触发检查失败:', error)
+    ElMessage.error('触发失败：' + (error.response?.data?.detail || error.message || '未知错误'))
+  } finally {
+    checkingUpdates.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -367,6 +402,12 @@ const handleCreateMapping = async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.card-header .header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .search-area {

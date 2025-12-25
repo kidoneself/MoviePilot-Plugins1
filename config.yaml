@@ -57,3 +57,8 @@ wechat:
   token: "zFYzEyQDonVV"
   encoding_aes_key: "SsZwYFgwmDOfAKIqqQ6GEPjU1ohLVLK2rNcISxYzbOn"
   callback_url: "https://link.frp.naspt.vip/api/wechat/callback"
+  # 代理配置（可选，用于解决IP白名单问题）
+  proxy:
+    enabled: false  # 是否启用代理
+    http: ""  # HTTP代理，格式：http://ip:port
+    https: ""  # HTTPS代理，格式：http://ip:port

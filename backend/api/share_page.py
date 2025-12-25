@@ -69,7 +69,9 @@ async def share_page(mapping_id: int, request: Request, db: Session = Depends(ge
         if mapping.quark_link:
             links_html += f"""
             <div class="link-item">
-                <div class="link-icon">🟡</div>
+                <div class="link-icon">
+                    <img src="/svg/夸克网盘.svg" alt="夸克网盘" />
+                </div>
                 <div class="link-content">
                     <div class="link-title">夸克网盘</div>
                     <div class="link-url">{mapping.quark_link}</div>
@@ -81,7 +83,9 @@ async def share_page(mapping_id: int, request: Request, db: Session = Depends(ge
         if mapping.baidu_link:
             links_html += f"""
             <div class="link-item">
-                <div class="link-icon">🔵</div>
+                <div class="link-icon">
+                    <img src="/svg/百度网盘.svg" alt="百度网盘" />
+                </div>
                 <div class="link-content">
                     <div class="link-title">百度网盘</div>
                     <div class="link-url">{mapping.baidu_link}</div>
@@ -93,7 +97,9 @@ async def share_page(mapping_id: int, request: Request, db: Session = Depends(ge
         if mapping.xunlei_link:
             links_html += f"""
             <div class="link-item">
-                <div class="link-icon">🔴</div>
+                <div class="link-icon">
+                    <img src="/svg/迅雷.svg" alt="迅雷网盘" />
+                </div>
                 <div class="link-content">
                     <div class="link-title">迅雷网盘</div>
                     <div class="link-url">{mapping.xunlei_link}</div>
@@ -164,8 +170,18 @@ async def share_page(mapping_id: int, request: Request, db: Session = Depends(ge
             transform: translateY(-2px);
         }}
         .link-icon {{
-            font-size: 32px;
+            width: 48px;
+            height: 48px;
             margin-right: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }}
+        .link-icon img {{
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }}
         .link-content {{
             flex: 1;

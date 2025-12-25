@@ -25,12 +25,13 @@ logger = logging.getLogger(__name__)
 db_engine = None
 monitor_service = None
 config = None
+app_config = None  # 全局配置，用于其他模块访问
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    global db_engine, monitor_service, config
+    global db_engine, monitor_service, config, app_config
     
     # 启动时
     logger.info("🚀 启动文件监控硬链接系统...")
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI):
     
     with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
+        app_config = config  # 保存全局配置
     
     # 初始化数据库（MySQL硬编码配置）
     db_engine = init_database()
@@ -55,8 +57,9 @@ async def lifespan(app: FastAPI):
     logger.info("✅ 监控服务已启动")
     
     # 初始化企业微信功能
+    wechat_service = None
     try:
-        wechat.init_wechat(config, db_engine)
+        wechat_service = wechat.init_wechat(config, db_engine)
     except Exception as e:
         logger.warning(f"⚠️ 企业微信功能初始化失败: {e}")
     
@@ -68,6 +71,15 @@ async def lifespan(app: FastAPI):
         logger.info("✅ 闲鱼定时任务调度器已启动")
     except Exception as e:
         logger.warning(f"⚠️ 闲鱼调度器启动失败: {e}")
+    
+    # 启动TMDB剧集更新检查器
+    try:
+        from backend.services.tmdb_scheduler import init_checker
+        tmdb_checker = init_checker(wechat_service)
+        await tmdb_checker.start()
+        logger.info("✅ TMDB剧集更新检查器已启动")
+    except Exception as e:
+        logger.warning(f"⚠️ TMDB检查器启动失败: {e}")
     
     yield
     
@@ -82,6 +94,15 @@ async def lifespan(app: FastAPI):
         scheduler = get_scheduler()
         await scheduler.stop()
         logger.info("✅ 闲鱼调度器已停止")
+    except:
+        pass
+    
+    # 停止TMDB检查器
+    try:
+        from backend.services.tmdb_scheduler import get_checker
+        tmdb_checker = get_checker()
+        await tmdb_checker.stop()
+        logger.info("✅ TMDB检查器已停止")
     except:
         pass
     

@@ -143,5 +143,10 @@ export default {
 
   getTmdbCategories() {
     return api.get('/tmdb/categories')
+  },
+
+  // TMDb 检查更新
+  checkTmdbUpdates() {
+    return api.post('/tmdb/check-updates')
   }
 }

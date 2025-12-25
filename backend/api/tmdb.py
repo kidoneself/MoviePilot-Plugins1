@@ -426,3 +426,33 @@ async def create_mapping(
         db.rollback()
         logger.error(f"创建映射失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/tmdb/check-updates")
+async def check_updates_now():
+    """
+    手动触发TMDB剧集更新检查
+    
+    用于测试和立即检查更新
+    """
+    try:
+        from backend.services.tmdb_scheduler import get_checker
+        
+        checker = get_checker()
+        if not checker or not checker.running:
+            return {
+                "success": False,
+                "message": "TMDB检查器未运行"
+            }
+        
+        # 手动触发检查
+        import asyncio
+        asyncio.create_task(checker._check_tv_updates())
+        
+        return {
+            "success": True,
+            "message": "已触发TMDB剧集更新检查，请稍后查看微信通知"
+        }
+    except Exception as e:
+        logger.error(f"触发更新检查失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

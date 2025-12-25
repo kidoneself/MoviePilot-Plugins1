@@ -25,6 +25,9 @@ def init_wechat(config: dict, db_engine):
     Args:
         config: 配置字典
         db_engine: 数据库引擎
+        
+    Returns:
+        WeChatService实例，如果未启用则返回None
     """
     global wechat_service, wechat_handler, wechat_crypto
     
@@ -32,7 +35,7 @@ def init_wechat(config: dict, db_engine):
     
     if not wechat_config.get('enabled'):
         logger.info("企业微信功能未启用")
-        return
+        return None
     
     try:
         # 初始化服务
@@ -47,6 +50,7 @@ def init_wechat(config: dict, db_engine):
         )
         
         logger.info("✅ 企业微信功能初始化成功")
+        return wechat_service
     except Exception as e:
         logger.error(f"❌ 企业微信功能初始化失败: {e}")
         raise
