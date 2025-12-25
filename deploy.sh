@@ -8,6 +8,7 @@ echo ""
 
 # 解析参数
 BUILD_MODE="restart"  # 默认只重启
+SKIP_GIT=false  # 是否跳过 git 操作
 while [[ $# -gt 0 ]]; do
     case $1 in
         --build)
@@ -18,19 +19,24 @@ while [[ $# -gt 0 ]]; do
             BUILD_MODE="rebuild"
             shift
             ;;
+        --skip-git)
+            SKIP_GIT=true
+            shift
+            ;;
         --help)
             echo "用法: $0 [选项]"
             echo ""
             echo "选项:"
-            echo "  (无参数)    只重启容器（代码热更新）"
-            echo "  --build     重新构建镜像并启动"
-            echo "  --rebuild   清除缓存重新构建镜像"
-            echo "  --help      显示帮助信息"
+            echo "  (无参数)      只重启容器（代码热更新）"
+            echo "  --build       重新构建镜像并启动"
+            echo "  --rebuild     清除缓存重新构建镜像"
+            echo "  --skip-git    跳过 git 提交和推送（服务器部署时使用）"
+            echo "  --help        显示帮助信息"
             echo ""
             echo "说明:"
+            echo "  - 本地部署：./deploy.sh --rebuild"
+            echo "  - 服务器部署（已用 git pull）：./deploy.sh --rebuild --skip-git"
             echo "  - 一般代码更新：直接运行 ./deploy.sh"
-            echo "  - Dockerfile更新：运行 ./deploy.sh --build"
-            echo "  - 依赖或系统包更新：运行 ./deploy.sh --rebuild"
             exit 0
             ;;
         *)
@@ -44,38 +50,43 @@ done
 echo "📦 部署模式: $BUILD_MODE"
 echo ""
 
-# 检查是否在Git仓库中
-if [ ! -d ".git" ]; then
-    echo "❌ 错误：当前目录不是Git仓库"
-    exit 1
-fi
-
-# 检查是否有未提交的更改
-if [[ -n $(git status -s) ]]; then
-    echo "📝 检测到未提交的更改："
-    git status -s
-    echo ""
-    read -p "是否提交这些更改？(y/n) " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        read -p "请输入提交信息: " commit_msg
-        git add .
-        git commit -m "$commit_msg"
-        echo "✅ 代码已提交"
-    else
-        echo "⚠️  跳过提交，继续部署现有代码"
+# Git 操作（可选）
+if [ "$SKIP_GIT" = false ]; then
+    # 检查是否在Git仓库中
+    if [ ! -d ".git" ]; then
+        echo "❌ 错误：当前目录不是Git仓库"
+        exit 1
     fi
-fi
 
-# 推送到远程仓库
-echo ""
-echo "📤 推送代码到远程仓库..."
-git push
-if [ $? -eq 0 ]; then
-    echo "✅ 代码推送成功"
+    # 检查是否有未提交的更改
+    if [[ -n $(git status -s) ]]; then
+        echo "📝 检测到未提交的更改："
+        git status -s
+        echo ""
+        read -p "是否提交这些更改？(y/n) " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            read -p "请输入提交信息: " commit_msg
+            git add .
+            git commit -m "$commit_msg"
+            echo "✅ 代码已提交"
+        else
+            echo "⚠️  跳过提交，继续部署现有代码"
+        fi
+    fi
+
+    # 推送到远程仓库
+    echo ""
+    echo "📤 推送代码到远程仓库..."
+    git push
+    if [ $? -eq 0 ]; then
+        echo "✅ 代码推送成功"
+    else
+        echo "❌ 代码推送失败"
+        exit 1
+    fi
 else
-    echo "❌ 代码推送失败"
-    exit 1
+    echo "⏭️  跳过 Git 操作（--skip-git）"
 fi
 
 # 检查是否在服务器上运行
