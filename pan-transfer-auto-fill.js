@@ -331,87 +331,47 @@
         return fileIds;
     }
     
-    // 创建百度网盘文件夹
-    function createBaiduFolder(path) {
-        console.log('📁 创建文件夹:', path);
-        
-        const yunData = unsafeWindow.yunData || {};
-        if (!yunData.bdstoken) {
-            throw new Error('无法获取bdstoken');
-        }
-        
-        // 生成logid和dp-logid
-        const logid = btoa(`${Date.now()}${Math.random()}`).substring(0, 32);
-        const dpLogid = Date.now().toString() + Math.floor(Math.random() * 100000);
+    // 百度确保目录存在（通过OpenList API，和夸克、迅雷统一）
+    async function ensureBaiduFolderExists(fullPath) {
+        console.log('🔍 通过OpenList检查并创建百度目录:', fullPath);
         
         return new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
                 method: 'POST',
-                url: `https://pan.baidu.com/api/create?a=commit&channel=chunlei&bdstoken=${yunData.bdstoken}&app_id=250528&web=1&logid=${logid}&clienttype=0&dp-logid=${dpLogid}`,
+                url: `${API_BASE}/openlist/get-folder-id`,
                 headers: {
-                    'Accept': '*/*',
-                    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,en-US;q=0.7',
-                    'Cache-Control': 'no-cache',
-                    'Connection': 'keep-alive',
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                    'Origin': 'https://pan.baidu.com',
-                    'Pragma': 'no-cache',
-                    'Referer': location.href,
-                    'Sec-Fetch-Dest': 'empty',
-                    'Sec-Fetch-Mode': 'cors',
-                    'Sec-Fetch-Site': 'same-origin',
-                    'User-Agent': navigator.userAgent,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'sec-ch-ua': '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
-                    'sec-ch-ua-mobile': '?0',
-                    'sec-ch-ua-platform': '"macOS"'
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
-                cookie: document.cookie,
-                data: `path=${encodeURIComponent(path)}&isdir=1&size=&block_list=%5B%5D&method=post&dataType=json`,
+                data: JSON.stringify({
+                    pan_type: 'baidu',
+                    path: fullPath
+                }),
                 onload: (response) => {
                     try {
+                        console.log('  后端响应状态:', response.status);
+                        console.log('  后端响应内容:', response.responseText);
                         const result = JSON.parse(response.responseText);
-                        console.log('  创建文件夹响应:', result);
+                        console.log('  解析后结果:', result);
                         
-                        // errno=0 成功，errno=-8 已存在也算成功
-                        if (result.errno === 0 || result.errno === -8) {
-                            console.log('  ✅ 文件夹已就绪:', path);
-                            resolve(result);
+                        if (result.success) {
+                            console.log('✅ OpenList路径就绪:', result.path);
+                            resolve(result.path);
                         } else {
-                            reject(new Error(`创建文件夹失败: errno=${result.errno}`));
+                            console.error('  后端返回失败:', result);
+                            reject(new Error(`获取路径失败: ${JSON.stringify(result)}`));
                         }
                     } catch (e) {
+                        console.error('  解析响应失败:', e);
+                        console.error('  原始响应:', response.responseText);
                         reject(e);
                     }
                 },
                 onerror: (error) => {
-                    reject(new Error('创建文件夹请求失败'));
+                    reject(new Error('网络请求失败'));
                 }
             });
         });
-    }
-    
-    // 确保目录存在（逐层创建）
-    async function ensureFolderExists(fullPath) {
-        console.log('🔍 检查并创建目录:', fullPath);
-        
-        // 分割路径
-        const parts = fullPath.split('/').filter(p => p);
-        
-        // 逐层创建
-        let currentPath = '';
-        for (const part of parts) {
-            currentPath += '/' + part;
-            
-            try {
-                await createBaiduFolder(currentPath);
-            } catch (error) {
-                console.error(`  ❌ 创建失败: ${currentPath}`, error);
-                throw error;
-            }
-        }
-        
-        console.log('✅ 目录检查完成:', fullPath);
     }
     
     // 调用百度网盘原生API转存
@@ -439,11 +399,11 @@
             throw new Error('无法获取页面数据，请刷新页面重试');
         }
         
-        // 先确保目录存在
+        // 通过OpenList确保目录存在（统一逻辑）
         try {
-            await ensureFolderExists(cleanPath);
+            await ensureBaiduFolderExists(cleanPath);
         } catch (error) {
-            console.error('❌ 创建目录失败:', error);
+            console.error('❌ OpenList创建目录失败:', error);
             throw new Error(`创建目录失败: ${error.message}`);
         }
         
