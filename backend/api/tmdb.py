@@ -22,7 +22,7 @@ TMDB_IMAGE_W300 = "https://image.tmdb.org/t/p/w300"  # 小尺寸（列表用）
 
 # 加载分类配置
 try:
-    cat_file = Path(__file__).parent.parent.parent / "cat.yaml"
+    cat_file = Path(__file__).parent.parent / "cat.yaml"
     with open(cat_file, 'r', encoding='utf-8') as f:
         CATEGORIES = yaml.safe_load(f)
 except Exception as e:
