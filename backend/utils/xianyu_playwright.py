@@ -44,18 +44,66 @@ def get_global_browser(headless: bool = True) -> tuple[Browser, BrowserContext]:
         logger.info(f"🌐 启动全局Playwright浏览器（{mode}模式）...")
         
         _global_playwright = sync_playwright().start()
+        
+        # 反检测参数配置
+        launch_args = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-blink-features=AutomationControlled',  # 关键：隐藏自动化特征
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--disable-site-isolation-trials',
+        ]
+        
         _global_browser = _global_playwright.chromium.launch(
             headless=headless,
-            args=[
-                '--no-sandbox',
-                '--disable-dev-shm-usage',
-            ]
+            args=launch_args,
+            chromium_sandbox=False
         )
         
+        # 创建上下文，模拟真实浏览器
         _global_context = _global_browser.new_context(
             user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            viewport={'width': 1920, 'height': 1080}
+            viewport={'width': 1920, 'height': 1080},
+            locale='zh-CN',
+            timezone_id='Asia/Shanghai',
+            # 模拟真实浏览器的权限
+            permissions=['geolocation', 'notifications'],
+            # 设置额外的HTTP头
+            extra_http_headers={
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            }
         )
+        
+        # 注入反检测脚本到每个新页面
+        _global_context.add_init_script("""
+            // 覆盖 navigator.webdriver
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+            
+            // 覆盖 plugins
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5]
+            });
+            
+            // 覆盖 languages
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['zh-CN', 'zh', 'en']
+            });
+            
+            // 覆盖 chrome 对象
+            window.chrome = {
+                runtime: {}
+            };
+            
+            // 覆盖 permissions
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+        """)
         
         _global_headless = headless
         logger.info(f"✅ 全局Playwright浏览器启动成功（{mode}模式）")
