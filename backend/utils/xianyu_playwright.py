@@ -147,13 +147,40 @@ class KamiAutomation:
             # 打印页面标题和内容，帮助调试
             logger.info(f"页面标题: {page.title()}")
             
+            # 等待页面完全加载
+            try:
+                page.wait_for_load_state('networkidle', timeout=10000)
+                logger.info("页面加载完成（networkidle）")
+            except:
+                logger.info("等待networkidle超时，继续...")
+            
+            # 打印页面部分HTML，帮助调试
+            try:
+                body_html = page.content()
+                # 只打印前2000字符
+                logger.info(f"页面HTML片段: {body_html[:2000]}")
+                # 查找所有img标签
+                imgs = page.locator('img').all()
+                logger.info(f"页面中找到 {len(imgs)} 个img标签")
+                for idx, img in enumerate(imgs[:5]):  # 只看前5个
+                    try:
+                        src = img.get_attribute('src')
+                        alt = img.get_attribute('alt')
+                        class_name = img.get_attribute('class')
+                        logger.info(f"  img[{idx}]: src={src[:50] if src else 'None'}, alt={alt}, class={class_name}")
+                    except:
+                        pass
+            except Exception as e:
+                logger.error(f"打印HTML失败: {e}")
+            
             # 尝试点击扫码登录tab（如果有）
             try:
                 qr_tab = page.locator("text=扫码登录").or_(page.locator("text=二维码登录"))
                 if qr_tab.count() > 0:
                     logger.info("找到扫码登录标签，点击切换")
                     qr_tab.first.click()
-                    time.sleep(1)
+                    time.sleep(2)
+                    logger.info("已切换到扫码登录")
             except Exception as e:
                 logger.info(f"没有找到扫码登录标签: {e}")
             
