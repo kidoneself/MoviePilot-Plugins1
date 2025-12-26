@@ -71,16 +71,26 @@
               <el-input v-model="shippingForm.product_title" placeholder="商品标题（用于搜索定位商品）" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="setupShipping" :loading="shippingSetup">
+              <el-button type="primary" @click="setupShipping" :loading="shippingSetup" :disabled="shippingNeedRetry">
                 设置自动发货
+              </el-button>
+              <el-button v-if="shippingNeedRetry" type="warning" @click="retrySetupShipping" :loading="shippingSetup" style="margin-left: 10px;">
+                🔄 重试
               </el-button>
             </el-form-item>
             <el-alert
+              v-if="shippingNeedRetry"
               type="warning"
               :closable="false"
-              style="margin-top: 10px;"
+              style="margin-bottom: 10px;"
             >
-              将为最新的2个商品设置自动发货，使用指定的卡种发货
+              商品可能还在审核中，请等待审核通过后点击"重试"按钮
+            </el-alert>
+            <el-alert
+              type="info"
+              :closable="false"
+            >
+              将通过商品标题搜索商品，并为搜索到的商品设置自动发货
             </el-alert>
           </el-form>
         </el-tab-pane>
@@ -140,6 +150,7 @@ const shippingForm = ref({
   product_title: ''
 })
 const shippingSetup = ref(false)
+const shippingNeedRetry = ref(false)
 
 // 添加日志
 const addLog = (message, status = 'info') => {
@@ -210,6 +221,14 @@ const pollTaskStatus = async (taskId, taskType) => {
           // 简单去重：检查最后一条日志
           if (logs.value.length === 0 || logs.value[0].message !== latestStep.step) {
             addLog(latestStep.step, latestStep.status)
+          }
+          
+          // 检测是否需要重试（仅针对设置自动发货）
+          if (taskType === 'setup_shipping' && latestStep.status === 'need_retry') {
+            shippingNeedRetry.value = true
+            shippingSetup.value = false
+            ElMessage.warning('商品可能还在审核中，请等待审核通过后点击重试')
+            return // 停止轮询，等待用户手动重试
           }
         }
         
@@ -298,6 +317,7 @@ const setupShipping = async () => {
   }
   
   shippingSetup.value = true
+  shippingNeedRetry.value = false  // 清除重试状态
   addLog(`开始设置自动发货: ${shippingForm.value.kind_name}`, 'loading')
   
   try {
@@ -319,6 +339,12 @@ const setupShipping = async () => {
   }
 }
 
+// 重试设置自动发货
+const retrySetupShipping = async () => {
+  shippingNeedRetry.value = false
+  await setupShipping()
+}
+
 // 获取日志类型
 const getLogType = (status) => {
   const map = {
@@ -326,7 +352,8 @@ const getLogType = (status) => {
     'success': 'success',
     'error': 'danger',
     'warning': 'warning',
-    'info': ''
+    'info': '',
+    'need_retry': 'warning'
   }
   return map[status] || ''
 }

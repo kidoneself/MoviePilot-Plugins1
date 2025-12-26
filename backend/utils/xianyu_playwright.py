@@ -828,9 +828,11 @@ class KamiAutomation:
                 logger.info(f"搜索结果中找到 {found_count} 个匹配的商品")
                 
                 if found_count == 0:
-                    self._send_step("搜索结果为空或不匹配", "error")
-                    logger.error(f"搜索'{product_title}'无结果")
+                    # 商品可能还在审核中，发送需要重试的提示
+                    self._send_step(f"搜索'{product_title}'暂无结果（商品可能在审核中），请稍后重试", "need_retry")
+                    logger.warning(f"搜索'{product_title}'无结果，可能商品还在审核")
                     page.screenshot(path="/tmp/search_no_result.png", full_page=True)
+                    # 保持浏览器打开，等待用户重试
                     return False
                 
                 self._send_step(f"找到 {found_count} 个匹配商品", "success")
