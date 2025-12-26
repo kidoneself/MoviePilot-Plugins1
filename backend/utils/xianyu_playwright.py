@@ -328,9 +328,51 @@ class KamiAutomation:
             for i in range(120):
                 time.sleep(1)
                 current_url = page.url
+                
+                # 多种方式判断登录成功
+                login_success = False
+                
+                # 方式1: URL跳转（离开登录页）
                 if 'login' not in current_url:
+                    login_success = True
+                    logger.info(f"检测到URL跳转: {current_url}")
+                
+                # 方式2: 检查是否出现"我的工作台"等元素
+                if not login_success:
+                    try:
+                        # 检查是否有登录后的元素
+                        logged_in_elements = [
+                            "text=我的工作台",
+                            "text=退出登录",
+                            "text=个人中心",
+                            ".user-info",
+                            "#user-menu"
+                        ]
+                        for selector in logged_in_elements:
+                            if page.locator(selector).count() > 0:
+                                login_success = True
+                                logger.info(f"检测到登录元素: {selector}")
+                                break
+                    except:
+                        pass
+                
+                # 方式3: 检查cookie是否有登录凭证
+                if not login_success and i > 5:  # 5秒后开始检查cookie
+                    try:
+                        cookies = self.context.cookies()
+                        for cookie in cookies:
+                            if cookie.get('name') in ['token', 'sid', 'session', 'auth', '_tb_token_']:
+                                if cookie.get('value'):
+                                    login_success = True
+                                    logger.info(f"检测到登录Cookie: {cookie.get('name')}")
+                                    break
+                    except:
+                        pass
+                
+                if login_success:
                     self._send_step("✓ 登录成功！", "success")
                     logger.info(f"登录成功，当前URL: {current_url}")
+                    time.sleep(2)  # 等待页面稳定
                     return True
                 
                 if i > 0 and i % 15 == 0:
