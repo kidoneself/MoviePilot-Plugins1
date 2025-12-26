@@ -107,7 +107,29 @@ def classify_media(details: Dict, media_type: str) -> Optional[str]:
         logger.debug(f"  ✓ 匹配到分类: {cat_name}")
         return cat_name
     
-    logger.debug(f"  ✗ 未匹配到任何分类")
+    # 兜底分类逻辑：如果没有匹配到任何分类，根据国家和媒体类型给一个默认分类
+    logger.debug(f"  ⚠️ 未匹配到任何分类，使用兜底逻辑")
+    asian_countries = {'CN', 'TW', 'HK', 'JP', 'KR', 'KP', 'TH', 'IN', 'SG'}
+    is_asian = any(c in asian_countries for c in all_countries) if all_countries else False
+    
+    # 兜底分类映射
+    fallback_mapping = {
+        'movie': {
+            True: '电影/国产电影',      # 亚洲电影默认为国产
+            False: '电影/欧美电影'       # 非亚洲电影默认为欧美
+        },
+        'tv': {
+            True: '其他/综艺节目',       # 亚洲剧集默认为综艺（因为很多综艺节目可能没有genre_ids）
+            False: '剧集/欧美剧集'       # 非亚洲剧集默认为欧美剧集
+        }
+    }
+    
+    fallback_category = fallback_mapping.get(media_type, {}).get(is_asian)
+    if fallback_category:
+        logger.info(f"  🔄 使用兜底分类: {fallback_category} (亚洲={is_asian})")
+        return fallback_category
+    
+    logger.warning(f"  ✗ 无法分类，连兜底分类也失败")
     return None
 
 
