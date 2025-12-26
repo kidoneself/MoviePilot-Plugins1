@@ -424,18 +424,25 @@ class MonitorService:
                                 LinkRecord.source_file == str(file_path)
                             ).first()
                             
-                            # 判断是否已同步过（检查对应网盘字段）
+                            # 判断是否已同步过（检查对应网盘字段 + 文件是否存在）
                             already_synced = False
                             if record:
+                                target_file_in_db = None
                                 if idx == 0 and record.quark_target_file:
-                                    already_synced = True
+                                    target_file_in_db = record.quark_target_file
                                 elif idx == 1 and record.baidu_target_file:
-                                    already_synced = True
+                                    target_file_in_db = record.baidu_target_file
                                 elif idx == 2 and record.xunlei_target_file:
+                                    target_file_in_db = record.xunlei_target_file
+                                
+                                # 必须同时满足：数据库有记录 AND 目标文件真实存在
+                                if target_file_in_db and Path(target_file_in_db).exists():
                                     already_synced = True
+                                    logger.debug(f"文件已存在，跳过: {file_path} -> {target_file_in_db}")
+                                elif target_file_in_db:
+                                    logger.info(f"数据库有记录但文件不存在，重新创建: {target_file_in_db}")
                             
                             if already_synced:
-                                logger.debug(f"数据库已有记录，跳过: {file_path} -> {target}")
                                 skipped_count += 1
                                 continue
                             
