@@ -188,6 +188,7 @@ class KamiAutomation:
             
             # 尝试多种二维码选择器
             qr_selectors = [
+                "#wechat-bind-code > img",  # 最新的正确选择器
                 "//div[contains(@class,'bind-code-scan')]//img",
                 "//div[contains(@class,'qrcode')]//img",
                 "img[alt*='二维码']",
