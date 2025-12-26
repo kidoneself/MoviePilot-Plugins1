@@ -61,6 +61,13 @@ class GoofishClient:
     def __init__(self, config: GoofishConfig):
         self.config = config
         self.session = requests.Session()
+        
+        # 如果禁用SSL验证，需要关闭警告并配置session
+        if not config.verify_ssl:
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            # 在session级别配置SSL验证
+            self.session.verify = False
     
     def post(self, path: str, request_body: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
