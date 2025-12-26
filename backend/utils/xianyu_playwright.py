@@ -835,6 +835,33 @@ class KamiAutomation:
                 logger.info("点击搜索按钮")
                 self._send_step("搜索商品中...", "loading")
                 time.sleep(3)  # 等待搜索结果
+                
+                # 验证搜索结果是否包含目标商品
+                verify_script = f"""
+                (function() {{
+                    var rows = document.querySelectorAll('tbody tr');
+                    var foundCount = 0;
+                    for (var i = 0; i < rows.length; i++) {{
+                        var text = rows[i].textContent;
+                        if (text.includes('{product_title}')) {{
+                            foundCount++;
+                        }}
+                    }}
+                    return foundCount;
+                }})()
+                """
+                
+                found_count = page.evaluate(verify_script)
+                logger.info(f"搜索结果中找到 {found_count} 个匹配的商品")
+                
+                if found_count == 0:
+                    self._send_step("搜索结果为空或不匹配", "error")
+                    logger.error(f"搜索'{product_title}'无结果")
+                    page.screenshot(path="/tmp/search_no_result.png", full_page=True)
+                    return False
+                
+                self._send_step(f"找到 {found_count} 个匹配商品", "success")
+                
             except Exception as e:
                 logger.error(f"搜索商品失败: {e}")
                 page.screenshot(path="/tmp/search_product_failed.png", full_page=True)
