@@ -415,8 +415,30 @@ class MonitorService:
                         relative_path = file_path.relative_to(source)
                         file_size = file_path.stat().st_size
                         
+                        # 查询自定义名称映射，检查同步开关
+                        from backend.utils.obfuscator import FolderObfuscator
+                        original_name = FolderObfuscator.extract_show_name(file_path)
+                        name_mapping = session.query(CustomNameMapping).filter(
+                            CustomNameMapping.original_name == original_name
+                        ).first()
+                        
                         # 为每个目标创建硬链接
                         for idx, target in enumerate(targets):
+                            # 检查对应网盘的同步开关
+                            if name_mapping:
+                                if idx == 0 and not name_mapping.sync_to_quark:
+                                    logger.debug(f"夸克同步已关闭，跳过: {original_name}")
+                                    skipped_count += 1
+                                    continue
+                                elif idx == 1 and not name_mapping.sync_to_baidu:
+                                    logger.debug(f"百度同步已关闭，跳过: {original_name}")
+                                    skipped_count += 1
+                                    continue
+                                elif idx == 2 and not name_mapping.sync_to_xunlei:
+                                    logger.debug(f"迅雷同步已关闭，跳过: {original_name}")
+                                    skipped_count += 1
+                                    continue
+                            
                             target_file = target / relative_path
                             
                             # 查询或创建记录
