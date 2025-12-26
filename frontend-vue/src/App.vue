@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Document, List, Folder, Share, Setting, Film, Collection, MagicStick } from '@element-plus/icons-vue'
 import api from './api'
 
@@ -50,6 +50,16 @@ const handleMenuSelect = (key) => {
 
 const syncAll = async () => {
   try {
+    await ElMessageBox.confirm(
+      '确定要执行全量同步吗？此操作将扫描所有源目录并创建硬链接。',
+      '确认全量同步',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    
     const res = await api.syncAll()
     if (res.data.success) {
       ElMessage.success('全量同步已启动')
@@ -57,12 +67,26 @@ const syncAll = async () => {
       ElMessage.error('启动失败: ' + res.data.message)
     }
   } catch (error) {
-    ElMessage.error('请求失败')
+    if (error === 'cancel') {
+      ElMessage.info('已取消全量同步')
+    } else {
+      ElMessage.error('请求失败')
+    }
   }
 }
 
 const triggerTaoSync = async () => {
   try {
+    await ElMessageBox.confirm(
+      '确定要触发云盘同步吗？此操作将启动 TaoSync 云盘同步任务。',
+      '确认触发云盘同步',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    
     const res = await api.triggerTaoSync()
     if (res.data.success) {
       ElMessage.success('TaoSync云盘同步已触发')
@@ -70,12 +94,26 @@ const triggerTaoSync = async () => {
       ElMessage.error('触发失败: ' + res.data.message)
     }
   } catch (error) {
-    ElMessage.error('请求失败')
+    if (error === 'cancel') {
+      ElMessage.info('已取消云盘同步')
+    } else {
+      ElMessage.error('请求失败')
+    }
   }
 }
 
 const batchLinkTemplates = async () => {
   try {
+    await ElMessageBox.confirm(
+      '确定要批量补充模板文件吗？此操作将为所有剧集/电影目录补充模板文件。',
+      '确认批量补充模板',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    
     ElMessage.info('开始批量补充模板文件...')
     const res = await api.batchLinkTemplates()
     if (res.data.success) {
@@ -84,7 +122,11 @@ const batchLinkTemplates = async () => {
       ElMessage.error('补充失败: ' + res.data.message)
     }
   } catch (error) {
-    ElMessage.error('请求失败')
+    if (error === 'cancel') {
+      ElMessage.info('已取消批量补充')
+    } else {
+      ElMessage.error('请求失败')
+    }
   }
 }
 
