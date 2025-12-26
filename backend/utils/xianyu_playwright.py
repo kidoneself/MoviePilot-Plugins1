@@ -54,8 +54,22 @@ def get_global_browser(headless: bool = True) -> tuple[Browser, BrowserContext]:
             '--disable-site-isolation-trials',
         ]
         
+        # 检测 macOS ARM 架构，使用正确的浏览器路径
+        import platform
+        import os
+        executable_path = None
+        if platform.system() == 'Darwin' and 'arm' in platform.machine().lower():
+            arm_path = os.path.expanduser(
+                '~/Library/Caches/ms-playwright/chromium-1200/'
+                'chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'
+            )
+            if os.path.exists(arm_path):
+                executable_path = arm_path
+                logger.info(f"检测到 macOS ARM 架构，使用: {executable_path}")
+        
         _global_browser = _global_playwright.chromium.launch(
             headless=headless,
+            executable_path=executable_path,  # 如果是ARM Mac，使用指定路径
             args=launch_args,
             chromium_sandbox=False
         )
@@ -202,24 +216,53 @@ class KamiAutomation:
             except:
                 logger.info("等待networkidle超时，继续...")
             
-            # 打印页面部分HTML，帮助调试
+            # 保存页面HTML和截图，帮助调试
             try:
-                body_html = page.content()
-                # 只打印前2000字符
-                logger.info(f"页面HTML片段: {body_html[:2000]}")
+                # 保存完整HTML
+                html_path = '/tmp/xianyu_login_page.html'
+                with open(html_path, 'w', encoding='utf-8') as f:
+                    f.write(page.content())
+                logger.info(f"✅ 已保存页面HTML到: {html_path}")
+                
+                # 保存截图
+                screenshot_path = '/tmp/xianyu_login_page.png'
+                page.screenshot(path=screenshot_path, full_page=True)
+                logger.info(f"✅ 已保存页面截图到: {screenshot_path}")
+                
+                # 打印页面标题和URL
+                logger.info(f"页面标题: {page.title()}")
+                logger.info(f"页面URL: {page.url}")
+                
                 # 查找所有img标签
                 imgs = page.locator('img').all()
                 logger.info(f"页面中找到 {len(imgs)} 个img标签")
-                for idx, img in enumerate(imgs[:5]):  # 只看前5个
+                for idx, img in enumerate(imgs):
                     try:
                         src = img.get_attribute('src')
                         alt = img.get_attribute('alt')
                         class_name = img.get_attribute('class')
-                        logger.info(f"  img[{idx}]: src={src[:50] if src else 'None'}, alt={alt}, class={class_name}")
+                        id_attr = img.get_attribute('id')
+                        logger.info(f"  img[{idx}]: src={src if src else 'None'}")
+                        logger.info(f"         alt={alt}, class={class_name}, id={id_attr}")
                     except:
                         pass
+                
+                # 查找所有可能的登录相关元素
+                logger.info("查找登录相关元素...")
+                possible_selectors = [
+                    "button", "div[class*='login']", "div[class*='qr']", 
+                    "div[class*='code']", "div[id*='wechat']", "canvas"
+                ]
+                for sel in possible_selectors:
+                    try:
+                        elements = page.locator(sel).all()
+                        if len(elements) > 0:
+                            logger.info(f"  找到 {len(elements)} 个 {sel} 元素")
+                    except:
+                        pass
+                        
             except Exception as e:
-                logger.error(f"打印HTML失败: {e}")
+                logger.error(f"保存调试信息失败: {e}")
             
             # 查找并点击可能触发二维码显示的按钮
             logger.info("尝试触发二维码显示...")
@@ -270,31 +313,26 @@ class KamiAutomation:
             
             self._send_step("获取登录二维码...", "loading")
             
-            # 尝试多种二维码选择器
+            # 等待二维码元素（等待带alt属性的img）
+            # 从日志看，二维码有 alt="Scan me!" 属性
             qr_selectors = [
-                "#wechat-bind-code > img",  # 最新的正确选择器
-                "#wechat-bind-code img",    # 不带 > 的版本
-                "//div[contains(@class,'bind-code-scan')]//img",
-                "//div[contains(@class,'qrcode')]//img",
-                "//div[@id='wechat-bind-code']//img",  # xpath版本
-                "img[alt*='二维码']",
-                "img[alt*='扫码']",
-                ".qrcode-img",
-                "#J_QRCodeImg"
+                "img[alt='Scan me!']",  # 从调试日志发现的
+                "//div[contains(@class,'bind-code-scan')]//img",  # Selenium 版本的
+                "#wechat-bind-code img",
             ]
             
+            logger.info(f"等待二维码元素加载...")
             qr_img = None
+            
             for selector in qr_selectors:
                 try:
-                    logger.info(f"尝试选择器: {selector}")
-                    # 第一个选择器多等待一会儿
-                    timeout = 10000 if selector == "#wechat-bind-code > img" else 3000
-                    qr_img = page.wait_for_selector(selector, timeout=timeout)
+                    logger.info(f"  尝试: {selector}")
+                    qr_img = page.wait_for_selector(selector, timeout=10000, state='visible')
                     if qr_img:
-                        logger.info(f"✅ 找到二维码，使用选择器: {selector}")
+                        logger.info(f"  ✅ 找到二维码: {selector}")
                         break
                 except Exception as e:
-                    logger.info(f"选择器失败: {selector}")
+                    logger.info(f"  ❌ 失败: {selector}")
                     continue
             
             if not qr_img:
