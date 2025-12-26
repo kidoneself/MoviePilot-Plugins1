@@ -173,24 +173,62 @@ class KamiAutomation:
             except Exception as e:
                 logger.error(f"打印HTML失败: {e}")
             
-            # 尝试点击扫码登录tab（如果有）
+            # 查找并点击可能触发二维码显示的按钮
+            logger.info("尝试触发二维码显示...")
             try:
-                qr_tab = page.locator("text=扫码登录").or_(page.locator("text=二维码登录"))
-                if qr_tab.count() > 0:
-                    logger.info("找到扫码登录标签，点击切换")
-                    qr_tab.first.click()
-                    time.sleep(2)
-                    logger.info("已切换到扫码登录")
+                # 尝试多种可能的触发按钮
+                trigger_selectors = [
+                    "text=微信登录",
+                    "text=扫码登录",
+                    "text=二维码登录",
+                    ".wechat-login",
+                    "#wechat-login-btn",
+                    "button:has-text('微信')",
+                    "div:has-text('微信登录')"
+                ]
+                
+                clicked = False
+                for selector in trigger_selectors:
+                    try:
+                        logger.info(f"尝试点击触发按钮: {selector}")
+                        btn = page.locator(selector).first
+                        if btn.count() > 0:
+                            btn.click()
+                            logger.info(f"✅ 点击了触发按钮: {selector}")
+                            time.sleep(3)  # 等待二维码加载
+                            clicked = True
+                            break
+                    except Exception as e:
+                        logger.info(f"触发按钮不存在: {selector}")
+                        continue
+                
+                if not clicked:
+                    logger.info("未找到触发按钮，二维码可能已在页面上")
+                else:
+                    # 点击后重新检查img标签
+                    imgs = page.locator('img').all()
+                    logger.info(f"点击后页面中找到 {len(imgs)} 个img标签")
+                    for idx, img in enumerate(imgs[:10]):
+                        try:
+                            src = img.get_attribute('src')
+                            alt = img.get_attribute('alt')
+                            id_attr = img.get_attribute('id')
+                            logger.info(f"  img[{idx}]: src={src[:80] if src else 'None'}, alt={alt}, id={id_attr}")
+                        except:
+                            pass
+                    
             except Exception as e:
-                logger.info(f"没有找到扫码登录标签: {e}")
+                logger.info(f"触发二维码显示失败: {e}")
             
             self._send_step("获取登录二维码...", "loading")
             
             # 尝试多种二维码选择器
             qr_selectors = [
                 "#wechat-bind-code > img",  # 最新的正确选择器
+                "#wechat-bind-code img",    # 不带 > 的版本
                 "//div[contains(@class,'bind-code-scan')]//img",
                 "//div[contains(@class,'qrcode')]//img",
+                "//div[@id='wechat-bind-code']//img",  # xpath版本
                 "img[alt*='二维码']",
                 "img[alt*='扫码']",
                 ".qrcode-img",
@@ -201,7 +239,9 @@ class KamiAutomation:
             for selector in qr_selectors:
                 try:
                     logger.info(f"尝试选择器: {selector}")
-                    qr_img = page.wait_for_selector(selector, timeout=3000)
+                    # 第一个选择器多等待一会儿
+                    timeout = 10000 if selector == "#wechat-bind-code > img" else 3000
+                    qr_img = page.wait_for_selector(selector, timeout=timeout)
                     if qr_img:
                         logger.info(f"✅ 找到二维码，使用选择器: {selector}")
                         break
