@@ -407,12 +407,10 @@ class KamiAutomation:
             page = self._get_page()
             self._send_step(f"开始创建卡种: {kind_name}", "loading")
             
-            # 访问卡密类型添加页面（和 Selenium 版本一样）
+            # 访问卡密类型添加页面
             add_url = "https://www.goofish.pro/kam/kind/add"
             page.goto(add_url, timeout=30000)
             self._send_step("访问卡密类型添加页面", "loading")
-            
-            time.sleep(2)
             
             # 检查是否需要登录
             if 'login' in page.url:
@@ -420,14 +418,8 @@ class KamiAutomation:
                 if not self._login():
                     self._send_step("登录失败", "error")
                     return False
-                # 登录成功后重新访问添加页面
-                self._send_step("登录成功，重新访问添加页面...", "loading")
+                # 重新访问添加页面
                 page.goto(add_url, timeout=30000)
-                time.sleep(2)
-            
-            # 调试：打印页面信息
-            logger.info(f"当前页面URL: {page.url}")
-            logger.info(f"页面标题: {page.title()}")
             
             time.sleep(2)
             
@@ -448,12 +440,13 @@ class KamiAutomation:
             # 2. 填写卡种名称
             self._send_step(f"填写卡种名称: {kind_name}", "loading")
             name_input = page.locator("//label[contains(text(),'卡种名称')]/..//input").first
-            name_input.fill("")  # 先清空
+            name_input.clear()
             name_input.fill(kind_name)
             
             # 3. 填写卡号前缀
             try:
                 card_prefix = page.locator("//label[contains(text(),'卡号前缀')]/..//input").first
+                card_prefix.clear()
                 card_prefix.fill("  ")
             except:
                 pass
@@ -461,6 +454,7 @@ class KamiAutomation:
             # 4. 填写密码前缀
             try:
                 pwd_prefix = page.locator("//label[contains(text(),'密码前缀')]/..//input").first
+                pwd_prefix.clear()
                 pwd_prefix.fill("  ")
             except:
                 pass
@@ -468,6 +462,7 @@ class KamiAutomation:
             # 5. 填写库存预警
             try:
                 stock_input = page.locator("//label[contains(text(),'库存预警')]/..//input").first
+                stock_input.clear()
                 stock_input.fill("1")
             except:
                 pass
