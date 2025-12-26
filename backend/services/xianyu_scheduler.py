@@ -69,6 +69,12 @@ class XianyuScheduler:
         self.running = True
         logger.info("闲鱼定时任务调度器启动")
         
+        # 首次启动时立即检查一次
+        try:
+            await self._check_and_execute_tasks()
+        except Exception as e:
+            logger.error(f"首次检查任务失败: {e}", exc_info=True)
+        
         # 启动定时检查循环
         asyncio.create_task(self._check_loop())
     
@@ -96,6 +102,7 @@ class XianyuScheduler:
         session = _get_session()
         try:
             now = datetime.now()
+            logger.debug(f"⏰ 检查定时任务，当前时间: {now}")
             
             # 查询待执行的任务（状态为PENDING，执行时间小于等于当前时间）
             tasks = session.query(GoofishScheduleTask).filter(
@@ -104,6 +111,16 @@ class XianyuScheduler:
                     GoofishScheduleTask.execute_time <= now
                 )
             ).all()
+            
+            # 查询所有PENDING任务（用于调试）
+            all_pending = session.query(GoofishScheduleTask).filter(
+                GoofishScheduleTask.status == 'PENDING'
+            ).all()
+            
+            if all_pending:
+                logger.info(f"📋 当前有 {len(all_pending)} 个待执行任务")
+                for t in all_pending:
+                    logger.info(f"  - 任务 {t.id}: {t.task_type}, 执行时间: {t.execute_time}, 当前时间: {now}, 差值: {(t.execute_time - now).total_seconds()}秒")
             
             if not tasks:
                 return
