@@ -9,9 +9,9 @@
           </el-button>
           <el-select v-model="filterStatus" placeholder="状态筛选" style="width: 150px" @change="loadProducts">
             <el-option label="全部" :value="null" />
-            <el-option label="待发布" :value="0" />
-            <el-option label="已上架" :value="1" />
-            <el-option label="已下架" :value="2" />
+            <el-option label="📝 草稿箱" :value="21" />
+            <el-option label="✅ 已上架" :value="22" />
+            <el-option label="⏸️ 已下架" :value="36" />
           </el-select>
         </el-space>
       </div>
@@ -48,12 +48,15 @@
         </el-table-column>
         <el-table-column prop="stock" label="库存" width="80" />
         <el-table-column prop="sold" label="已售" width="80" />
-        <el-table-column prop="product_status" label="状态" width="100">
+        <el-table-column prop="product_status" label="状态" width="120">
           <template #default="{ row }">
-            <el-tag v-if="row.product_status === 0" type="info">待发布</el-tag>
+            <el-tag v-if="row.product_status === 21" type="info">📝 草稿箱</el-tag>
+            <el-tag v-else-if="row.product_status === 22" type="success">✅ 已上架</el-tag>
+            <el-tag v-else-if="row.product_status === 36" type="warning">⏸️ 已下架</el-tag>
+            <el-tag v-else-if="row.product_status === 0" type="info">待发布</el-tag>
             <el-tag v-else-if="row.product_status === 1" type="success">已上架</el-tag>
             <el-tag v-else-if="row.product_status === 2" type="warning">已下架</el-tag>
-            <el-tag v-else type="info">{{ row.product_status }}</el-tag>
+            <el-tag v-else type="info">未知({{ row.product_status }})</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="sync_time" label="同步时间" width="180">
@@ -64,7 +67,7 @@
         <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
             <el-button
-              v-if="row.product_status !== 1"
+              v-if="row.product_status !== 22 && row.product_status !== 1"
               size="small"
               type="primary"
               @click="publishProduct(row)"
@@ -72,7 +75,7 @@
               上架
             </el-button>
             <el-button
-              v-if="row.product_status === 1"
+              v-if="row.product_status === 22 || row.product_status === 1"
               size="small"
               type="warning"
               @click="downshelfProduct(row)"
@@ -86,7 +89,7 @@
               定时任务
             </el-button>
             <el-button
-              v-if="row.product_status === 0"
+              v-if="row.product_status === 21 || row.product_status === 0"
               size="small"
               type="danger"
               @click="deleteProduct(row)"
@@ -304,8 +307,8 @@ const batchScheduleTask = () => {
     return
   }
   
-  // 判断默认任务类型：如果全是已上架则默认下架，否则默认上架
-  const allOnline = selectedProducts.value.every(p => p.product_status === 1)
+  // 判断默认任务类型：如果全是已上架（22或1）则默认下架，否则默认上架
+  const allOnline = selectedProducts.value.every(p => p.product_status === 22 || p.product_status === 1)
   
   scheduleForm.value = {
     product: null,
@@ -322,7 +325,7 @@ const createScheduleTask = (product) => {
   scheduleForm.value = {
     product: product,
     products: null,
-    task_type: product.product_status === 1 ? 'downshelf' : 'publish',
+    task_type: (product.product_status === 22 || product.product_status === 1) ? 'downshelf' : 'publish',
     execute_time: null,
     repeat_daily: true
   }

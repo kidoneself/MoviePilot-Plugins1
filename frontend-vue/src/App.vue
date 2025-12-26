@@ -70,7 +70,7 @@ const syncAll = async () => {
     if (error === 'cancel') {
       ElMessage.info('已取消全量同步')
     } else {
-      ElMessage.error('请求失败')
+    ElMessage.error('请求失败')
     }
   }
 }
@@ -97,7 +97,7 @@ const triggerTaoSync = async () => {
     if (error === 'cancel') {
       ElMessage.info('已取消云盘同步')
     } else {
-      ElMessage.error('请求失败')
+    ElMessage.error('请求失败')
     }
   }
 }
@@ -125,7 +125,7 @@ const batchLinkTemplates = async () => {
     if (error === 'cancel') {
       ElMessage.info('已取消批量补充')
     } else {
-      ElMessage.error('请求失败')
+    ElMessage.error('请求失败')
     }
   }
 }
