@@ -19,7 +19,26 @@
 
     <!-- 商品列表 -->
     <el-card style="margin-top: 20px;">
-      <el-table v-loading="loading" :data="products" style="width: 100%">
+      <div style="margin-bottom: 10px;">
+        <el-button 
+          type="success" 
+          size="small" 
+          @click="batchScheduleTask"
+          :disabled="selectedProducts.length === 0"
+        >
+          批量定时任务 ({{ selectedProducts.length }})
+        </el-button>
+        <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+          提示：勾选商品后可批量创建定时任务
+        </span>
+      </div>
+      <el-table 
+        v-loading="loading" 
+        :data="products" 
+        style="width: 100%"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
         <el-table-column prop="product_id" label="商品ID" width="120" />
         <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
         <el-table-column prop="price" label="价格" width="100">
@@ -93,28 +112,49 @@
     </el-card>
 
     <!-- 定时任务对话框 -->
-    <el-dialog v-model="scheduleVisible" title="创建定时任务" width="500px">
+    <el-dialog 
+      v-model="scheduleVisible" 
+      :title="scheduleForm.products && scheduleForm.products.length > 1 ? '批量创建定时任务' : '创建定时任务'" 
+      width="600px"
+    >
       <el-form :model="scheduleForm" label-width="120px">
         <el-form-item label="商品">
-          <el-input :value="scheduleForm.product?.title" disabled />
+          <div v-if="scheduleForm.products && scheduleForm.products.length > 1">
+            <el-tag type="success" size="large">
+              已选择 {{ scheduleForm.products.length }} 个商品
+            </el-tag>
+            <div style="max-height: 150px; overflow-y: auto; margin-top: 10px; padding: 10px; background: #f5f7fa; border-radius: 4px;">
+              <div v-for="(prod, idx) in scheduleForm.products" :key="prod.product_id" style="padding: 3px 0; font-size: 13px;">
+                {{ idx + 1 }}. {{ prod.title }}
+              </div>
+            </div>
+          </div>
+          <el-input 
+            v-else 
+            :value="scheduleForm.product?.title || (scheduleForm.products && scheduleForm.products[0]?.title)" 
+            disabled 
+          />
         </el-form-item>
         <el-form-item label="任务类型">
           <el-select v-model="scheduleForm.task_type" style="width: 100%">
-            <el-option label="定时上架" value="publish" />
-            <el-option label="定时下架" value="downshelf" />
+            <el-option label="每日定时上架" value="publish" />
+            <el-option label="每日定时下架" value="downshelf" />
           </el-select>
+          <div style="color: #909399; font-size: 12px; margin-top: 5px;">
+            ⏰ 任务将每天在指定时间自动执行
+          </div>
         </el-form-item>
         <el-form-item label="执行时间">
-          <el-date-picker
+          <el-time-picker
             v-model="scheduleForm.execute_time"
-            type="datetime"
             placeholder="选择时间"
             style="width: 100%"
-            format="YYYY-MM-DD HH:mm"
+            format="HH:mm"
+            value-format="HH:mm"
           />
-        </el-form-item>
-        <el-form-item label="每日重复">
-          <el-switch v-model="scheduleForm.repeat_daily" />
+          <div style="color: #909399; font-size: 12px; margin-top: 5px;">
+            设置每天固定的执行时间（例如：08:00 上架，23:00 下架）
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -140,10 +180,12 @@ const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(20)
 const filterStatus = ref(null)
+const selectedProducts = ref([])
 
 const scheduleVisible = ref(false)
 const scheduleForm = ref({
   product: null,
+  products: null,  // 批量商品
   task_type: 'publish',
   execute_time: null,
   repeat_daily: false
@@ -250,13 +292,39 @@ const deleteProduct = async (product) => {
   }
 }
 
-// 创建定时任务
+// 处理表格选择变化
+const handleSelectionChange = (selection) => {
+  selectedProducts.value = selection
+}
+
+// 批量创建定时任务
+const batchScheduleTask = () => {
+  if (selectedProducts.value.length === 0) {
+    ElMessage.warning('请先选择商品')
+    return
+  }
+  
+  // 判断默认任务类型：如果全是已上架则默认下架，否则默认上架
+  const allOnline = selectedProducts.value.every(p => p.product_status === 1)
+  
+  scheduleForm.value = {
+    product: null,
+    products: selectedProducts.value,
+    task_type: allOnline ? 'downshelf' : 'publish',
+    execute_time: null,
+    repeat_daily: true
+  }
+  scheduleVisible.value = true
+}
+
+// 创建定时任务（单个）
 const createScheduleTask = (product) => {
   scheduleForm.value = {
     product: product,
+    products: null,
     task_type: product.product_status === 1 ? 'downshelf' : 'publish',
     execute_time: null,
-    repeat_daily: false
+    repeat_daily: true
   }
   scheduleVisible.value = true
 }
@@ -268,18 +336,44 @@ const submitScheduleTask = async () => {
     return
   }
   
+  // 获取商品ID列表
+  let productIds = []
+  if (scheduleForm.value.products) {
+    // 批量
+    productIds = scheduleForm.value.products.map(p => p.product_id)
+  } else if (scheduleForm.value.product) {
+    // 单个
+    productIds = [scheduleForm.value.product.product_id]
+  }
+  
+  if (productIds.length === 0) {
+    ElMessage.warning('请选择商品')
+    return
+  }
+  
   scheduling.value = true
   try {
+    // 将时分秒转换为今天的完整时间
+    const now = new Date()
+    const [hours, minutes] = scheduleForm.value.execute_time.split(':')
+    const executeDateTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(hours), parseInt(minutes), 0)
+    
+    // 如果设置的时间已经过了今天，则从明天开始
+    if (executeDateTime < now) {
+      executeDateTime.setDate(executeDateTime.getDate() + 1)
+    }
+    
     const res = await api.post('/xianyu/schedule-task', {
       task_type: scheduleForm.value.task_type,
-      product_ids: [scheduleForm.value.product.product_id],
-      execute_time: scheduleForm.value.execute_time.toISOString(),
-      repeat_daily: scheduleForm.value.repeat_daily
+      product_ids: productIds,
+      execute_time: executeDateTime.toISOString(),
+      repeat_daily: true  // 每天重复
     })
     
     if (res.data.success) {
-      ElMessage.success('定时任务创建成功')
+      ElMessage.success(`定时任务创建成功，共 ${productIds.length} 个商品`)
       scheduleVisible.value = false
+      selectedProducts.value = []
     }
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || '创建失败')
