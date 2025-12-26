@@ -137,15 +137,64 @@ class KamiAutomation:
             time.sleep(3)
             
             # 检查是否在登录页面
-            if 'login' not in page.url:
+            current_url = page.url
+            logger.info(f"当前页面 URL: {current_url}")
+            
+            if 'login' not in current_url:
                 self._send_step("已登录", "success")
                 return True
             
+            # 打印页面标题和内容，帮助调试
+            logger.info(f"页面标题: {page.title()}")
+            
+            # 尝试点击扫码登录tab（如果有）
+            try:
+                qr_tab = page.locator("text=扫码登录").or_(page.locator("text=二维码登录"))
+                if qr_tab.count() > 0:
+                    logger.info("找到扫码登录标签，点击切换")
+                    qr_tab.first.click()
+                    time.sleep(1)
+            except Exception as e:
+                logger.info(f"没有找到扫码登录标签: {e}")
+            
             self._send_step("获取登录二维码...", "loading")
             
-            # 获取二维码
+            # 尝试多种二维码选择器
+            qr_selectors = [
+                "//div[contains(@class,'bind-code-scan')]//img",
+                "//div[contains(@class,'qrcode')]//img",
+                "img[alt*='二维码']",
+                "img[alt*='扫码']",
+                ".qrcode-img",
+                "#J_QRCodeImg"
+            ]
+            
+            qr_img = None
+            for selector in qr_selectors:
+                try:
+                    logger.info(f"尝试选择器: {selector}")
+                    qr_img = page.wait_for_selector(selector, timeout=3000)
+                    if qr_img:
+                        logger.info(f"✅ 找到二维码，使用选择器: {selector}")
+                        break
+                except Exception as e:
+                    logger.info(f"选择器失败: {selector}")
+                    continue
+            
+            if not qr_img:
+                # 截图保存，方便调试
+                try:
+                    screenshot_path = '/tmp/login_page_screenshot.png'
+                    page.screenshot(path=screenshot_path)
+                    logger.error(f"未找到二维码元素，已保存截图到: {screenshot_path}")
+                except:
+                    pass
+                
+                logger.error("所有二维码选择器都失败了")
+                self._send_step("未找到二维码，请检查页面", "error")
+                return False
+            
             try:
-                qr_img = page.wait_for_selector("//div[contains(@class,'bind-code-scan')]//img", timeout=10000)
                 qr_base64 = qr_img.get_attribute('src')
                 
                 if self.step_callback:
@@ -155,27 +204,29 @@ class KamiAutomation:
                 self._send_step("请扫码登录（120秒）", "loading")
                 
             except Exception as e:
-                logger.error(f"获取二维码失败: {e}")
+                logger.error(f"获取二维码src失败: {e}")
                 self._send_step(f"获取二维码失败: {e}", "error")
                 return False
             
             # 等待登录成功
             for i in range(120):
                 time.sleep(1)
-                if 'login' not in page.url:
+                current_url = page.url
+                if 'login' not in current_url:
                     self._send_step("✓ 登录成功！", "success")
-                    logger.info("登录成功")
+                    logger.info(f"登录成功，当前URL: {current_url}")
                     return True
                 
                 if i > 0 and i % 15 == 0:
                     self._send_step(f"等待扫码中... 已等待{i}秒", "loading")
+                    logger.info(f"等待扫码中... URL: {current_url}")
             
             self._send_step("登录超时（120秒）", "error")
             return False
             
         except Exception as e:
             self._send_step(f"登录过程出错: {e}", "error")
-            logger.error(f"登录过程出错: {e}")
+            logger.error(f"登录过程出错: {e}", exc_info=True)
             return False
     
     def create_kami_kind(self, kind_name: str, category_id: Optional[int] = None) -> bool:
