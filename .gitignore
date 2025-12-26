@@ -33,5 +33,8 @@ backend/services/logs/
 # 缓存
 cache/
 
+# 上传文件
+uploads/
+
 # Docker
 .dockerignore

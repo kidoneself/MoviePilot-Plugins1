@@ -180,10 +180,16 @@ const syncProducts = async () => {
   try {
     const res = await api.post('/xianyu/product/sync', {
       page_no: 1,
-      page_size: 100
+      page_size: 100,
+      clear_history: true  // 清除历史数据
     })
     if (res.data.success) {
-      ElMessage.success(`同步成功，共 ${res.data.synced_count} 个商品`)
+      const { deleted_count, synced_count, message } = res.data
+      if (deleted_count > 0) {
+        ElMessage.success(`${message}，新增 ${synced_count} 个商品`)
+      } else {
+        ElMessage.success(`同步成功，共 ${synced_count} 个商品`)
+      }
       loadProducts()
     }
   } catch (error) {

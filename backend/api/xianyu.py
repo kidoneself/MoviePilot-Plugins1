@@ -49,7 +49,8 @@ def get_sdk() -> GoofishSDK:
             
             config = SDKConfig(
                 app_key=app_key_cfg.config_value,
-                app_secret=app_secret_cfg.config_value
+                app_secret=app_secret_cfg.config_value,
+                verify_ssl=False  # macOS SSL 证书问题临时禁用验证
             )
             _sdk_instance = GoofishSDK(config)
         finally:
@@ -480,13 +481,28 @@ async def upload_images(
 
 
 @router.post("/xianyu/product/sync")
-async def sync_products(page_no: int = 1, page_size: int = 50, product_status: Optional[int] = None):
-    """同步商品列表"""
+async def sync_products(page_no: int = 1, page_size: int = 50, product_status: Optional[int] = None, clear_history: bool = True):
+    """同步商品列表
+    
+    Args:
+        page_no: 页码
+        page_size: 每页数量
+        product_status: 商品状态筛选
+        clear_history: 是否清除历史数据（默认True）
+    """
     try:
         sdk = get_sdk()
         session = _get_session()
         
         try:
+            # 清除历史数据
+            deleted_count = 0
+            if clear_history:
+                logger.info("开始清除历史商品数据...")
+                deleted_count = session.query(GoofishProduct).delete()
+                session.commit()
+                logger.info(f"已清除 {deleted_count} 条历史商品记录")
+            
             # 构建请求
             request = ProductListRequest(
                 pageNo=page_no,
@@ -510,50 +526,43 @@ async def sync_products(page_no: int = 1, page_size: int = 50, product_status: O
                 if not product_id:
                     continue
                 
-                # 查找或创建
-                db_product = session.query(GoofishProduct).filter_by(product_id=product_id).first()
-                
-                if db_product:
-                    # 更新
-                    db_product.title = item.get('title')
-                    db_product.price = item.get('price')
-                    db_product.stock = item.get('stock')
-                    db_product.sold = item.get('sold')
-                    db_product.product_status = item.get('productStatus')
-                    db_product.sync_time = datetime.now()
-                else:
-                    # 新建
-                    db_product = GoofishProduct(
-                        product_id=product_id,
-                        title=item.get('title'),
-                        outer_id=item.get('outerId'),
-                        price=item.get('price'),
-                        original_price=item.get('originalPrice'),
-                        stock=item.get('stock'),
-                        sold=item.get('sold'),
-                        product_status=item.get('productStatus'),
-                        item_biz_type=item.get('itemBizType'),
-                        sp_biz_type=item.get('spBizType'),
-                        channel_cat_id=item.get('channelCatId'),
-                        district_id=item.get('districtId'),
-                        stuff_status=item.get('stuffStatus'),
-                        express_fee=item.get('expressFee'),
-                        spec_type=item.get('specType'),
-                        source=item.get('source'),
-                        online_time=item.get('onlineTime'),
-                        offline_time=item.get('offlineTime'),
-                        update_time_remote=item.get('updateTime'),
-                        create_time_remote=item.get('createTime')
-                    )
-                    session.add(db_product)
-                
+                # 由于已清除历史数据，直接创建新记录
+                db_product = GoofishProduct(
+                    product_id=product_id,
+                    title=item.get('title'),
+                    outer_id=item.get('outerId'),
+                    price=item.get('price'),
+                    original_price=item.get('originalPrice'),
+                    stock=item.get('stock'),
+                    sold=item.get('sold'),
+                    product_status=item.get('productStatus'),
+                    item_biz_type=item.get('itemBizType'),
+                    sp_biz_type=item.get('spBizType'),
+                    channel_cat_id=item.get('channelCatId'),
+                    district_id=item.get('districtId'),
+                    stuff_status=item.get('stuffStatus'),
+                    express_fee=item.get('expressFee'),
+                    spec_type=item.get('specType'),
+                    source=item.get('source'),
+                    online_time=item.get('onlineTime'),
+                    offline_time=item.get('offlineTime'),
+                    update_time_remote=item.get('updateTime'),
+                    create_time_remote=item.get('createTime')
+                )
+                session.add(db_product)
                 saved_count += 1
             
             session.commit()
             
+            # 构建返回消息
+            message = '同步成功'
+            if clear_history and deleted_count > 0:
+                message = f'同步成功，已清除 {deleted_count} 条历史记录'
+            
             return {
                 'success': True,
-                'message': '同步成功',
+                'message': message,
+                'deleted_count': deleted_count,
                 'synced_count': saved_count,
                 'total': response.total
             }

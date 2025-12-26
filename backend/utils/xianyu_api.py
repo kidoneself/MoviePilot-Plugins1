@@ -22,6 +22,7 @@ class GoofishConfig:
     seller_id: Optional[str] = None
     connect_timeout: int = 30
     read_timeout: int = 60
+    verify_ssl: bool = True  # SSL 证书验证，macOS 有问题时可设为 False
 
 
 class SignUtil:
@@ -115,12 +116,14 @@ class GoofishClient:
         logger.info(f"请求体: {body_json}")
         
         try:
+            # 使用配置的 SSL 验证选项（macOS 证书问题时可以禁用）
             response = self.session.post(
                 url,
                 params=params,
                 headers=headers,
                 data=body_json.encode('utf-8'),
-                timeout=(self.config.connect_timeout, self.config.read_timeout)
+                timeout=(self.config.connect_timeout, self.config.read_timeout),
+                verify=self.config.verify_ssl
             )
             response.raise_for_status()
             
