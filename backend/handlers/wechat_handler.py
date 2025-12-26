@@ -46,6 +46,16 @@ class WeChatCommandHandler:
             self._send_help(user_id)
             return
         
+        # 未完结剧集列表
+        if content in ['未完结', '未完结剧集', 'unfinished']:
+            self._handle_unfinished_shows(user_id)
+            return
+        
+        # 立即检查TMDB更新
+        if content in ['检查更新', '更新检查', 'check']:
+            self._handle_check_updates(user_id)
+            return
+        
         # 数字选择（如果用户刚搜索过）
         if content.isdigit() and user_id in self.user_search_cache:
             self._handle_number_select(user_id, int(content))
@@ -65,6 +75,10 @@ class WeChatCommandHandler:
 📝 **多个结果时**
 1️⃣ 系统返回编号列表
 2️⃣ 回复数字查看对应剧集
+
+📺 **TMDB功能**
+- 「未完结」查看所有未完结剧集
+- 「检查更新」立即检查剧集更新
 
 💡 **提示**
 - 支持模糊搜索
@@ -209,3 +223,77 @@ class WeChatCommandHandler:
             user_id,
             f"🔍 正在搜索「{keyword}」...\n\n此功能开发中，请稍后"
         )
+    
+    def _handle_unfinished_shows(self, user_id: str):
+        """处理未完结剧集查询指令"""
+        session = get_session(self.db_engine)
+        try:
+            from datetime import datetime
+            
+            # 查询所有未完结的电视剧
+            tv_shows = session.query(CustomNameMapping).filter(
+                CustomNameMapping.media_type == 'tv',
+                CustomNameMapping.is_completed == False,
+                CustomNameMapping.tmdb_id.isnot(None)
+            ).all()
+            
+            # 构建消息
+            now = datetime.now()
+            content_parts = [f"📺 未完结剧集汇总 ({now.strftime('%H:%M')})\n"]
+            
+            if not tv_shows:
+                content_parts.append("✅ 当前没有未完结的剧集")
+            else:
+                content_parts.append(f"共有 {len(tv_shows)} 部未完结剧集：\n")
+                
+                # 按名称排序
+                sorted_shows = sorted(tv_shows, key=lambda x: x.original_name)
+                
+                for i, show in enumerate(sorted_shows, 1):
+                    content_parts.append(f"{i}. {show.original_name}")
+                    
+                    # 如果有分享链接，添加短链接
+                    if hasattr(show, 'id'):
+                        short_url = f"https://link.frp.naspt.vip/s/{show.id}"
+                        content_parts.append(f"   🔗 {short_url}")
+            
+            content_parts.append(f"\n⏰ 查询时间: {now.strftime('%Y-%m-%d %H:%M')}")
+            
+            message = "\n".join(content_parts)
+            self.wechat.send_text(user_id, message)
+            logger.info(f"✅ 已发送未完结剧集列表给用户 {user_id} (共{len(tv_shows)}部)")
+            
+        except Exception as e:
+            logger.error(f"查询未完结剧集失败: {e}", exc_info=True)
+            self.wechat.send_text(user_id, f"❌ 查询失败: {str(e)}")
+        finally:
+            session.close()
+    
+    def _handle_check_updates(self, user_id: str):
+        """处理立即检查更新指令"""
+        import asyncio
+        
+        try:
+            # 先发送确认消息
+            self.wechat.send_text(user_id, "⏳ 正在检查TMDB剧集更新...\n\n这可能需要几分钟，请稍后")
+            
+            # 异步执行检查
+            async def do_check():
+                try:
+                    from backend.services.tmdb_scheduler import get_checker
+                    checker = get_checker()
+                    if checker and checker.running:
+                        await checker._check_tv_updates()
+                        logger.info(f"✅ 用户 {user_id} 触发的更新检查已完成")
+                    else:
+                        self.wechat.send_text(user_id, "❌ TMDB检查器未运行")
+                except Exception as e:
+                    logger.error(f"检查更新失败: {e}", exc_info=True)
+                    self.wechat.send_text(user_id, f"❌ 检查失败: {str(e)}")
+            
+            # 在后台执行
+            asyncio.create_task(do_check())
+            
+        except Exception as e:
+            logger.error(f"触发更新检查失败: {e}", exc_info=True)
+            self.wechat.send_text(user_id, f"❌ 触发失败: {str(e)}")
