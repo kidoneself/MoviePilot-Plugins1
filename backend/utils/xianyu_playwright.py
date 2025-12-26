@@ -780,128 +780,163 @@ class KamiAutomation:
     
     def setup_auto_shipping(self, kind_name: str, product_title: str) -> bool:
         """
-        设置自动发货（完全按照Java版本第537-675行）
+        设置自动发货（通过搜索商品标题）
         
         Args:
             kind_name: 卡种名称
-            product_title: 商品标题（暂未使用）
+            product_title: 商品标题（用于搜索）
             
         Returns:
             bool: 是否成功
         """
         try:
-            self._send_step(f"开始为卡种 {kind_name} 设置自动发货", "loading")
-            logger.info(f"开始设置自动发货，卡种: {kind_name}")
+            self._send_step(f"开始设置自动发货: {kind_name}", "loading")
+            logger.info(f"开始设置自动发货，卡种: {kind_name}, 商品: {product_title}")
             page = self._get_page()
             
-            # 1. 导航到发货设置页面（Java 第550-554行）
-            self._send_step("导航到发货设置页面", "loading")
+            # 1. 访问发货设置页面
+            self._send_step("访问发货设置页面", "loading")
             page.goto("https://www.goofish.pro/kam/send/consign-setting/list", timeout=30000)
-            logger.info("导航到发货设置页面")
+            logger.info("访问发货设置页面")
             time.sleep(3)
             
-            # 检查是否需要登录（Java 第556-572行）
+            # 检查登录
             if 'login' in page.url:
                 self._send_step("检测到需要登录，等待扫码...", "loading")
-                logger.info("需要登录，开始自动登录流程")
                 if not self._login():
                     self._send_step("登录失败", "error")
-                    logger.error("登录失败")
                     return False
-                
-                # 登录成功后，重新导航到发货设置页面
-                self._send_step("登录成功，重新导航", "success")
                 page.goto("https://www.goofish.pro/kam/send/consign-setting/list", timeout=30000)
-                logger.info("登录成功，重新导航到发货设置页面")
                 time.sleep(3)
             
-            # 2. 点击"去设置"按钮（Java 第574-581行）
-            self._send_step("点击去设置按钮", "loading")
-            go_set_button = page.locator("xpath=//button[contains(.,'去设置')]").first
-            go_set_button.click(timeout=15000)
-            logger.info("点击去设置按钮")
-            time.sleep(3)  # 等待页面跳转到设置页面
-            
-            # 调试：检查当前页面状态
-            logger.info(f"点击'去设置'后 URL: {page.url}")
-            logger.info(f"页面标题: {page.title()}")
-            
-            # 3. 勾选最新的2个商品（Java 第583-609行）
-            self._send_step("勾选商品（最新2个）", "loading")
-            # 等待checkbox出现
+            # 2. 点击"销售中"标签
+            self._send_step("切换到销售中标签", "loading")
             try:
-                page.wait_for_selector("xpath=//tbody//input[@type='checkbox']", timeout=15000)
-                logger.info("✅ 找到checkbox")
+                selling_tab = page.locator("text=销售中").first
+                selling_tab.click()
+                logger.info("点击销售中标签")
+                time.sleep(2)
             except Exception as e:
-                logger.error(f"未找到checkbox: {e}")
-                # 保存截图和HTML
-                page.screenshot(path="/tmp/auto_shipping_no_checkbox.png", full_page=True)
-                logger.error("已保存截图: /tmp/auto_shipping_no_checkbox.png")
-                raise
-            time.sleep(1)
+                logger.warning(f"点击销售中标签失败: {e}")
             
-            # 使用JavaScript勾选前两个商品（Java 第589-599行）
-            check_script = """
+            # 3. 在"商品标题"输入框搜索
+            self._send_step(f"搜索商品: {product_title}", "loading")
+            try:
+                # 找到"商品标题"输入框
+                title_input = page.locator("input[placeholder='商品标题']").first
+                title_input.clear()
+                title_input.fill(product_title)
+                logger.info(f"输入商品标题: {product_title}")
+                time.sleep(0.5)
+                
+                # 点击"搜索"按钮
+                search_button = page.locator("button:has-text('搜索')").first
+                search_button.click()
+                logger.info("点击搜索按钮")
+                self._send_step("搜索商品中...", "loading")
+                time.sleep(3)  # 等待搜索结果
+            except Exception as e:
+                logger.error(f"搜索商品失败: {e}")
+                page.screenshot(path="/tmp/search_product_failed.png", full_page=True)
+                return False
+            
+            # 4. 点击全选（用JavaScript强制点击）
+            self._send_step("点击全选", "loading")
+            time.sleep(2)  # 等待搜索结果加载
+            
+            # 用JavaScript强制点击全选（不管是否visible）
+            select_all_script = """
             (function() {
-                var checkboxes = document.querySelectorAll('tbody input[type="checkbox"]');
-                if (checkboxes.length >= 2) {
-                    checkboxes[0].click();
-                    checkboxes[1].click();
+                var selectAll = document.querySelector('thead input[type="checkbox"]');
+                if (selectAll) {
+                    selectAll.click();
                     return true;
                 }
                 return false;
             })()
             """
             
-            checked = page.evaluate(check_script)
-            if checked:
-                self._send_step("已勾选2个商品", "success")
-                logger.info("已勾选最新的2个商品")
+            selected = page.evaluate(select_all_script)
+            if selected:
+                logger.info("点击全选checkbox")
+                self._send_step("已勾选所有商品", "success")
+                time.sleep(1)
             else:
-                self._send_step("未找到足够的商品", "error")
-                logger.error("未找到足够的商品进行勾选")
+                logger.error("未找到全选checkbox")
+                page.screenshot(path="/tmp/no_select_all.png", full_page=True)
                 return False
-            time.sleep(1)
             
-            # 4. 点击"批量设置付款后发货"按钮（Java 第611-619行）
+            # 5. 点击"批量设置付款后发货"
             self._send_step("点击批量设置付款后发货", "loading")
-            batch_set_button = page.locator("xpath=//button[contains(.,'批量设置付款后发货')]").first
-            batch_set_button.click(timeout=15000)
-            self._send_step("进入发货设置弹窗", "success")
-            logger.info("点击批量设置付款后发货按钮")
+            batch_button = page.locator("xpath=//button[contains(.,'批量设置付款后发货')]").first
+            batch_button.click(timeout=15000)
+            logger.info("点击批量设置付款后发货")
             time.sleep(2)
             
-            # 5. 在弹窗中设置（Java 第621-634行）
-            # 5.1 选择"单卡种"
+            # 6. 在弹窗中选择"单卡种"
             try:
                 self._send_step("选择单卡种模式", "loading")
                 single_kind_radio = page.locator("xpath=//label[contains(.,'单卡种')]").first
-                single_kind_radio.click(timeout=15000)
-                self._send_step("单卡种模式已选择", "success")
+                single_kind_radio.click(timeout=10000)
                 logger.info("选择单卡种")
                 time.sleep(1)
             except Exception as e:
                 logger.warning(f"选择单卡种失败: {e}")
             
-            # 5.2 选择发货卡种（Java 第636-653行）
+            # 7. 选择发货卡种（在弹窗内，找"发货卡种"标签旁的下拉框）
             self._send_step(f"选择发货卡种: {kind_name}", "loading")
-            # 点击发货卡种下拉框
-            kind_select = page.locator("xpath=//div[contains(@class,'el-select') and contains(@class,'w-340')]//input").first
-            kind_select.click(timeout=15000)
-            logger.info("点击发货卡种下拉框")
-            time.sleep(1)
+            time.sleep(1)  # 等待弹窗完全显示
             
-            # 在下拉列表中选择指定的卡种
-            kind_option = page.locator(f"xpath=//div[contains(@class,'el-select-dropdown')]//li[contains(.,'{kind_name}')]").first
-            kind_option.click(timeout=15000)
-            self._send_step(f"发货卡种已选择: {kind_name}", "success")
-            logger.info(f"选择发货卡种: {kind_name}")
-            time.sleep(1)
+            # 用JavaScript在弹窗内查找"发货卡种"下拉框并选择
+            select_kind_script = f"""
+            (function() {{
+                // 在可见的dialog中查找
+                var dialog = document.querySelector('.el-dialog__wrapper:not([style*="display: none"])');
+                if (!dialog) return false;
+                
+                // 在dialog内找到"发货卡种"标签
+                var labels = dialog.querySelectorAll('span, label, div');
+                for (var i = 0; i < labels.length; i++) {{
+                    if (labels[i].textContent.trim() === '发货卡种') {{
+                        // 找到标签后，找它附近的input
+                        var parent = labels[i].parentElement;
+                        var input = parent.querySelector('.el-select input');
+                        if (input) {{
+                            input.click();
+                            
+                            // 等待下拉框出现，然后选择
+                            setTimeout(function() {{
+                                var options = document.querySelectorAll('.el-select-dropdown:not([style*="display: none"]) li');
+                                for (var j = 0; j < options.length; j++) {{
+                                    if (options[j].textContent.includes('{kind_name}')) {{
+                                        options[j].click();
+                                        return;
+                                    }}
+                                }}
+                            }}, 500);
+                            
+                            return true;
+                        }}
+                    }}
+                }}
+                return false;
+            }})()
+            """
             
-            # 5.3 点击"确认"按钮（Java 第655-662行）
+            selected = page.evaluate(select_kind_script)
+            if selected:
+                logger.info(f"选择发货卡种: {kind_name}")
+                self._send_step(f"发货卡种已选择: {kind_name}", "success")
+                time.sleep(2)  # 等待选择完成
+            else:
+                logger.error("未找到发货卡种下拉框")
+                page.screenshot(path="/tmp/kind_select_failed.png", full_page=True)
+                return False
+            
+            # 8. 点击"确认"按钮
             self._send_step("保存发货设置", "loading")
             confirm_button = page.locator("xpath=//button[contains(@class,'el-button--primary') and contains(.,'确认')]").first
-            confirm_button.click(timeout=15000)
+            confirm_button.click(timeout=10000)
             logger.info("点击确认按钮")
             time.sleep(3)
             
