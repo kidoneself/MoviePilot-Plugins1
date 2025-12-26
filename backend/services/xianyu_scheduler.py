@@ -5,7 +5,7 @@
 import logging
 import asyncio
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 import json
 
 from sqlalchemy import and_
@@ -18,8 +18,9 @@ def _get_session():
     return get_session(db_engine)
 from backend.utils.xianyu_api import (
     GoofishSDK, GoofishConfig as SDKConfig,
-    PublishProductRequest, DownShelfProductRequest
+    PublishProductRequest, DownShelfProductRequest, ProductListRequest
 )
+from backend.models.xianyu import GoofishProduct
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +130,51 @@ class XianyuScheduler:
         finally:
             session.close()
     
+    async def _sync_products_after_task(self, product_ids: List[int], session):
+        """任务执行后同步商品状态"""
+        try:
+            # 构建请求，查询所有商品（不限时间范围）
+            request = ProductListRequest(
+                pageNo=1,
+                pageSize=100  # 一次查询100个，足够覆盖大部分情况
+            )
+            
+            # 查询商品列表
+            response = self.sdk.product().list_product(request)
+            
+            synced_count = 0
+            for item in response.list:
+                product_id = item.get('product_id')
+                if not product_id:
+                    continue
+                
+                # 查找数据库记录
+                db_product = session.query(GoofishProduct).filter_by(product_id=product_id).first()
+                
+                if db_product:
+                    # 更新状态
+                    old_status = db_product.product_status
+                    new_status = item.get('product_status')
+                    
+                    db_product.product_status = new_status
+                    db_product.stock = item.get('stock')
+                    db_product.sold = item.get('sold')
+                    db_product.online_time = item.get('online_time')
+                    db_product.offline_time = item.get('offline_time')
+                    db_product.sync_time = datetime.now()
+                    
+                    if old_status != new_status:
+                        logger.info(f"商品状态已更新: {product_id} {old_status} -> {new_status}")
+                    
+                    synced_count += 1
+            
+            session.commit()
+            logger.info(f"✅ 商品状态同步完成，更新了 {synced_count} 个商品")
+            
+        except Exception as e:
+            logger.error(f"同步商品状态失败: {e}")
+            raise
+    
     async def _execute_task(self, task: GoofishScheduleTask, session):
         """执行单个任务"""
         logger.info(f"执行任务 {task.id}: {task.task_type}")
@@ -198,6 +244,13 @@ class XianyuScheduler:
             
             session.commit()
             logger.info(f"任务 {task.id} 执行完成")
+            
+            # 任务执行完成后，同步所有商品状态
+            try:
+                logger.info("定时任务完成，开始同步商品状态...")
+                await self._sync_products_after_task(product_ids, session)
+            except Exception as e:
+                logger.error(f"同步商品状态失败: {e}", exc_info=True)
         
         except Exception as e:
             task.status = 'FAILED'
