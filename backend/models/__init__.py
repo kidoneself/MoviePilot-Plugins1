@@ -113,10 +113,10 @@ def init_database(db_config: dict = None):
     if db_type == 'mysql':
         # MySQL配置
         mysql_config = db_config.get('mysql', {})
-        host = mysql_config.get('host', '10.10.10.17')
+        host = mysql_config.get('host', '101.35.224.59')
         port = mysql_config.get('port', 3306)
         user = mysql_config.get('user', 'root')
-        password = mysql_config.get('password', 'MyStrongPass123')
+        password = mysql_config.get('password', 'e0237e873f08ad0b')
         database = mysql_config.get('database', 'file_link_monitor_v2')
         charset = mysql_config.get('charset', 'utf8mb4')
         

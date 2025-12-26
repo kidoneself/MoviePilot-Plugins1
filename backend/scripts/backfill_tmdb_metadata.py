@@ -30,7 +30,7 @@ TMDB_BASE_URL = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w300"  # 使用小尺寸，加载更快
 
 # 数据库连接
-DB_URL = "mysql+pymysql://root:MyStrongPass123@10.10.10.17:3306/file_link_monitor_v2?charset=utf8mb4"
+DB_URL = "mysql+pymysql://root:e0237e873f08ad0b@101.35.224.59:3306/file_link_monitor_v2?charset=utf8mb4"
 
 
 def search_tmdb(query: str, media_type: str = "multi"):

@@ -6,10 +6,10 @@ import pymysql
 
 # 数据库配置
 db_config = {
-    'host': '10.10.10.17',
+    'host': '101.35.224.59',
     'port': 3306,
     'user': 'root',
-    'password': 'MyStrongPass123',
+    'password': 'e0237e873f08ad0b',
     'database': 'file_link_monitor_v2',
     'charset': 'utf8mb4'
 }

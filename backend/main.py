@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
     
     # 初始化数据库（MySQL硬编码配置）
     db_engine = init_database()
-    logger.info("✅ 数据库初始化完成: MySQL (10.10.10.17:3306/file_link_monitor_v2)")
+    logger.info("✅ 数据库初始化完成: MySQL (101.35.224.59:3306/file_link_monitor_v2)")
     
     # 启动监控服务
     monitor_service = MonitorService(config, db_engine)
