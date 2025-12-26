@@ -66,9 +66,9 @@ async def lifespan(app: FastAPI):
     # 启动闲鱼定时任务调度器
     try:
         from backend.services.xianyu_scheduler import get_scheduler
-        scheduler = get_scheduler()
+        scheduler = get_scheduler(wechat_service=wechat_service)
         await scheduler.start()
-        logger.info("✅ 闲鱼定时任务调度器已启动")
+        logger.info("✅ 闲鱼定时任务调度器已启动（已配置微信通知）")
     except Exception as e:
         logger.warning(f"⚠️ 闲鱼调度器启动失败: {e}")
     

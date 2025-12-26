@@ -28,9 +28,10 @@ logger = logging.getLogger(__name__)
 class XianyuScheduler:
     """闲鱼定时任务调度器"""
     
-    def __init__(self):
+    def __init__(self, wechat_service=None):
         self.running = False
         self.sdk: Optional[GoofishSDK] = None
+        self.wechat_service = wechat_service
     
     def _init_sdk(self):
         """初始化SDK"""
@@ -129,6 +130,75 @@ class XianyuScheduler:
         
         finally:
             session.close()
+    
+    async def _send_wechat_notification(self, task: GoofishScheduleTask, results: list, product_ids: List[int]):
+        """发送微信通知"""
+        if not self.wechat_service:
+            logger.debug("微信服务未配置，跳过通知")
+            return
+        
+        try:
+            # 获取商品标题列表
+            product_titles = json.loads(task.product_titles) if task.product_titles else []
+            
+            # 任务类型翻译
+            task_type_text = "上架" if task.task_type == "publish" else "下架"
+            
+            # 统计结果
+            success_count = len([r for r in results if "成功" in r])
+            failed_count = len([r for r in results if "失败" in r])
+            
+            # 构建通知内容
+            content_parts = [f"🐟 闲鱼商品{task_type_text}完成\n"]
+            content_parts.append(f"✅ 成功: {success_count} 个")
+            if failed_count > 0:
+                content_parts.append(f"❌ 失败: {failed_count} 个")
+            content_parts.append("")
+            
+            # 显示商品列表（最多5个）
+            if product_titles:
+                content_parts.append(f"📦 {task_type_text}商品：")
+                for i, title in enumerate(product_titles[:5], 1):
+                    # 状态图标
+                    if i-1 < len(results):
+                        status = "✅" if "成功" in results[i-1] else "❌"
+                    else:
+                        status = "•"
+                    content_parts.append(f"{status} {title}")
+                
+                if len(product_titles) > 5:
+                    content_parts.append(f"... 还有 {len(product_titles) - 5} 个")
+                content_parts.append("")
+            
+            # 如果有失败的，显示失败详情
+            if failed_count > 0:
+                content_parts.append("⚠️ 失败详情：")
+                failed_results = [r for r in results if "失败" in r]
+                for result in failed_results[:3]:  # 最多显示3个
+                    content_parts.append(f"• {result}")
+                if len(failed_results) > 3:
+                    content_parts.append(f"... 还有 {len(failed_results) - 3} 个")
+                content_parts.append("")
+            
+            content_parts.append(f"⏰ 执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            if task.repeat_daily:
+                next_time = (task.execute_time + timedelta(days=1)).strftime('%H:%M')
+                content_parts.append(f"🔄 下次执行: 明天 {next_time}")
+            
+            message = "\n".join(content_parts)
+            
+            # 从配置获取用户ID
+            from backend.main import app_config
+            wechat_config = app_config.get('wechat', {})
+            default_user = wechat_config.get('default_user', '@all')
+            
+            # 发送通知
+            self.wechat_service.send_text(default_user, message)
+            logger.info(f"✅ 已发送微信通知: {task_type_text} {len(product_ids)} 个商品")
+            
+        except Exception as e:
+            logger.error(f"发送微信通知异常: {e}", exc_info=True)
     
     async def _sync_products_after_task(self, product_ids: List[int], session):
         """任务执行后同步商品状态"""
@@ -251,6 +321,12 @@ class XianyuScheduler:
                 await self._sync_products_after_task(product_ids, session)
             except Exception as e:
                 logger.error(f"同步商品状态失败: {e}", exc_info=True)
+            
+            # 发送微信通知
+            try:
+                await self._send_wechat_notification(task, results, product_ids)
+            except Exception as e:
+                logger.error(f"发送微信通知失败: {e}", exc_info=True)
         
         except Exception as e:
             task.status = 'FAILED'
@@ -263,10 +339,10 @@ class XianyuScheduler:
 _scheduler_instance: Optional[XianyuScheduler] = None
 
 
-def get_scheduler() -> XianyuScheduler:
+def get_scheduler(wechat_service=None) -> XianyuScheduler:
     """获取调度器实例"""
     global _scheduler_instance
     if _scheduler_instance is None:
-        _scheduler_instance = XianyuScheduler()
+        _scheduler_instance = XianyuScheduler(wechat_service=wechat_service)
     return _scheduler_instance
 
