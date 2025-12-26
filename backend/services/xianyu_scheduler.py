@@ -149,6 +149,70 @@ class XianyuScheduler:
         finally:
             session.close()
     
+    async def _send_failure_notification(self, task: GoofishScheduleTask, error_msg: str, product_ids: List[int]):
+        """发送任务失败通知"""
+        if not self.wechat_service:
+            logger.debug("微信服务未配置，跳过通知")
+            return
+        
+        try:
+            # 获取商品标题列表
+            product_titles = json.loads(task.product_titles) if task.product_titles else []
+            
+            # 任务类型翻译
+            task_type_text = "上架" if task.task_type == "publish" else "下架"
+            
+            # 构建失败通知内容
+            content_parts = [f"❌ 闲鱼商品{task_type_text}失败\n"]
+            content_parts.append(f"📦 涉及商品数: {len(product_ids)} 个")
+            content_parts.append("")
+            
+            # 显示商品列表（最多5个）
+            if product_titles:
+                content_parts.append(f"商品列表：")
+                for i, title in enumerate(product_titles[:5], 1):
+                    content_parts.append(f"{i}. {title}")
+                
+                if len(product_titles) > 5:
+                    content_parts.append(f"... 还有 {len(product_titles) - 5} 个")
+                content_parts.append("")
+            
+            # 错误信息
+            content_parts.append("⚠️ 失败原因：")
+            # 简化错误信息，只显示关键部分
+            if "SSLError" in error_msg:
+                content_parts.append("• SSL证书验证失败")
+                content_parts.append("• 建议：检查服务器证书配置")
+            elif "超时" in error_msg or "timeout" in error_msg.lower():
+                content_parts.append("• 网络请求超时")
+                content_parts.append("• 建议：检查网络连接")
+            else:
+                # 显示前200个字符
+                error_summary = error_msg[:200] + "..." if len(error_msg) > 200 else error_msg
+                content_parts.append(f"• {error_summary}")
+            
+            content_parts.append("")
+            content_parts.append(f"⏰ 执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            if task.repeat_daily:
+                next_time = (task.execute_time + timedelta(days=1)).strftime('%H:%M')
+                content_parts.append(f"🔄 下次执行: 明天 {next_time}")
+                content_parts.append("💡 提示：任务已标记为失败，但每日重复仍会继续")
+            
+            message = "\n".join(content_parts)
+            
+            # 从配置获取用户ID
+            from backend.main import app_config
+            wechat_config = app_config.get('wechat', {})
+            default_user = wechat_config.get('default_user', '@all')
+            
+            # 发送通知
+            self.wechat_service.send_text(default_user, message)
+            logger.info(f"✅ 已发送失败通知: {task_type_text} {len(product_ids)} 个商品失败")
+            
+        except Exception as e:
+            logger.error(f"发送失败通知异常: {e}", exc_info=True)
+    
     async def _send_wechat_notification(self, task: GoofishScheduleTask, results: list, product_ids: List[int]):
         """发送微信通知"""
         if not self.wechat_service:
@@ -347,9 +411,17 @@ class XianyuScheduler:
                 logger.error(f"发送微信通知失败: {e}", exc_info=True)
         
         except Exception as e:
+            # 任务执行失败，记录状态
             task.status = 'FAILED'
             task.execute_result = str(e)
             session.commit()
+            
+            # 发送失败通知
+            try:
+                await self._send_failure_notification(task, str(e), product_ids)
+            except Exception as notify_error:
+                logger.error(f"发送失败通知失败: {notify_error}", exc_info=True)
+            
             raise
 
 
