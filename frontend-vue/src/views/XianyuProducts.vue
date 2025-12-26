@@ -364,20 +364,11 @@ const submitScheduleTask = async () => {
   
   scheduling.value = true
   try {
-    // 将时分秒转换为今天的完整时间
-    const now = new Date()
-    const [hours, minutes] = scheduleForm.value.execute_time.split(':')
-    const executeDateTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(hours), parseInt(minutes), 0)
-    
-    // 如果设置的时间已经过了今天，则从明天开始
-    if (executeDateTime < now) {
-      executeDateTime.setDate(executeDateTime.getDate() + 1)
-    }
-    
+    // 直接传时分秒字符串，让后端按服务器本地时区处理
     const res = await api.post('/xianyu/schedule-task', {
       task_type: scheduleForm.value.task_type,
       product_ids: productIds,
-      execute_time: executeDateTime.toISOString(),
+      execute_time: scheduleForm.value.execute_time,  // 直接传 "HH:mm" 格式
       repeat_daily: true  // 每天重复
     })
     

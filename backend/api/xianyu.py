@@ -738,7 +738,27 @@ async def create_schedule_task(request: ScheduleTaskRequest):
         session = _get_session()
         try:
             # 解析执行时间
-            execute_time = datetime.fromisoformat(request.execute_time.replace('Z', '+00:00'))
+            # 支持两种格式：
+            # 1. "HH:mm" 格式（如 "08:00"）- 转换为今天/明天的该时间
+            # 2. ISO格式（如 "2025-12-26T10:00:00"）- 直接解析
+            execute_time_str = request.execute_time
+            
+            if ':' in execute_time_str and len(execute_time_str) <= 5:
+                # HH:mm 格式
+                hours, minutes = map(int, execute_time_str.split(':'))
+                now = datetime.now()
+                execute_time = datetime(now.year, now.month, now.day, hours, minutes, 0)
+                
+                # 如果设置的时间已经过了今天，则从明天开始
+                if execute_time < now:
+                    from datetime import timedelta
+                    execute_time = execute_time + timedelta(days=1)
+                    logger.info(f"设置时间已过，调整为明天 {hours:02d}:{minutes:02d}")
+            else:
+                # ISO格式
+                execute_time = datetime.fromisoformat(execute_time_str.replace('Z', '+00:00'))
+            
+            logger.info(f"创建定时任务: {request.task_type}, 执行时间: {execute_time}")
             
             # 获取商品标题
             product_titles = []
