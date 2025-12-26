@@ -486,52 +486,35 @@ class KamiAutomation:
             name_input.fill(kind_name)
             logger.info(f"填写卡种名称: {kind_name}")
             
-            # 2. 选择卡种分类（可选）
+            # 3. 清空卡号前缀（Java 第184-194行）
             try:
-                self._send_step("选择卡种分类", "loading")
-                # 点击分类下拉框
-                category_input = page.locator('input[placeholder="请选择"]').first
-                category_input.click()
-                time.sleep(0.5)
-                
-                # 选择第一个分类选项
-                dropdown_option = page.locator('.el-select-dropdown__item').first
-                if dropdown_option.is_visible(timeout=3000):
-                    dropdown_option.click()
-                    self._send_step("已选择卡种分类", "success")
-                time.sleep(0.5)
+                self._send_step("清空卡号前缀", "loading")
+                card_prefix_input = page.locator("xpath=//label[contains(text(),'卡号前缀')]/..//input").first
+                card_prefix_input.clear()
+                card_prefix_input.fill("  ")
+                logger.info("清空卡号前缀")
             except Exception as e:
-                logger.warning(f"卡种分类选择跳过: {e}")
+                logger.warning(f"清空卡号前缀失败: {e}")
             
-            # 3. 填写卡号前缀（清空默认值）
+            # 4. 清空密码前缀（Java 第196-206行）
             try:
-                # 找到包含"卡号："的输入框
-                card_prefix_inputs = page.locator('input').all()
-                for inp in card_prefix_inputs:
-                    try:
-                        val = inp.input_value()
-                        if '卡号' in val:
-                            inp.clear()
-                            inp.fill("  ")
-                            break
-                    except:
-                        pass
-            except:
-                pass
+                self._send_step("清空密码前缀", "loading")
+                pwd_prefix_input = page.locator("xpath=//label[contains(text(),'密码前缀')]/..//input").first
+                pwd_prefix_input.clear()
+                pwd_prefix_input.fill("  ")
+                logger.info("清空密码前缀")
+            except Exception as e:
+                logger.warning(f"清空密码前缀失败: {e}")
             
-            # 4. 填写密码前缀（清空默认值）
+            # 5. 填写库存预警（Java 第208-218行）
             try:
-                for inp in card_prefix_inputs:
-                    try:
-                        val = inp.input_value()
-                        if '密码' in val:
-                            inp.clear()
-                            inp.fill("  ")
-                            break
-                    except:
-                        pass
-            except:
-                pass
+                self._send_step("填写库存预警", "loading")
+                stock_input = page.locator("xpath=//label[contains(text(),'库存预警')]/..//input").first
+                stock_input.clear()
+                stock_input.fill("1")
+                logger.info("填写库存预警: 1")
+            except Exception as e:
+                logger.warning(f"填写库存预警失败: {e}")
             
             time.sleep(1)
             
@@ -686,17 +669,7 @@ class KamiAutomation:
             
             time.sleep(1)
             
-            # 4. 在弹出对话框中填写卡密数据 - 点击"空格"标签（Java 第417-428行）
-            try:
-                space_tab = page.locator("xpath=//div[contains(text(),'空格')]").first
-                space_tab.click()
-                self._send_step("切换到空格标签", "success")
-                logger.info("切换到空格标签")
-                time.sleep(0.5)
-            except Exception as e:
-                logger.warning(f"切换空格标签失败，可能已经在空格标签: {e}")
-            
-            # 5. 输入卡密数据到文本框（Java 第430-441行）
+            # 4. 输入卡密数据到文本框（Java 第430-441行）
             self._send_step("填写卡密数据", "loading")
             textarea = page.locator("xpath=//textarea").first
             textarea.wait_for(state='visible', timeout=15000)
