@@ -975,7 +975,7 @@ async def setup_auto_shipping(request: AutoShippingRequest):
         logger.info(f"收到设置自动发货请求: kind_name={request.kind_name}, product_title={request.product_title}")
         
         from backend.utils.task_manager import get_task_manager
-        from backend.utils.xianyu_selenium import KamiAutomation
+        from backend.utils.xianyu_playwright import KamiAutomation
         import threading
         
         # 创建任务
