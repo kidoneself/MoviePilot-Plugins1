@@ -407,10 +407,10 @@ class KamiAutomation:
             page = self._get_page()
             self._send_step(f"开始创建卡种: {kind_name}", "loading")
             
-            # 访问卡密类型添加页面
-            add_url = "https://www.goofish.pro/kam/kind/add"
-            page.goto(add_url, timeout=30000)
-            self._send_step("访问卡密类型添加页面", "loading")
+            # 先访问登录页检查登录状态
+            login_url = "https://www.goofish.pro/login"
+            page.goto(login_url, timeout=30000)
+            time.sleep(2)
             
             # 检查是否需要登录
             if 'login' in page.url:
@@ -418,8 +418,13 @@ class KamiAutomation:
                 if not self._login():
                     self._send_step("登录失败", "error")
                     return False
-                # 重新访问添加页面
-                page.goto(add_url, timeout=30000)
+            else:
+                self._send_step("已登录", "success")
+            
+            # 访问卡密类型添加页面
+            add_url = "https://www.goofish.pro/kam/kind/add"
+            page.goto(add_url, timeout=30000)
+            self._send_step("访问卡密类型添加页面", "loading")
             
             time.sleep(2)
             
