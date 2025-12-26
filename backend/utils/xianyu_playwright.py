@@ -332,10 +332,15 @@ class KamiAutomation:
                 # 多种方式判断登录成功
                 login_success = False
                 
-                # 方式1: URL跳转（离开登录页）
+                # 方式1: URL跳转（离开登录页或到达首页）
                 if 'login' not in current_url:
                     login_success = True
                     logger.info(f"检测到URL跳转: {current_url}")
+                
+                # 检查是否跳转到了首页
+                if '/sale/statistics' in current_url or '/home' in current_url:
+                    login_success = True
+                    logger.info(f"检测到跳转到首页: {current_url}")
                 
                 # 方式2: 检查是否出现"我的工作台"等元素
                 if not login_success:
@@ -415,8 +420,14 @@ class KamiAutomation:
                 if not self._login():
                     self._send_step("登录失败", "error")
                     return False
-                # 重新访问添加页面
+                # 登录成功后重新访问添加页面
+                self._send_step("登录成功，重新访问添加页面...", "loading")
                 page.goto(add_url, timeout=30000)
+                time.sleep(2)
+            
+            # 调试：打印页面信息
+            logger.info(f"当前页面URL: {page.url}")
+            logger.info(f"页面标题: {page.title()}")
             
             time.sleep(2)
             
