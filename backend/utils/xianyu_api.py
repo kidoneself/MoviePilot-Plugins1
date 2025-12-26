@@ -400,7 +400,7 @@ class ProductService:
         data = self.client.post('/api/open/product/list', request.to_dict())
         return ProductListResponse(
             list=data.get('list', []),
-            total=data.get('total', 0)
+            total=data.get('count', data.get('total', 0))  # API返回的是count字段，不是total
         )
     
     def get_product_detail(self, request: ProductDetailRequest) -> Dict[str, Any]:
