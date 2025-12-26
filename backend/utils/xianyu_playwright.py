@@ -1,95 +1,23 @@
 """
 闲鱼卡密管理自动化服务（Playwright版本）
 使用 Playwright 替代 Selenium，解决Docker兼容性问题
-全局浏览器实例，保持登录会话
+每个 KamiAutomation 实例完全独立管理自己的浏览器，无全局状态
 """
 import logging
 import time
 import os
+import platform
 from pathlib import Path
 from typing import Optional, Callable
-from playwright.sync_api import sync_playwright, Browser, Page, BrowserContext
-import threading
+from playwright.sync_api import sync_playwright, Browser, Page, BrowserContext, Playwright
 
 logger = logging.getLogger(__name__)
 
-# 是否使用无头模式，默认根据环境变量判断
-HEADLESS_MODE = os.getenv('XIANYU_HEADLESS', 'true').lower() == 'true'
-
-# 全局浏览器实例管理
-_global_playwright = None
-_global_browser: Optional[Browser] = None
-_global_context: Optional[BrowserContext] = None
-_global_headless: bool = True
-_browser_lock = threading.Lock()
-
-
-def get_global_browser(headless: bool = True) -> tuple[Browser, BrowserContext]:
-    """获取全局浏览器实例（单例模式，保持会话）"""
-    global _global_playwright, _global_browser, _global_context, _global_headless
-    
-    with _browser_lock:
-        # 如果模式改变，关闭旧实例
-        if _global_browser and _global_headless != headless:
-            logger.info("浏览器模式改变，重启浏览器")
-            close_global_browser()
+# 登录状态文件路径（跨实例共享）
+STORAGE_STATE_FILE = os.path.expanduser('~/.xianyu_storage_state.json')
         
-        # 如果已存在，直接返回
-        if _global_browser and _global_context:
-            logger.info("✅ 复用全局Playwright浏览器实例")
-            return _global_browser, _global_context
-        
-        # 创建新的浏览器实例
-        mode = "无头" if headless else "有头"
-        logger.info(f"🌐 启动全局Playwright浏览器（{mode}模式）...")
-        
-        _global_playwright = sync_playwright().start()
-        
-        # 反检测参数配置
-        launch_args = [
-            '--no-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-blink-features=AutomationControlled',  # 关键：隐藏自动化特征
-            '--disable-features=IsolateOrigins,site-per-process',
-            '--disable-site-isolation-trials',
-        ]
-        
-        # 检测 macOS ARM 架构，使用正确的浏览器路径
-        import platform
-        import os
-        executable_path = None
-        if platform.system() == 'Darwin' and 'arm' in platform.machine().lower():
-            arm_path = os.path.expanduser(
-                '~/Library/Caches/ms-playwright/chromium-1200/'
-                'chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'
-            )
-            if os.path.exists(arm_path):
-                executable_path = arm_path
-                logger.info(f"检测到 macOS ARM 架构，使用: {executable_path}")
-        
-        _global_browser = _global_playwright.chromium.launch(
-            headless=headless,
-            executable_path=executable_path,  # 如果是ARM Mac，使用指定路径
-            args=launch_args,
-            chromium_sandbox=False
-        )
-        
-        # 创建上下文，模拟真实浏览器
-        _global_context = _global_browser.new_context(
-            user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            viewport={'width': 1920, 'height': 1080},
-            locale='zh-CN',
-            timezone_id='Asia/Shanghai',
-            # 模拟真实浏览器的权限
-            permissions=['geolocation', 'notifications'],
-            # 设置额外的HTTP头
-            extra_http_headers={
-                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-            }
-        )
-        
-        # 注入反检测脚本到每个新页面
-        _global_context.add_init_script("""
+# 反检测脚本
+ANTI_DETECT_SCRIPT = """
             // 覆盖 navigator.webdriver
             Object.defineProperty(navigator, 'webdriver', {
                 get: () => undefined
@@ -117,49 +45,19 @@ def get_global_browser(headless: bool = True) -> tuple[Browser, BrowserContext]:
                     Promise.resolve({ state: Notification.permission }) :
                     originalQuery(parameters)
             );
-        """)
-        
-        _global_headless = headless
-        logger.info(f"✅ 全局Playwright浏览器启动成功（{mode}模式）")
-        
-        return _global_browser, _global_context
-
-
-def close_global_browser():
-    """关闭全局浏览器实例"""
-    global _global_playwright, _global_browser, _global_context
-    
-    with _browser_lock:
-        if _global_context:
-            logger.info("关闭全局浏览器上下文")
-            try:
-                _global_context.close()
-            except:
-                pass
-            _global_context = None
-        
-        if _global_browser:
-            logger.info("关闭全局浏览器实例")
-            try:
-                _global_browser.close()
-            except:
-                pass
-            _global_browser = None
-        
-        if _global_playwright:
-            try:
-                _global_playwright.stop()
-            except:
-                pass
-            _global_playwright = None
+"""
 
 
 class KamiAutomation:
-    """卡密管理自动化（Playwright版本）"""
+    """
+    卡密管理自动化（Playwright版本）
+    
+    每个实例完全独立管理自己的浏览器，无全局状态，无线程问题
+    """
     
     def __init__(self, phone: Optional[str] = None, headless: bool = True):
         """
-        初始化
+        初始化（不启动浏览器，延迟到需要时再启动）
         
         Args:
             phone: 手机号（用于登录）
@@ -169,7 +67,8 @@ class KamiAutomation:
         self.headless = headless
         self.step_callback: Optional[Callable] = None
         
-        # 使用全局browser和context，不要在这里创建
+        # 每个实例独立管理自己的 Playwright
+        self._playwright: Optional[Playwright] = None
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
         self.page: Optional[Page] = None
@@ -185,10 +84,74 @@ class KamiAutomation:
         logger.info(f"[{status.upper()}] {step}")
     
     def _get_page(self) -> Page:
-        """获取浏览器页面实例（使用全局单例）"""
-        if self.page is None:
-            self.browser, self.context = get_global_browser(self.headless)
-            self.page = self.context.new_page()
+        """获取浏览器页面实例（延迟启动，每个实例独立）"""
+        if self.page is not None:
+            return self.page
+        
+        mode = "无头" if self.headless else "有头"
+        logger.info(f"🌐 启动Playwright浏览器（{mode}模式）...")
+        
+        # 启动 Playwright
+        self._playwright = sync_playwright().start()
+        
+        # 反检测参数
+        launch_args = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--disable-site-isolation-trials',
+        ]
+        
+        # macOS ARM 浏览器路径
+        executable_path = None
+        if platform.system() == 'Darwin' and 'arm' in platform.machine().lower():
+            arm_path = os.path.expanduser(
+                '~/Library/Caches/ms-playwright/chromium-1200/'
+                'chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'
+            )
+            if os.path.exists(arm_path):
+                executable_path = arm_path
+        
+        # 启动浏览器（Java 第82-102行的反检测配置）
+        self.browser = self._playwright.chromium.launch(
+            headless=self.headless,
+            executable_path=executable_path,
+            args=launch_args,
+            chromium_sandbox=False,
+            # Java: options.setExperimentalOption("excludeSwitches", new String[]{"enable-automation"})
+            ignore_default_args=['--enable-automation']
+        )
+        
+        # 加载已保存的登录状态
+        storage_state = None
+        if os.path.exists(STORAGE_STATE_FILE):
+            try:
+                storage_state = STORAGE_STATE_FILE
+                logger.info(f"📂 加载登录状态: {STORAGE_STATE_FILE}")
+            except:
+                pass
+        
+        # 创建上下文
+        self.context = self.browser.new_context(
+            storage_state=storage_state,
+            user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            viewport={'width': 1920, 'height': 1080},
+            locale='zh-CN',
+            timezone_id='Asia/Shanghai',
+            permissions=['geolocation', 'notifications'],
+            extra_http_headers={
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            }
+        )
+        
+        # 注入反检测脚本
+        self.context.add_init_script(ANTI_DETECT_SCRIPT)
+        
+        # 创建页面
+        self.page = self.context.new_page()
+        logger.info(f"✅ 浏览器启动成功（{mode}模式）")
+        
         return self.page
     
     def _login(self) -> bool:
@@ -211,10 +174,21 @@ class KamiAutomation:
             
             # 等待页面完全加载
             try:
-                page.wait_for_load_state('networkidle', timeout=10000)
+                page.wait_for_load_state('networkidle', timeout=15000)
                 logger.info("页面加载完成（networkidle）")
             except:
                 logger.info("等待networkidle超时，继续...")
+            
+            # 额外等待，确保 JavaScript 渲染完成
+            # 给页面更多时间加载二维码（JS动态生成）
+            page.wait_for_timeout(5000)  # 等待5秒让JS渲染
+            
+            # 再次检查URL（页面可能在等待期间自动跳转）
+            current_url = page.url
+            if 'login' not in current_url:
+                self._send_step("检测到已登录", "success")
+                logger.info(f"页面已跳转到: {current_url}")
+                return True
             
             # 保存页面HTML和截图，帮助调试
             try:
@@ -416,6 +390,24 @@ class KamiAutomation:
                     self._send_step("✓ 登录成功！", "success")
                     logger.info(f"登录成功，当前URL: {current_url}")
                     time.sleep(2)  # 等待页面稳定
+                    
+                    # 自动关闭"知道了"弹窗
+                    try:
+                        know_btn = page.locator("text=知道了").first
+                        if know_btn.is_visible(timeout=3000):
+                            know_btn.click()
+                            logger.info("✅ 已关闭'知道了'弹窗")
+                            time.sleep(0.5)
+                    except:
+                        pass
+                    
+                    # 保存登录状态到文件，下次可以复用
+                    try:
+                        self.context.storage_state(path=STORAGE_STATE_FILE)
+                        logger.info(f"💾 登录状态已保存到: {STORAGE_STATE_FILE}")
+                    except Exception as e:
+                        logger.warning(f"保存登录状态失败: {e}")
+                    
                     return True
                 
                 if i > 0 and i % 15 == 0:
@@ -432,7 +424,7 @@ class KamiAutomation:
     
     def create_kami_kind(self, kind_name: str, category_id: Optional[int] = None) -> bool:
         """
-        创建卡密类型（和 Selenium 版本逻辑完全一致）
+        创建卡密类型（完全按照Java版本第122-256行）
         
         Args:
             kind_name: 卡种名称
@@ -442,71 +434,102 @@ class KamiAutomation:
             bool: 是否成功
         """
         try:
-            page = self._get_page()
             self._send_step(f"开始创建卡种: {kind_name}", "loading")
+            page = self._get_page()
             
-            # 先访问登录页检查登录状态
-            login_url = "https://www.goofish.pro/login"
-            page.goto(login_url, timeout=30000)
-            time.sleep(2)
-            
-            # 检查是否需要登录
-            if 'login' in page.url:
-                self._send_step("需要登录，等待扫码...", "loading")
-                if not self._login():
-                    self._send_step("登录失败", "error")
-                    return False
-            else:
-                self._send_step("已登录", "success")
-            
-            # 访问卡密类型添加页面
+            # 访问卡密类型添加页面（Java 第128-131行）
             add_url = "https://www.goofish.pro/kam/kind/add"
             page.goto(add_url, timeout=30000)
             self._send_step("访问卡密类型添加页面", "loading")
+            logger.info(f"访问卡密类型添加页面: {add_url}")
             
+            # 等待页面加载（Java 第134行）
+            time.sleep(2)  # Thread.sleep(2000)
+            
+            # 检查是否需要登录（Java 第137-148行）
+            if 'login' in page.url:
+                self._send_step("检测到需要登录，等待扫码登录...", "loading")
+                logger.info("需要登录，开始自动登录流程")
+                if not self._login():
+                    self._send_step("登录失败", "error")
+                    logger.error("登录失败")
+                    return False
+                self._send_step("登录成功", "success")
+                # 登录后重新访问添加页面
+                page.goto(add_url, timeout=30000)
+            
+            # 等待表单加载（Java 第151行）
             time.sleep(2)
             
-            # 1. 选择卡种分类
+            # 1. 选择卡种分类（Java 第153-173行）
             try:
                 self._send_step("选择卡种分类", "loading")
-                category_select = page.locator("//label[contains(text(),'卡种分类')]/..//input[@placeholder='请选择']").first
+                category_select = page.locator("xpath=//label[contains(text(),'卡种分类')]/..//input[@placeholder='请选择']").first
                 category_select.click()
+                logger.info("点击卡种分类下拉框")
                 time.sleep(0.5)
                 
-                category_option = page.locator("//div[contains(@class,'el-select-dropdown')]//li[contains(.,'影视')]").first
-                category_option.click()
+                # 选择"影视"分类（Java 第164-169行）
+                category_option = page.locator("xpath=//div[contains(@class,'el-select-dropdown')]//li[contains(.,'影视')]").first
+                category_option.click(timeout=10000)
+                logger.info("选择卡种分类: 影视")
                 self._send_step("已选择卡种分类: 影视", "success")
                 time.sleep(0.5)
             except Exception as e:
-                logger.warning(f"卡种分类选择失败: {e}")
+                logger.warning(f"卡种分类选择失败，使用默认值: {e}")
             
-            # 2. 填写卡种名称
+            # 2. 填写卡种名称（Java 第175-182行）
             self._send_step(f"填写卡种名称: {kind_name}", "loading")
-            name_input = page.locator("//label[contains(text(),'卡种名称')]/..//input").first
+            name_input = page.locator("xpath=//label[contains(text(),'卡种名称')]/..//input").first
+            name_input.wait_for(state='visible', timeout=10000)
             name_input.clear()
             name_input.fill(kind_name)
+            logger.info(f"填写卡种名称: {kind_name}")
             
-            # 3. 填写卡号前缀
+            # 2. 选择卡种分类（可选）
             try:
-                card_prefix = page.locator("//label[contains(text(),'卡号前缀')]/..//input").first
-                card_prefix.clear()
-                card_prefix.fill("  ")
+                self._send_step("选择卡种分类", "loading")
+                # 点击分类下拉框
+                category_input = page.locator('input[placeholder="请选择"]').first
+                category_input.click()
+                time.sleep(0.5)
+                
+                # 选择第一个分类选项
+                dropdown_option = page.locator('.el-select-dropdown__item').first
+                if dropdown_option.is_visible(timeout=3000):
+                    dropdown_option.click()
+                    self._send_step("已选择卡种分类", "success")
+                time.sleep(0.5)
+            except Exception as e:
+                logger.warning(f"卡种分类选择跳过: {e}")
+            
+            # 3. 填写卡号前缀（清空默认值）
+            try:
+                # 找到包含"卡号："的输入框
+                card_prefix_inputs = page.locator('input').all()
+                for inp in card_prefix_inputs:
+                    try:
+                        val = inp.input_value()
+                        if '卡号' in val:
+                            inp.clear()
+                            inp.fill("  ")
+                            break
+                    except:
+                        pass
             except:
                 pass
             
-            # 4. 填写密码前缀
+            # 4. 填写密码前缀（清空默认值）
             try:
-                pwd_prefix = page.locator("//label[contains(text(),'密码前缀')]/..//input").first
-                pwd_prefix.clear()
-                pwd_prefix.fill("  ")
-            except:
-                pass
-            
-            # 5. 填写库存预警
-            try:
-                stock_input = page.locator("//label[contains(text(),'库存预警')]/..//input").first
-                stock_input.clear()
-                stock_input.fill("1")
+                for inp in card_prefix_inputs:
+                    try:
+                        val = inp.input_value()
+                        if '密码' in val:
+                            inp.clear()
+                            inp.fill("  ")
+                            break
+                    except:
+                        pass
             except:
                 pass
             
@@ -517,15 +540,51 @@ class KamiAutomation:
             create_button.click()
             self._send_step("提交创建请求", "loading")
             
-            time.sleep(2)
+            # 等待页面响应 - 可能跳转到列表页，也可能停留在当前页（有错误提示）
+            time.sleep(3)
             
-            # 检查是否成功
+            # 检查是否有错误提示
+            try:
+                error_msg = page.locator(".el-message--error, .el-message__content").first
+                if error_msg.is_visible(timeout=1000):
+                    error_text = error_msg.text_content()
+                    logger.error(f"创建失败，页面错误提示: {error_text}")
+                    self._send_step(f"创建失败: {error_text}", "error")
+                    # 保存失败截图
+                    try:
+                        page.screenshot(path="/tmp/create_kind_failed.png")
+                        logger.info("已保存创建失败截图: /tmp/create_kind_failed.png")
+                    except:
+                        pass
+                    return False
+            except:
+                pass
+            
+            # 检查是否成功（URL跳转）
             current_url = page.url
+            logger.info(f"提交后URL: {current_url}")
+            
             if '/list' in current_url or '/add' not in current_url:
                 self._send_step(f"卡种创建成功: {kind_name}", "success")
                 return True
             else:
-                self._send_step("卡种创建失败", "error")
+                # 再等5秒看是否跳转
+                logger.info("URL未立即跳转，再等待5秒...")
+                time.sleep(5)
+                current_url = page.url
+                logger.info(f"5秒后URL: {current_url}")
+                
+                if '/list' in current_url or '/add' not in current_url:
+                    self._send_step(f"卡种创建成功: {kind_name}", "success")
+                    return True
+                else:
+                    self._send_step("卡种创建失败（URL未跳转）", "error")
+                    # 保存失败截图
+                    try:
+                        page.screenshot(path="/tmp/create_kind_no_redirect.png")
+                        logger.info("已保存未跳转截图: /tmp/create_kind_no_redirect.png")
+                    except:
+                        pass
                 return False
             
         except Exception as e:
@@ -533,15 +592,235 @@ class KamiAutomation:
             logger.error(f"创建卡密类型失败: {e}", exc_info=True)
             return False
     
+    def _close_popup(self, page):
+        """关闭可能出现的弹窗"""
+        try:
+            # 关闭"知道了"弹窗
+            know_btn = page.locator("text=知道了").first
+            if know_btn.is_visible(timeout=2000):
+                know_btn.click()
+                logger.info("✅ 已关闭'知道了'弹窗")
+                time.sleep(0.5)
+        except:
+            pass
+        
+        try:
+            # 关闭其他可能的弹窗（X 按钮）
+            close_btns = page.locator(".el-dialog__headerbtn").all()
+            for btn in close_btns:
+                if btn.is_visible():
+                    btn.click()
+                    time.sleep(0.3)
+        except:
+            pass
+    
+    def add_kami_cards(self, kind_name: str, kami_data: str, repeat_count: int = 1) -> bool:
+        """
+        添加卡密到指定卡种（完全按照 Java 版本翻译）
+        参考: Java KamiService.java 第343-528行
+        
+        Args:
+            kind_name: 卡种名称
+            kami_data: 卡密数据（每行一组，格式: 卡号 密码）
+            repeat_count: 重复次数
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            self._send_step(f"开始添加卡密到卡种: {kind_name}", "loading")
+            page = self._get_page()
+            
+            # 1. 访问卡种列表页面（Java 第370-375行）
+            self._send_step("访问卡种列表页面", "loading")
+            list_url = "https://www.goofish.pro/kam/kind/list"
+            logger.info(f"访问卡种列表页面: {list_url}")
+            page.goto(list_url, timeout=30000)
+            time.sleep(3)  # 增加等待时间确保页面完全加载
+            
+            # 检查登录（Java 第356-367行）
+            if 'login' in page.url:
+                self._send_step("检测到需要登录，等待扫码...", "loading")
+                logger.info("需要登录，开始自动登录流程")
+                if not self._login():
+                    self._send_step("登录失败", "error")
+                    logger.error("登录失败")
+                    return False
+                self._send_step("登录成功", "success")
+            
+            # 2. 使用 JavaScript 查找并点击"添加卡密"按钮（Java 第379-412行）
+            self._send_step(f"查找卡种: {kind_name}", "loading")
+            logger.info(f"查找卡种: {kind_name}")
+            
+            # 完全按照 Java 的 JavaScript 代码（Java 第384-400行）
+            script = f"""
+            (function() {{
+                var rows = document.querySelectorAll('tr');
+                for (var i = 0; i < rows.length; i++) {{
+                    var row = rows[i];
+                    var text = row.textContent;
+                    if (text.includes('{kind_name}')) {{
+                        var divs = row.querySelectorAll('div');
+                        for (var j = 0; j < divs.length; j++) {{
+                            var div = divs[j];
+                            if (div.textContent.trim() === '添加卡密') {{
+                                div.click();
+                                return true;
+                            }}
+                        }}
+                    }}
+                }}
+                return false;
+            }})()
+            """
+            
+            clicked = page.evaluate(script)
+            
+            if clicked:
+                self._send_step("点击添加卡密按钮", "success")
+                logger.info("通过JavaScript成功点击添加卡密按钮")
+            else:
+                self._send_step("未找到添加卡密按钮", "error")
+                logger.error("未找到添加卡密按钮")
+                return False
+            
+            time.sleep(1)
+            
+            # 4. 在弹出对话框中填写卡密数据 - 点击"空格"标签（Java 第417-428行）
+            try:
+                space_tab = page.locator("xpath=//div[contains(text(),'空格')]").first
+                space_tab.click()
+                self._send_step("切换到空格标签", "success")
+                logger.info("切换到空格标签")
+                time.sleep(0.5)
+            except Exception as e:
+                logger.warning(f"切换空格标签失败，可能已经在空格标签: {e}")
+            
+            # 5. 输入卡密数据到文本框（Java 第430-441行）
+            self._send_step("填写卡密数据", "loading")
+            textarea = page.locator("xpath=//textarea").first
+            textarea.wait_for(state='visible', timeout=15000)
+            textarea.clear()
+            textarea.fill(kami_data)
+            self._send_step("卡密数据填写完成", "success")
+            logger.info("填写卡密数据")
+            
+            # 等待页面内容完全加载
+            time.sleep(2)
+            
+            # 6. 开启"重复卡密"开关（Java 第443-464行）
+            try:
+                self._send_step("开启重复卡密开关", "loading")
+                repeat_switch = page.locator("xpath=//p[contains(text(),'重复卡密')]/following-sibling::div//div[@role='switch']").first
+                
+                # 检查开关状态
+                switch_class = repeat_switch.get_attribute("class")
+                if switch_class and 'is-checked' not in switch_class:
+                    repeat_switch.click()
+                    self._send_step("重复卡密开关已开启", "success")
+                    logger.info("开启重复卡密开关")
+                    time.sleep(2)  # 等待开关动画完成和输入框启用
+                else:
+                    self._send_step("重复卡密开关已开启", "success")
+                    logger.info("重复卡密开关已开启")
+            except Exception as e:
+                self._send_step(f"开关操作失败: {e}", "error")
+                logger.error(f"重复卡密开关操作失败: {e}")
+                raise e
+            
+            # 7. 填写重复次数（Java 第466-498行）
+            time.sleep(2)  # 等待开关切换后的动画和输入框启用
+            
+            try:
+                self._send_step(f"填写重复次数: {repeat_count}", "loading")
+                repeat_input = page.locator("xpath=//p[contains(text(),'重复卡密')]/following-sibling::div//input[@placeholder='请输入数字']").first
+                logger.info("找到重复卡密输入框")
+                
+                time.sleep(1)  # 等待一下确保完全可交互
+                
+                # 滚动到输入框可见位置
+                repeat_input.scroll_into_view_if_needed()
+                time.sleep(0.5)
+                
+                # 使用 sendKeys 填写（Java 第488行）
+                repeat_input.fill(str(repeat_count))
+                self._send_step(f"重复次数已设置: {repeat_count}", "success")
+                logger.info(f"通过fill填写重复次数: {repeat_count}")
+                
+                time.sleep(1)  # 等待Vue更新
+            except Exception as e:
+                self._send_step("填写重复次数失败，将添加1组卡密", "error")
+                logger.error(f"填写重复次数失败: {e}")
+                logger.warning("跳过重复次数填写，将添加1组卡密")
+            
+            # 8. 点击"添加"按钮（Java 第500-507行）
+            self._send_step("提交卡密数据", "loading")
+            time.sleep(0.5)
+            # 完全按照 Java 的 XPath: //button[contains(.,'添加') and not(contains(.,'添加卡密'))]
+            submit_button = page.locator("xpath=//button[contains(.,'添加') and not(contains(.,'添加卡密'))]").first
+            submit_button.click()
+            logger.info("点击添加按钮提交")
+            
+            # 9. 等待提交完成（Java 第509-510行）
+            time.sleep(3)
+            
+            # 10. 刷新页面（Java 第512-515行）
+            page.reload()
+            logger.info("刷新页面")
+            time.sleep(1)
+            
+            self._send_step("卡密添加成功", "success")
+            logger.info("卡密添加成功")
+            return True
+                
+        except Exception as e:
+            self._send_step(f"添加卡密失败: {e}", "error")
+            logger.error(f"添加卡密失败", e)
+            return False
+    
     def close(self):
-        """关闭浏览器"""
+        """关闭浏览器（任务结束后调用）"""
+        # 先保存登录状态
+        if self.context:
+            try:
+                self.context.storage_state(path=STORAGE_STATE_FILE)
+                logger.info(f"💾 登录状态已保存")
+            except:
+                pass
+        
+        # 关闭页面
         if self.page:
             try:
                 self.page.close()
             except:
                 pass
             self.page = None
-        # 不关闭browser和context，保留给全局复用
+        
+        # 关闭 context
+        if self.context:
+            try:
+                self.context.close()
+            except:
+                pass
+            self.context = None
+        
+        # 关闭浏览器
+        if self.browser:
+            try:
+                self.browser.close()
+            except:
+                pass
+            self.browser = None
+        
+        # 关闭 Playwright
+        if self._playwright:
+            try:
+                self._playwright.stop()
+            except:
+                pass
+            self._playwright = None
+        
+        logger.info("🔒 浏览器已关闭")
 
 
 # 便捷函数
@@ -570,5 +849,4 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     result = create_kami_kind_simple("测试卡种", headless=False)
     print(f"创建结果: {'成功' if result else '失败'}")
-    close_global_browser()
 

@@ -844,15 +844,18 @@ async def create_kami_kind(request: KamiKindRequest):
                 logger.info(f"🚀 开始执行任务 {task_id}")
                 task_manager.add_step(task_id, "正在启动浏览器", "loading")
                 
-                # Docker 容器中必须使用无头模式
+                # 本地macOS默认使用有头模式，Docker中设置XIANYU_HEADLESS=true
                 import os
-                headless = os.getenv('XIANYU_HEADLESS', 'true').lower() == 'true'
+                import platform
+                # macOS本地默认有头，Linux/Docker默认无头
+                default_headless = 'false' if platform.system() == 'Darwin' else 'true'
+                headless = os.getenv('XIANYU_HEADLESS', default_headless).lower() == 'true'
+                logger.info(f"浏览器模式: {'无头' if headless else '有头'}")
                 automation = KamiAutomation(headless=headless)
                 automation.set_step_callback(step_callback)
                 
                 task_manager.add_step(task_id, "浏览器已启动，开始创建卡种", "loading")
                 success = automation.create_kami_kind(request.kind_name, request.category_id)
-                # 不关闭浏览器，保持会话
                 
                 if success:
                     logger.info(f"✅ 任务 {task_id} 执行成功")
@@ -863,6 +866,12 @@ async def create_kami_kind(request: KamiKindRequest):
             except Exception as e:
                 logger.error(f"❌ 任务 {task_id} 执行异常: {e}", exc_info=True)
                 task_manager.complete_task(task_id, False, error=str(e))
+            finally:
+                # 任务结束后关闭浏览器（登录状态已保存）
+                try:
+                    automation.close()
+                except:
+                    pass
         
         thread = threading.Thread(target=run_automation, daemon=True)
         thread.start()
@@ -925,9 +934,12 @@ async def add_kami_cards(request: AddKamiRequest):
         # 后台线程执行
         def run_automation():
             try:
-                # Docker 容器中必须使用无头模式
+                # 本地macOS默认使用有头模式，Docker中设置XIANYU_HEADLESS=true
                 import os
-                headless = os.getenv('XIANYU_HEADLESS', 'true').lower() == 'true'
+                import platform
+                default_headless = 'false' if platform.system() == 'Darwin' else 'true'
+                headless = os.getenv('XIANYU_HEADLESS', default_headless).lower() == 'true'
+                logger.info(f"浏览器模式: {'无头' if headless else '有头'}")
                 automation = KamiAutomation(headless=headless)
                 automation.set_step_callback(step_callback)
                 success = automation.add_kami_cards(request.kind_name, request.kami_data, request.repeat_count)
@@ -939,6 +951,12 @@ async def add_kami_cards(request: AddKamiRequest):
             except Exception as e:
                 logger.error(f"添加卡密失败: {e}", exc_info=True)
                 task_manager.complete_task(task_id, False, error=str(e))
+            finally:
+                # 任务结束后关闭浏览器（登录状态已保存）
+                try:
+                    automation.close()
+                except:
+                    pass
         
         thread = threading.Thread(target=run_automation, daemon=True)
         thread.start()
@@ -975,9 +993,12 @@ async def setup_auto_shipping(request: AutoShippingRequest):
         # 后台线程执行
         def run_automation():
             try:
-                # Docker 容器中必须使用无头模式
+                # 本地macOS默认使用有头模式，Docker中设置XIANYU_HEADLESS=true
                 import os
-                headless = os.getenv('XIANYU_HEADLESS', 'true').lower() == 'true'
+                import platform
+                default_headless = 'false' if platform.system() == 'Darwin' else 'true'
+                headless = os.getenv('XIANYU_HEADLESS', default_headless).lower() == 'true'
+                logger.info(f"浏览器模式: {'无头' if headless else '有头'}")
                 automation = KamiAutomation(headless=headless)
                 automation.set_step_callback(step_callback)
                 success = automation.setup_auto_shipping(request.kind_name, request.product_title)
@@ -989,6 +1010,12 @@ async def setup_auto_shipping(request: AutoShippingRequest):
             except Exception as e:
                 logger.error(f"设置自动发货失败: {e}", exc_info=True)
                 task_manager.complete_task(task_id, False, error=str(e))
+            finally:
+                # 任务结束后关闭浏览器（登录状态已保存）
+                try:
+                    automation.close()
+                except:
+                    pass
         
         thread = threading.Thread(target=run_automation, daemon=True)
         thread.start()
