@@ -822,10 +822,22 @@ class KamiAutomation:
             logger.info("点击去设置按钮")
             time.sleep(3)  # 等待页面跳转到设置页面
             
+            # 调试：检查当前页面状态
+            logger.info(f"点击'去设置'后 URL: {page.url}")
+            logger.info(f"页面标题: {page.title()}")
+            
             # 3. 勾选最新的2个商品（Java 第583-609行）
             self._send_step("勾选商品（最新2个）", "loading")
             # 等待checkbox出现
-            page.wait_for_selector("xpath=//tbody//input[@type='checkbox']", timeout=15000)
+            try:
+                page.wait_for_selector("xpath=//tbody//input[@type='checkbox']", timeout=15000)
+                logger.info("✅ 找到checkbox")
+            except Exception as e:
+                logger.error(f"未找到checkbox: {e}")
+                # 保存截图和HTML
+                page.screenshot(path="/tmp/auto_shipping_no_checkbox.png", full_page=True)
+                logger.error("已保存截图: /tmp/auto_shipping_no_checkbox.png")
+                raise
             time.sleep(1)
             
             # 使用JavaScript勾选前两个商品（Java 第589-599行）
@@ -899,7 +911,7 @@ class KamiAutomation:
             
         except Exception as e:
             self._send_step(f"设置失败: {e}", "error")
-            logger.error(f"设置自动发货失败", e)
+            logger.error(f"设置自动发货失败: {e}")
             return False
     
     def close(self):
