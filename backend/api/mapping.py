@@ -72,6 +72,9 @@ async def get_mappings(
     page_size: int = 20,
     enabled: Optional[bool] = None,
     search: Optional[str] = None,
+    media_type: Optional[str] = None,
+    is_completed: Optional[bool] = None,
+    category: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -82,6 +85,9 @@ async def get_mappings(
         page_size: 每页数量
         enabled: 过滤启用状态
         search: 搜索原名或自定义名
+        media_type: 媒体类型筛选 (movie/tv)
+        is_completed: 完结状态筛选 (True/False)
+        category: 二级分类筛选 (如: "电影/国产电影")
     """
     try:
         query = db.query(CustomNameMapping)
@@ -96,6 +102,18 @@ async def get_mappings(
                 (CustomNameMapping.baidu_name.like(f'%{search}%')) |
                 (CustomNameMapping.xunlei_name.like(f'%{search}%'))
             )
+        
+        # 媒体类型筛选
+        if media_type:
+            query = query.filter(CustomNameMapping.media_type == media_type)
+        
+        # 完结状态筛选
+        if is_completed is not None:
+            query = query.filter(CustomNameMapping.is_completed == is_completed)
+        
+        # 二级分类筛选
+        if category:
+            query = query.filter(CustomNameMapping.category == category)
         
         # 总数
         total = query.count()

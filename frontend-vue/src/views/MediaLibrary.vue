@@ -20,19 +20,25 @@
           </el-input>
         </el-col>
         <el-col :span="12">
-          <el-space>
+          <el-space wrap>
             <el-button type="primary" @click="goToTmdb">
               ➕ 添加媒体
             </el-button>
             <el-select v-model="filterType" placeholder="类型" style="width: 120px" @change="handleSearch">
-              <el-option label="全部" value="" />
+              <el-option label="全部类型" value="" />
               <el-option label="电影" value="movie" />
               <el-option label="电视剧" value="tv" />
             </el-select>
             <el-select v-model="filterCompleted" placeholder="状态" style="width: 120px" @change="handleSearch">
-              <el-option label="全部" value="" />
+              <el-option label="全部状态" value="" />
               <el-option label="完结" value="completed" />
               <el-option label="更新中" value="ongoing" />
+            </el-select>
+            <el-select v-model="filterCategory" placeholder="分类" style="width: 150px" clearable @change="handleSearch">
+              <el-option label="全部分类" value="" />
+              <el-option-group v-for="(cats, group) in groupedCategories" :key="group" :label="group">
+                <el-option v-for="cat in cats" :key="cat" :label="cat" :value="cat" />
+              </el-option-group>
             </el-select>
           </el-space>
         </el-col>
@@ -375,8 +381,13 @@ const loading = ref(false)
 const searchText = ref('')
 const filterType = ref('')
 const filterCompleted = ref('')
+const filterCategory = ref('')
 const currentPage = ref(1)
 const pageSize = ref(24)
+
+// 分类列表
+const categories = ref([])
+const groupedCategories = ref({})
 
 const detailsVisible = ref(false)
 const currentItem = ref(null)
@@ -418,14 +429,23 @@ const loadMediaList = async () => {
       params.search = searchText.value
     }
     
+    // 类型筛选
     if (filterType.value) {
-      // 暂时不支持，可以后端加
+      params.media_type = filterType.value
     }
     
+    // 完结状态筛选
     if (filterCompleted.value) {
       if (filterCompleted.value === 'completed') {
-        // 暂时不支持，可以后端加
+        params.is_completed = true
+      } else if (filterCompleted.value === 'ongoing') {
+        params.is_completed = false
       }
+    }
+    
+    // 分类筛选
+    if (filterCategory.value) {
+      params.category = filterCategory.value
     }
     
     const res = await api.getMappings(params)
@@ -437,6 +457,19 @@ const loadMediaList = async () => {
     ElMessage.error('加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 加载分类列表
+const loadCategories = async () => {
+  try {
+    const res = await api.get('/categories')
+    if (res.data.success) {
+      categories.value = res.data.categories || []
+      groupedCategories.value = res.data.grouped || {}
+    }
+  } catch (error) {
+    console.error('加载分类失败:', error)
   }
 }
 
@@ -608,6 +641,7 @@ const submitXianyuProduct = async () => {
 }
 
 onMounted(() => {
+  loadCategories()
   loadMediaList()
 })
 </script>

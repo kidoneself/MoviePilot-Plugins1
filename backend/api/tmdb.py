@@ -42,7 +42,7 @@ def get_db():
 
 def classify_media(details: Dict, media_type: str) -> Optional[str]:
     """
-    根据 cat.yaml 规则进行分类
+    根据 cat.yaml 规则进行分类（兼容 MoviePilot 逻辑）
     
     Args:
         details: 媒体详细信息
@@ -50,6 +50,13 @@ def classify_media(details: Dict, media_type: str) -> Optional[str]:
         
     Returns:
         分类名称（如: "电影/国产电影"）
+    
+    匹配规则：
+    1. 按 YAML 顺序从上到下匹配，先匹配到就返回
+    2. 如果规则有 genre_ids，必须匹配
+    3. 如果规则有 origin_country（且不为null），必须匹配
+    4. origin_country 为 null 时，使用排除法（非亚洲国家）
+    5. 同时有多个条件时，必须全部满足（AND关系）
     """
     if media_type not in CATEGORIES:
         return None
@@ -62,33 +69,45 @@ def classify_media(details: Dict, media_type: str) -> Optional[str]:
     # 合并国家信息
     all_countries = set(origin_countries + production_countries)
     
-    # 遍历分类规则
-    for cat_name, cat_rule in CATEGORIES[media_type].items():
-        rule_genre_ids = cat_rule.get('genre_ids', '')
-        rule_countries = cat_rule.get('origin_country', '')
-        
-        # 检查类型ID匹配
-        genre_match = True
-        if rule_genre_ids:
-            rule_genres = [g.strip() for g in rule_genre_ids.split(',')]
-            genre_match = any(g in genre_ids for g in rule_genres)
-        
-        # 检查国家匹配
-        country_match = True
-        if rule_countries:
-            rule_country_list = [c.strip() for c in rule_countries.split(',')]
-            country_match = any(c in all_countries for c in rule_country_list)
-        elif rule_countries == "":  # 空字符串，不检查国家
-            country_match = True
-        elif rule_countries is None:  # null 表示欧美（排除法）
-            # 欧美：不是亚洲国家
-            asian_countries = {'CN', 'TW', 'HK', 'JP', 'KR', 'KP', 'TH', 'IN', 'SG'}
-            country_match = not any(c in asian_countries for c in all_countries)
-        
-        # 如果都匹配，返回分类
-        if genre_match and country_match:
-            return cat_name
+    logger.debug(f"分类匹配 - 类型:{media_type}, genre_ids:{genre_ids}, countries:{all_countries}")
     
+    # 遍历分类规则（保持 YAML 顺序）
+    for cat_name, cat_rule in CATEGORIES[media_type].items():
+        # 获取规则（注意：不设置默认值，让未定义的返回 None）
+        rule_genre_ids = cat_rule.get('genre_ids')
+        rule_countries = cat_rule.get('origin_country')
+        
+        # 检查 genre_ids 匹配
+        genre_match = True
+        if rule_genre_ids:  # 规则定义了 genre_ids
+            rule_genres = [g.strip() for g in str(rule_genre_ids).split(',')]
+            genre_match = any(g in genre_ids for g in rule_genres)
+            if not genre_match:
+                continue  # genre 不匹配，跳过
+        
+        # 检查 origin_country 匹配
+        country_match = True
+        if rule_countries is None:  # YAML 中配置为 null
+            # 欧美分类：排除法（不是亚洲国家，或者没有国家信息时也默认为欧美）
+            asian_countries = {'CN', 'TW', 'HK', 'JP', 'KR', 'KP', 'TH', 'IN', 'SG'}
+            if all_countries:  # 如果有国家信息
+                country_match = not any(c in asian_countries for c in all_countries)
+            else:  # 没有国家信息，默认匹配欧美（兼容 MoviePilot 逻辑）
+                country_match = True
+            if not country_match:
+                continue  # 不是欧美，跳过
+        elif rule_countries:  # YAML 中配置了具体国家
+            rule_country_list = [c.strip() for c in str(rule_countries).split(',')]
+            country_match = any(c in all_countries for c in rule_country_list)
+            if not country_match:
+                continue  # 国家不匹配，跳过
+        # 如果 rule_countries 不存在或为空字符串，则不检查国家（保持 country_match=True）
+        
+        # 所有条件都满足，返回该分类
+        logger.debug(f"  ✓ 匹配到分类: {cat_name}")
+        return cat_name
+    
+    logger.debug(f"  ✗ 未匹配到任何分类")
     return None
 
 
@@ -455,4 +474,252 @@ async def check_updates_now():
         }
     except Exception as e:
         logger.error(f"触发更新检查失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/tmdb/send-unfinished-list")
+async def send_unfinished_list_now():
+    """
+    手动推送未完结剧集列表
+    
+    用于测试和立即推送
+    """
+    try:
+        from backend.services.tmdb_scheduler import get_checker
+        
+        checker = get_checker()
+        if not checker or not checker.running:
+            return {
+                "success": False,
+                "message": "TMDB检查器未运行"
+            }
+        
+        # 手动触发推送
+        import asyncio
+        asyncio.create_task(checker._send_unfinished_shows_list())
+        
+        return {
+            "success": True,
+            "message": "已触发推送未完结剧集列表，请稍后查看微信通知"
+        }
+    except Exception as e:
+        logger.error(f"触发推送失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/tmdb/auto-fill")
+async def auto_fill_missing_data(
+    db: Session = Depends(get_db),
+    only_missing: bool = True
+):
+    """
+    批量补全缺失的 TMDB 信息（分类、图片、元数据）
+    
+    功能：
+    1. 查找没有 tmdb_id 或 poster_url 或 category 的记录
+    2. 根据 original_name 搜索 TMDB
+    3. 自动匹配并补全信息
+    
+    Args:
+        only_missing: 是否只处理缺失信息的记录（默认 True）
+    """
+    try:
+        import re
+        from sqlalchemy import or_
+        
+        # 查询需要补全的记录
+        query = db.query(CustomNameMapping)
+        if only_missing:
+            query = query.filter(
+                or_(
+                    CustomNameMapping.tmdb_id.is_(None),
+                    CustomNameMapping.poster_url.is_(None),
+                    CustomNameMapping.category.is_(None)
+                )
+            )
+        
+        mappings = query.all()
+        
+        if not mappings:
+            return {
+                "success": True,
+                "message": "没有需要补全的记录",
+                "total": 0,
+                "updated": 0
+            }
+        
+        logger.info(f"开始补全 {len(mappings)} 条记录...")
+        
+        updated_count = 0
+        failed_list = []
+        
+        for mapping in mappings:
+            try:
+                original_name = mapping.original_name
+                logger.info(f"\n处理: {original_name}")
+                
+                # 解析标题和年份（格式：标题 (年份)）
+                match = re.match(r"^(.+?)\s*\((\d{4})\)$", original_name)
+                if match:
+                    title = match.group(1).strip()
+                    year = match.group(2)
+                    logger.info(f"  解析: 标题={title}, 年份={year}")
+                else:
+                    # 没有年份，使用原始名称
+                    title = original_name.strip()
+                    year = None
+                    logger.info(f"  解析: 标题={title}, 年份=无")
+                
+                # 如果已有 tmdb_id，直接获取详情
+                if mapping.tmdb_id:
+                    logger.info(f"  已有 tmdb_id={mapping.tmdb_id}，获取详情...")
+                    media_type = mapping.media_type or "movie"
+                    
+                    # 获取详细信息
+                    url = f"{TMDB_BASE_URL}/{media_type}/{mapping.tmdb_id}"
+                    params = {"api_key": TMDB_API_KEY, "language": "zh-CN"}
+                    response = requests.get(url, params=params, timeout=10)
+                    
+                    if not response.ok:
+                        logger.warning(f"  ✗ 获取详情失败: {response.status_code}")
+                        failed_list.append({"name": original_name, "reason": "获取TMDB详情失败"})
+                        continue
+                    
+                    details = response.json()
+                    
+                    # 补全分类
+                    if not mapping.category:
+                        category = classify_media(details, media_type)
+                        if category:
+                            mapping.category = category
+                            logger.info(f"  ✓ 补全分类: {category}")
+                    
+                    # 补全海报
+                    if not mapping.poster_url:
+                        poster_path = details.get('poster_path')
+                        if poster_path:
+                            mapping.poster_url = f"{TMDB_IMAGE_W500}{poster_path}"
+                            logger.info(f"  ✓ 补全海报")
+                    
+                    # 补全简介
+                    if not mapping.overview:
+                        overview = details.get('overview')
+                        if overview:
+                            mapping.overview = overview
+                            logger.info(f"  ✓ 补全简介")
+                    
+                    updated_count += 1
+                    
+                else:
+                    # 没有 tmdb_id，需要搜索
+                    if year:
+                        logger.info(f"  搜索 TMDB: {title} ({year})...")
+                    else:
+                        logger.info(f"  搜索 TMDB: {title} (无年份)...")
+                    
+                    # 先尝试电影
+                    search_url = f"{TMDB_BASE_URL}/search/movie"
+                    search_params = {
+                        "api_key": TMDB_API_KEY,
+                        "query": title,
+                        "language": "zh-CN"
+                    }
+                    # 如果有年份，添加年份筛选
+                    if year:
+                        search_params["year"] = year
+                    
+                    response = requests.get(search_url, params=search_params, timeout=10)
+                    results = response.json().get("results", []) if response.ok else []
+                    
+                    media_type = "movie"
+                    
+                    # 如果电影没找到，尝试剧集
+                    if not results:
+                        search_url = f"{TMDB_BASE_URL}/search/tv"
+                        search_params.pop("year", None)  # 移除 year 参数
+                        # 如果有年份，添加剧集的年份筛选
+                        if year:
+                            search_params["first_air_date_year"] = year
+                        response = requests.get(search_url, params=search_params, timeout=10)
+                        results = response.json().get("results", []) if response.ok else []
+                        media_type = "tv"
+                    
+                    if not results:
+                        logger.warning(f"  ✗ 未找到匹配结果")
+                        failed_list.append({"name": original_name, "reason": "TMDB未找到"})
+                        continue
+                    
+                    # 使用第一个结果
+                    first_result = results[0]
+                    tmdb_id = first_result['id']
+                    
+                    logger.info(f"  找到 TMDB ID: {tmdb_id} ({media_type})")
+                    
+                    # 获取详细信息
+                    details_url = f"{TMDB_BASE_URL}/{media_type}/{tmdb_id}"
+                    details_params = {"api_key": TMDB_API_KEY, "language": "zh-CN"}
+                    details_response = requests.get(details_url, params=details_params, timeout=10)
+                    
+                    if not details_response.ok:
+                        logger.warning(f"  ✗ 获取详情失败")
+                        failed_list.append({"name": original_name, "reason": "获取详情失败"})
+                        continue
+                    
+                    details = details_response.json()
+                    
+                    # 补全所有信息
+                    mapping.tmdb_id = tmdb_id
+                    mapping.media_type = media_type
+                    
+                    # 补全分类
+                    if not mapping.category:
+                        category = classify_media(details, media_type)
+                        if category:
+                            mapping.category = category
+                            logger.info(f"  ✓ 补全分类: {category}")
+                    
+                    # 补全海报
+                    poster_path = details.get('poster_path')
+                    if poster_path:
+                        mapping.poster_url = f"{TMDB_IMAGE_W500}{poster_path}"
+                        logger.info(f"  ✓ 补全海报")
+                    
+                    # 补全简介
+                    overview = details.get('overview')
+                    if overview:
+                        mapping.overview = overview
+                        logger.info(f"  ✓ 补全简介")
+                    
+                    # 判断完结状态
+                    if media_type == "movie":
+                        mapping.is_completed = True
+                    else:
+                        status = details.get('status', '')
+                        mapping.is_completed = status in ['Ended', 'Canceled']
+                    
+                    updated_count += 1
+                    logger.info(f"  ✅ 补全成功")
+                
+            except Exception as e:
+                logger.error(f"  ✗ 处理失败: {e}")
+                failed_list.append({"name": original_name, "reason": str(e)})
+                continue
+        
+        # 提交数据库更新
+        db.commit()
+        
+        logger.info(f"\n补全完成: 成功 {updated_count}/{len(mappings)}")
+        
+        return {
+            "success": True,
+            "message": f"补全完成: 成功 {updated_count} 条，失败 {len(failed_list)} 条",
+            "total": len(mappings),
+            "updated": updated_count,
+            "failed": len(failed_list),
+            "failed_list": failed_list[:10] if failed_list else []  # 只返回前10个失败记录
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"批量补全失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))

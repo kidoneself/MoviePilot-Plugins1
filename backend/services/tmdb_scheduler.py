@@ -39,8 +39,11 @@ class TmdbUpdateChecker:
         self.running = True
         logger.info("🎬 TMDB剧集更新检查器启动")
         
-        # 启动定时检查循环
+        # 启动定时检查循环（每天9点）
         asyncio.create_task(self._check_loop())
+        
+        # 启动每小时推送未完结剧集列表
+        asyncio.create_task(self._hourly_notification_loop())
     
     async def stop(self):
         """停止调度器"""
@@ -68,6 +71,27 @@ class TmdbUpdateChecker:
                     
             except Exception as e:
                 logger.error(f"检查任务失败: {e}", exc_info=True)
+                await asyncio.sleep(60)
+    
+    async def _hourly_notification_loop(self):
+        """每小时推送未完结剧集列表"""
+        while self.running:
+            try:
+                now = datetime.now()
+                
+                # 每个整点推送（0分时）
+                if now.minute == 0:
+                    logger.info("⏰ 每小时推送未完结剧集")
+                    await self._send_unfinished_shows_list()
+                    
+                    # 等待61秒，避免重复执行
+                    await asyncio.sleep(61)
+                else:
+                    # 每分钟检查一次时间
+                    await asyncio.sleep(60)
+                    
+            except Exception as e:
+                logger.error(f"每小时推送失败: {e}", exc_info=True)
                 await asyncio.sleep(60)
     
     async def _check_tv_updates(self):
@@ -219,6 +243,59 @@ class TmdbUpdateChecker:
             
         except Exception as e:
             logger.error(f"发送通知失败: {e}", exc_info=True)
+    
+    async def _send_unfinished_shows_list(self):
+        """推送未完结剧集列表"""
+        if not self.wechat_service:
+            logger.warning("微信服务未配置，跳过推送")
+            return
+        
+        session = _get_session()
+        try:
+            # 查询所有未完结的电视剧
+            tv_shows = session.query(CustomNameMapping).filter(
+                CustomNameMapping.media_type == 'tv',
+                CustomNameMapping.is_completed == False,
+                CustomNameMapping.tmdb_id.isnot(None)
+            ).all()
+            
+            # 构建消息
+            now = datetime.now()
+            content_parts = [f"📺 未完结剧集汇总 ({now.strftime('%H:00')})\n"]
+            
+            if not tv_shows:
+                content_parts.append("✅ 当前没有未完结的剧集")
+            else:
+                content_parts.append(f"共有 {len(tv_shows)} 部未完结剧集：\n")
+                
+                # 按名称排序
+                sorted_shows = sorted(tv_shows, key=lambda x: x.original_name)
+                
+                for i, show in enumerate(sorted_shows, 1):
+                    content_parts.append(f"{i}. {show.original_name}")
+                    
+                    # 如果有分享链接，添加短链接
+                    if hasattr(show, 'id'):
+                        short_url = f"https://link.frp.naspt.vip/s/{show.id}"
+                        content_parts.append(f"   🔗 {short_url}")
+            
+            content_parts.append(f"\n⏰ 推送时间: {now.strftime('%Y-%m-%d %H:%M')}")
+            
+            message = "\n".join(content_parts)
+            
+            # 从配置获取用户ID
+            from backend.main import app_config
+            wechat_config = app_config.get('wechat', {})
+            default_user = wechat_config.get('default_user', '@all')
+            
+            # 发送通知
+            self.wechat_service.send_text(default_user, message)
+            logger.info(f"✅ 已推送未完结剧集列表 (共{len(tv_shows)}部)")
+            
+        except Exception as e:
+            logger.error(f"推送未完结剧集列表失败: {e}", exc_info=True)
+        finally:
+            session.close()
 
 
 # 全局调度器实例

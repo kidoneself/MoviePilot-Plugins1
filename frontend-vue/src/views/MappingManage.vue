@@ -10,6 +10,7 @@ const loading = ref(false)
 const searchText = ref('')
 const currentPage = ref(1)
 const pageSize = ref(20)
+const autoFillLoading = ref(false)
 
 const categories = ref([])
 const dialogVisible = ref(false)
@@ -754,6 +755,39 @@ const saveEditedLink = async () => {
   }
 }
 
+// 批量补全缺失信息
+const handleAutoFill = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '将自动补全所有缺失分类、海报或TMDB信息的记录。这可能需要几分钟时间，是否继续？',
+      '批量补全确认',
+      {
+        confirmButtonText: '开始补全',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    
+    autoFillLoading.value = true
+    const res = await api.post('/tmdb/auto-fill', { only_missing: true })
+    
+    if (res.data.success) {
+      const { updated, failed, total } = res.data
+      ElMessage.success(`补全完成！成功 ${updated}/${total} 条${failed > 0 ? `，失败 ${failed} 条` : ''}`)
+      loadMappings()  // 刷新列表
+    } else {
+      ElMessage.error(res.data.message || '补全失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('批量补全失败:', error)
+      ElMessage.error('批量补全失败')
+    }
+  } finally {
+    autoFillLoading.value = false
+  }
+}
+
 onMounted(() => {
   loadCategories()
   loadMappings()
@@ -780,6 +814,7 @@ onMounted(() => {
             <el-button type="success" @click="openCookieDialog('baidu')">导入百度Cookie</el-button>
             <el-button type="warning" @click="openCookieDialog('quark')">导入夸克Cookie</el-button>
             <el-button type="info" @click="openCookieDialog('xunlei')">导入迅雷Cookie</el-button>
+            <el-button type="warning" @click="handleAutoFill" :loading="autoFillLoading">🔧 批量补全</el-button>
             <el-button type="primary" @click="handleAdd">添加映射</el-button>
           </el-space>
         </div>
