@@ -522,7 +522,8 @@ async def sync_products(page_no: int = 1, page_size: int = 50, product_status: O
             
             saved_count = 0
             for item in response.list:
-                product_id = item.get('productId')
+                # API返回的字段名是下划线格式，不是驼峰格式
+                product_id = item.get('product_id')
                 if not product_id:
                     continue
                 
@@ -530,24 +531,24 @@ async def sync_products(page_no: int = 1, page_size: int = 50, product_status: O
                 db_product = GoofishProduct(
                     product_id=product_id,
                     title=item.get('title'),
-                    outer_id=item.get('outerId'),
+                    outer_id=item.get('outer_id'),
                     price=item.get('price'),
-                    original_price=item.get('originalPrice'),
+                    original_price=item.get('original_price'),
                     stock=item.get('stock'),
                     sold=item.get('sold'),
-                    product_status=item.get('productStatus'),
-                    item_biz_type=item.get('itemBizType'),
-                    sp_biz_type=item.get('spBizType'),
-                    channel_cat_id=item.get('channelCatId'),
-                    district_id=item.get('districtId'),
-                    stuff_status=item.get('stuffStatus'),
-                    express_fee=item.get('expressFee'),
-                    spec_type=item.get('specType'),
+                    product_status=item.get('product_status'),
+                    item_biz_type=item.get('item_biz_type'),
+                    sp_biz_type=item.get('sp_biz_type'),
+                    channel_cat_id=item.get('channel_cat_id'),
+                    district_id=item.get('district_id'),
+                    stuff_status=item.get('stuff_status'),
+                    express_fee=item.get('express_fee'),
+                    spec_type=item.get('spec_type'),
                     source=item.get('source'),
-                    online_time=item.get('onlineTime'),
-                    offline_time=item.get('offlineTime'),
-                    update_time_remote=item.get('updateTime'),
-                    create_time_remote=item.get('createTime')
+                    online_time=item.get('online_time'),
+                    offline_time=item.get('offline_time'),
+                    update_time_remote=item.get('update_time'),
+                    create_time_remote=item.get('create_time')
                 )
                 session.add(db_product)
                 saved_count += 1
