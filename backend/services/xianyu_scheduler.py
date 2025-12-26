@@ -51,10 +51,11 @@ class XianyuScheduler:
             
             config = SDKConfig(
                 app_key=app_key_cfg.config_value,
-                app_secret=app_secret_cfg.config_value
+                app_secret=app_secret_cfg.config_value,
+                verify_ssl=False  # 禁用SSL验证（解决证书问题）
             )
             self.sdk = GoofishSDK(config)
-            logger.info("闲鱼SDK初始化成功")
+            logger.info("闲鱼SDK初始化成功（SSL验证已禁用）")
         except Exception as e:
             logger.error(f"初始化闲鱼SDK失败: {e}")
         finally:
