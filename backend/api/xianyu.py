@@ -548,7 +548,8 @@ async def sync_products(page_no: int = 1, page_size: int = 50, product_status: O
                     online_time=item.get('online_time'),
                     offline_time=item.get('offline_time'),
                     update_time_remote=item.get('update_time'),
-                    create_time_remote=item.get('create_time')
+                    create_time_remote=item.get('create_time'),
+                    sync_time=datetime.now()  # 设置同步时间
                 )
                 session.add(db_product)
                 saved_count += 1

@@ -9,9 +9,12 @@
           </el-button>
           <el-select v-model="filterStatus" placeholder="状态筛选" style="width: 150px" @change="loadProducts">
             <el-option label="全部" :value="null" />
-            <el-option label="📝 草稿箱" :value="21" />
-            <el-option label="✅ 已上架" :value="22" />
-            <el-option label="⏸️ 已下架" :value="36" />
+            <el-option label="📝 待发布" :value="21" />
+            <el-option label="✅ 销售中" :value="22" />
+            <el-option label="💰 已售罄" :value="23" />
+            <el-option label="👋 手动下架" :value="31" />
+            <el-option label="📦 售出下架" :value="33" />
+            <el-option label="🤖 自动下架" :value="36" />
           </el-select>
         </el-space>
       </div>
@@ -50,12 +53,13 @@
         <el-table-column prop="sold" label="已售" width="80" />
         <el-table-column prop="product_status" label="状态" width="120">
           <template #default="{ row }">
-            <el-tag v-if="row.product_status === 21" type="info">📝 草稿箱</el-tag>
-            <el-tag v-else-if="row.product_status === 22" type="success">✅ 已上架</el-tag>
-            <el-tag v-else-if="row.product_status === 36" type="warning">⏸️ 已下架</el-tag>
-            <el-tag v-else-if="row.product_status === 0" type="info">待发布</el-tag>
-            <el-tag v-else-if="row.product_status === 1" type="success">已上架</el-tag>
-            <el-tag v-else-if="row.product_status === 2" type="warning">已下架</el-tag>
+            <el-tag v-if="row.product_status === -1" type="danger">🗑️ 已删除</el-tag>
+            <el-tag v-else-if="row.product_status === 21" type="info">📝 待发布</el-tag>
+            <el-tag v-else-if="row.product_status === 22" type="success">✅ 销售中</el-tag>
+            <el-tag v-else-if="row.product_status === 23" type="warning">💰 已售罄</el-tag>
+            <el-tag v-else-if="row.product_status === 31" type="warning">👋 手动下架</el-tag>
+            <el-tag v-else-if="row.product_status === 33" type="warning">📦 售出下架</el-tag>
+            <el-tag v-else-if="row.product_status === 36" type="warning">🤖 自动下架</el-tag>
             <el-tag v-else type="info">未知({{ row.product_status }})</el-tag>
           </template>
         </el-table-column>
@@ -66,30 +70,34 @@
         </el-table-column>
         <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
+            <!-- 上架按钮：仅在非销售中状态显示 -->
             <el-button
-              v-if="row.product_status !== 22 && row.product_status !== 1"
+              v-if="row.product_status !== 22"
               size="small"
               type="primary"
               @click="publishProduct(row)"
             >
               上架
             </el-button>
+            <!-- 下架按钮：仅在销售中时显示 -->
             <el-button
-              v-if="row.product_status === 22 || row.product_status === 1"
+              v-if="row.product_status === 22"
               size="small"
               type="warning"
               @click="downshelfProduct(row)"
             >
               下架
             </el-button>
+            <!-- 定时任务：所有状态都可创建 -->
             <el-button
               size="small"
               @click="createScheduleTask(row)"
             >
               定时任务
             </el-button>
+            <!-- 删除按钮：仅在待发布(草稿箱)状态显示 -->
             <el-button
-              v-if="row.product_status === 21 || row.product_status === 0"
+              v-if="row.product_status === 21"
               size="small"
               type="danger"
               @click="deleteProduct(row)"
@@ -307,8 +315,8 @@ const batchScheduleTask = () => {
     return
   }
   
-  // 判断默认任务类型：如果全是已上架（22或1）则默认下架，否则默认上架
-  const allOnline = selectedProducts.value.every(p => p.product_status === 22 || p.product_status === 1)
+  // 判断默认任务类型：如果全是销售中(22)则默认下架，否则默认上架
+  const allOnline = selectedProducts.value.every(p => p.product_status === 22)
   
   scheduleForm.value = {
     product: null,
@@ -325,7 +333,7 @@ const createScheduleTask = (product) => {
   scheduleForm.value = {
     product: product,
     products: null,
-    task_type: (product.product_status === 22 || product.product_status === 1) ? 'downshelf' : 'publish',
+    task_type: product.product_status === 22 ? 'downshelf' : 'publish',
     execute_time: null,
     repeat_daily: true
   }
