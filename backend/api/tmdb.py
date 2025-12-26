@@ -73,9 +73,8 @@ def classify_media(details: Dict, media_type: str) -> Optional[str]:
     
     # 遍历分类规则（保持 YAML 顺序）
     for cat_name, cat_rule in CATEGORIES[media_type].items():
-        # 获取规则（注意：不设置默认值，让未定义的返回 None）
+        # 获取规则
         rule_genre_ids = cat_rule.get('genre_ids')
-        rule_countries = cat_rule.get('origin_country')
         
         # 检查 genre_ids 匹配
         genre_match = True
@@ -87,21 +86,24 @@ def classify_media(details: Dict, media_type: str) -> Optional[str]:
         
         # 检查 origin_country 匹配
         country_match = True
-        if rule_countries is None:  # YAML 中配置为 null
-            # 欧美分类：排除法（不是亚洲国家，或者没有国家信息时也默认为欧美）
-            asian_countries = {'CN', 'TW', 'HK', 'JP', 'KR', 'KP', 'TH', 'IN', 'SG'}
-            if all_countries:  # 如果有国家信息
-                country_match = not any(c in asian_countries for c in all_countries)
-            else:  # 没有国家信息，默认匹配欧美（兼容 MoviePilot 逻辑）
-                country_match = True
-            if not country_match:
-                continue  # 不是欧美，跳过
-        elif rule_countries:  # YAML 中配置了具体国家
-            rule_country_list = [c.strip() for c in str(rule_countries).split(',')]
-            country_match = any(c in all_countries for c in rule_country_list)
-            if not country_match:
-                continue  # 国家不匹配，跳过
-        # 如果 rule_countries 不存在或为空字符串，则不检查国家（保持 country_match=True）
+        if 'origin_country' in cat_rule:  # YAML 中定义了 origin_country 键
+            rule_countries = cat_rule['origin_country']
+            
+            if rule_countries is None:  # origin_country: null（欧美分类）
+                # 欧美分类：排除法（不是亚洲国家，或者没有国家信息时也默认为欧美）
+                asian_countries = {'CN', 'TW', 'HK', 'JP', 'KR', 'KP', 'TH', 'IN', 'SG'}
+                if all_countries:  # 如果有国家信息
+                    country_match = not any(c in asian_countries for c in all_countries)
+                else:  # 没有国家信息，默认匹配欧美（兼容 MoviePilot 逻辑）
+                    country_match = True
+                if not country_match:
+                    continue  # 不是欧美，跳过
+            elif rule_countries:  # origin_country: "CN,TW,HK"（具体国家）
+                rule_country_list = [c.strip() for c in str(rule_countries).split(',')]
+                country_match = any(c in all_countries for c in rule_country_list)
+                if not country_match:
+                    continue  # 国家不匹配，跳过
+        # 如果 origin_country 键不存在，则不检查国家（保持 country_match=True）
         
         # 所有条件都满足，返回该分类
         logger.debug(f"  ✓ 匹配到分类: {cat_name}")
