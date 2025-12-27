@@ -100,6 +100,28 @@ class PanCookie(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
+class MediaRequest(Base):
+    """用户资源请求表"""
+    __tablename__ = 'media_requests'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tmdb_id = Column(Integer, nullable=False, comment='TMDB媒体ID')
+    media_type = Column(String(20), nullable=False, comment='媒体类型: movie/tv')
+    title = Column(String(255), nullable=False, comment='标题')
+    year = Column(String(10), comment='年份')
+    poster_url = Column(String(500), comment='海报URL')
+    request_count = Column(Integer, default=1, comment='请求次数')
+    status = Column(String(20), default='pending', comment='状态: pending/completed')
+    created_at = Column(DateTime, default=datetime.now, comment='首次请求时间')
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='最后请求时间')
+    
+    __table_args__ = (
+        Index('idx_created_at', 'created_at'),
+        Index('idx_request_count', 'request_count'),
+        Index('idx_status', 'status'),
+    )
+
+
 def init_database(db_config: dict = None):
     """
     初始化数据库

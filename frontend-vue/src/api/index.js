@@ -148,5 +148,26 @@ export default {
   // TMDb 检查更新
   checkTmdbUpdates() {
     return api.post('/tmdb/check-updates')
+  },
+
+  // 用户资源请求管理
+  getMediaRequests(params) {
+    return api.get('/media-requests', { params })
+  },
+
+  createMediaRequest(data) {
+    return api.post('/media-requests', data)
+  },
+
+  updateMediaRequest(id, data) {
+    return api.put(`/media-requests/${id}`, data)
+  },
+
+  deleteMediaRequest(id) {
+    return api.delete(`/media-requests/${id}`)
+  },
+
+  getMediaRequestsStats() {
+    return api.get('/media-requests/stats')
   }
 }

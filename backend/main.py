@@ -11,7 +11,7 @@ import uvicorn
 
 from backend.models import init_database
 from backend.monitor import MonitorService
-from backend.api import records, tree, export, mapping, share_link, transfer, category, openlist, wechat, share_page, tmdb, media, xianyu
+from backend.api import records, tree, export, mapping, share_link, transfer, category, openlist, wechat, share_page, tmdb, media, xianyu, media_requests
 from backend.api import config as config_api
 
 # 配置日志
@@ -131,6 +131,7 @@ app.include_router(share_page.router, tags=["短链接分享"])
 app.include_router(tmdb.router, prefix="/api", tags=["TMDb搜索"])
 app.include_router(media.router, prefix="/api", tags=["媒体管理"])
 app.include_router(xianyu.router, prefix="/api", tags=["闲鱼管家"])
+app.include_router(media_requests.router, prefix="/api", tags=["资源请求"])
 app.include_router(config_api.router, prefix="/api", tags=["配置管理"])
 
 # 静态文件
@@ -424,6 +425,7 @@ frontend_routes = [
     "/tree",
     "/share-links",
     "/tmdb",
+    "/media-requests",
     "/config",
     "/xianyu/products",
     "/xianyu/kami",

@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Document, List, Folder, Share, Setting, Film, Collection, MagicStick } from '@element-plus/icons-vue'
+import { Document, List, Folder, Share, Setting, Film, Collection, MagicStick, Bell } from '@element-plus/icons-vue'
 import api from './api'
 
 const router = useRouter()
@@ -224,6 +224,10 @@ onMounted(() => {
           <el-menu-item index="tmdb">
             <el-icon><Film /></el-icon>
             <span>添加媒体</span>
+          </el-menu-item>
+          <el-menu-item index="media-requests">
+            <el-icon><Bell /></el-icon>
+            <span>用户请求</span>
           </el-menu-item>
           <el-menu-item index="config">
             <el-icon><Setting /></el-icon>

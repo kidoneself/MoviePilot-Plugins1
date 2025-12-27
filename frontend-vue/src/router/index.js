@@ -6,6 +6,7 @@ import DirectoryTree from '../views/DirectoryTree.vue'
 import Config from '../views/Config.vue'
 import ShareLinks from '../views/ShareLinks.vue'
 import TmdbSearch from '../views/TmdbSearch.vue'
+import MediaRequests from '../views/MediaRequests.vue'
 import XianyuProducts from '../views/XianyuProducts.vue'
 import XianyuKami from '../views/XianyuKami.vue'
 import XianyuCreateProduct from '../views/XianyuCreateProduct.vue'
@@ -45,6 +46,11 @@ const routes = [
     path: '/tmdb',
     name: 'TmdbSearch',
     component: TmdbSearch
+  },
+  {
+    path: '/media-requests',
+    name: 'MediaRequests',
+    component: MediaRequests
   },
   {
     path: '/config',
