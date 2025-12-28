@@ -162,30 +162,44 @@ class QuarkTransferHandler:
             # 构建文件列表消息
             stats = self.user_sessions[user_id]['stats']
             
-            message_parts = [
+            # 第一条消息：统计信息
+            header_message = "\n".join([
                 f"📦 文件列表（共{stats['total']}个）\n",
                 f"✅ 干净文件：{stats['clean_count']}个",
-                f"🚫 广告文件：{stats['ad_count']}个\n"
-            ]
+                f"🚫 广告文件：{stats['ad_count']}个（已自动过滤）\n",
+                "━━━━━━━━━━━━━━━"
+            ])
+            self.wechat.send_text(user_id, header_message)
             
-            # 显示前10个干净文件
+            # 分批发送文件列表（每批20个）
             clean_files = [f for f in files if not f['is_ad']]
-            for i, file in enumerate(clean_files[:10], 1):
-                size_mb = file['size'] / 1024 / 1024
-                message_parts.append(f"{i}. {file['name']} ({size_mb:.1f}MB)")
+            batch_size = 20
             
-            if len(clean_files) > 10:
-                message_parts.append(f"... 还有 {len(clean_files) - 10} 个文件")
+            for batch_start in range(0, len(clean_files), batch_size):
+                batch_end = min(batch_start + batch_size, len(clean_files))
+                batch_files = clean_files[batch_start:batch_end]
+                
+                file_list = []
+                for i, file in enumerate(batch_files, start=batch_start + 1):
+                    size_mb = file['size'] / 1024 / 1024
+                    file_list.append(f"{i}. {file['name']} ({size_mb:.1f}MB)")
+                
+                batch_message = "\n".join(file_list)
+                self.wechat.send_text(user_id, batch_message)
+                
+                # 避免消息发送过快
+                import time
+                time.sleep(0.3)
             
-            message_parts.extend([
+            # 最后一条消息：操作提示
+            footer_message = "\n".join([
                 "\n━━━━━━━━━━━━━━━",
                 "请回复：",
                 "• all - 全选干净文件",
                 "• 1,3,5 - 选择指定序号",
-                "• 1-10 - 选择范围"
+                f"• 1-{len(clean_files)} - 选择范围"
             ])
-            
-            self.wechat.send_text(user_id, "\n".join(message_parts))
+            self.wechat.send_text(user_id, footer_message)
             
             logger.info(f"✅ 用户 {user_id} 解析成功，会话ID: {session_id}")
             
