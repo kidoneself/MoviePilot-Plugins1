@@ -21,8 +21,11 @@
         </el-col>
         <el-col :span="12">
           <el-space wrap>
-            <el-button type="primary" @click="goToTmdb">
+            <el-button type="primary" @click="showTmdbDialog">
               ➕ 添加媒体
+            </el-button>
+            <el-button type="success" @click="handleAutoFillTmdb" :loading="autoFilling">
+              🔄 补齐TMDB信息
             </el-button>
             <el-select v-model="filterType" placeholder="类型" style="width: 120px" @change="handleSearch">
               <el-option label="全部类型" value="" />
@@ -135,7 +138,7 @@
 
       <!-- 空状态 -->
       <el-empty v-if="!loading && mediaList.length === 0" description="暂无媒体">
-        <el-button type="primary" @click="goToTmdb">去添加媒体</el-button>
+        <el-button type="primary" @click="showTmdbDialog">去添加媒体</el-button>
       </el-empty>
     </div>
 
@@ -297,6 +300,243 @@
       </template>
     </el-dialog>
 
+    <!-- TMDb 搜索对话框 -->
+    <el-dialog
+      v-model="tmdbDialogVisible"
+      title="🎬 TMDb 影视搜索"
+      width="90%"
+      top="5vh"
+    >
+      <div class="tmdb-search-content">
+        <!-- 搜索区域 -->
+        <div class="search-area" style="margin-bottom: 20px;">
+          <el-input
+            v-model="tmdbSearchQuery"
+            placeholder="输入影视作品名称搜索..."
+            size="large"
+            clearable
+            @keyup.enter="handleTmdbSearch"
+          >
+            <template #prepend>
+              <el-select v-model="tmdbMediaType" placeholder="类型" style="width: 100px">
+                <el-option label="全部" value="multi" />
+                <el-option label="电影" value="movie" />
+                <el-option label="电视剧" value="tv" />
+              </el-select>
+            </template>
+            <template #append>
+              <el-button :icon="Search" @click="handleTmdbSearch" :loading="tmdbSearching">
+                搜索
+              </el-button>
+            </template>
+          </el-input>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
+            <el-tag type="info" size="small">根据 cat.yaml 自动分类</el-tag>
+            <el-button 
+              type="warning" 
+              size="small" 
+              :loading="checkingUpdates"
+              @click="handleCheckUpdates"
+            >
+              🔔 检查剧集更新
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 搜索结果 -->
+        <div v-if="tmdbSearchResults.length > 0" class="results-section">
+          <h3>搜索结果 ({{ tmdbSearchResults.length }} 个)</h3>
+          <div class="results-grid">
+            <div
+              v-for="item in tmdbSearchResults"
+              :key="item.id"
+              class="result-item"
+              @click="showTmdbDetails(item)"
+            >
+              <el-image
+                :src="item.poster_path || '/placeholder.jpg'"
+                fit="cover"
+                class="poster"
+                lazy
+              >
+                <template #error>
+                  <div class="image-slot">
+                    <el-icon><Picture /></el-icon>
+                  </div>
+                </template>
+              </el-image>
+              
+              <div class="info">
+                <div class="title">{{ item.title }}</div>
+                <div class="meta">
+                  <el-tag :type="item.media_type === 'movie' ? 'success' : 'primary'" size="small">
+                    {{ item.media_type === 'movie' ? '电影' : '电视剧' }}
+                  </el-tag>
+                  <span class="year">{{ item.year }}</span>
+                </div>
+                <div class="rating">
+                  <el-rate
+                    v-model="item.vote_average"
+                    disabled
+                    show-score
+                    text-color="#ff9900"
+                    score-template="{value}"
+                    :max="10"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- TMDb 详情对话框 -->
+    <el-dialog
+      v-model="tmdbDetailsVisible"
+      :title="tmdbCurrentDetails?.title"
+      width="90%"
+      top="5vh"
+      class="details-dialog"
+    >
+      <div v-if="tmdbCurrentDetails" class="details-content">
+        <el-row :gutter="20">
+          <!-- 左侧：海报和基本信息 -->
+          <el-col :span="8">
+            <el-image
+              :src="tmdbCurrentDetails.main_poster"
+              fit="cover"
+              class="main-poster"
+            >
+              <template #error>
+                <div class="image-slot">
+                  <el-icon><Picture /></el-icon>
+                </div>
+              </template>
+            </el-image>
+
+            <el-descriptions :column="1" border class="info-box" style="margin-top: 20px;">
+              <el-descriptions-item label="名称">
+                {{ tmdbCurrentDetails.title }} ({{ tmdbCurrentDetails.year }})
+              </el-descriptions-item>
+              <el-descriptions-item label="二级分类">
+                <el-tag v-if="tmdbCurrentDetails.category" type="success">
+                  {{ tmdbCurrentDetails.category }}
+                </el-tag>
+                <el-tag v-else type="info">未分类</el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="类型">
+                {{ tmdbCurrentDetails.genres.join(', ') }}
+              </el-descriptions-item>
+              <el-descriptions-item label="国家">
+                {{ tmdbCurrentDetails.origin_country.join(', ') }}
+              </el-descriptions-item>
+              <el-descriptions-item label="评分">
+                <el-rate
+                  v-model="tmdbCurrentDetails.vote_average"
+                  disabled
+                  show-score
+                  text-color="#ff9900"
+                  score-template="{value}/10"
+                  :max="10"
+                />
+              </el-descriptions-item>
+              <el-descriptions-item v-if="tmdbCurrentDetails.runtime" label="时长">
+                {{ tmdbCurrentDetails.runtime }} 分钟
+              </el-descriptions-item>
+              <el-descriptions-item v-if="tmdbCurrentDetails.number_of_seasons" label="季数">
+                {{ tmdbCurrentDetails.number_of_seasons }} 季
+              </el-descriptions-item>
+              <el-descriptions-item v-if="tmdbCurrentDetails.number_of_episodes" label="集数">
+                {{ tmdbCurrentDetails.number_of_episodes }} 集
+              </el-descriptions-item>
+            </el-descriptions>
+          </el-col>
+
+          <!-- 右侧：简介和图片 -->
+          <el-col :span="16">
+            <div class="overview-section">
+              <h3>简介</h3>
+              <p>{{ tmdbCurrentDetails.overview || '暂无简介' }}</p>
+            </div>
+
+            <el-divider />
+
+            <!-- 主图链接 -->
+            <div class="image-urls">
+              <h3>🖼️ 主图链接</h3>
+              <el-input
+                :value="tmdbCurrentDetails.main_poster"
+                readonly
+                class="url-input"
+              >
+                <template #append>
+                  <el-button @click="copyUrl(tmdbCurrentDetails.main_poster)">
+                    复制
+                  </el-button>
+                </template>
+              </el-input>
+            </div>
+
+            <el-divider />
+
+            <!-- 海报图片 -->
+            <div v-if="tmdbCurrentDetails.posters.length > 0" class="gallery">
+              <h3>📸 海报 ({{ tmdbCurrentDetails.posters.length }} 张)</h3>
+              <div class="gallery-grid">
+                <div v-for="(poster, index) in tmdbCurrentDetails.posters" :key="index" class="gallery-item">
+                  <el-image
+                    :src="poster"
+                    fit="cover"
+                    class="gallery-image"
+                    :preview-src-list="tmdbCurrentDetails.posters"
+                    :initial-index="index"
+                  />
+                  <el-button size="small" @click="copyUrl(poster)" class="copy-btn">
+                    复制链接
+                  </el-button>
+                </div>
+              </div>
+            </div>
+
+            <el-divider />
+
+            <!-- 剧照图片 -->
+            <div v-if="tmdbCurrentDetails.backdrops.length > 0" class="gallery">
+              <h3>🎬 剧照 ({{ tmdbCurrentDetails.backdrops.length }} 张)</h3>
+              <div class="gallery-grid">
+                <div v-for="(backdrop, index) in tmdbCurrentDetails.backdrops" :key="index" class="gallery-item">
+                  <el-image
+                    :src="backdrop"
+                    fit="cover"
+                    class="gallery-image"
+                    :preview-src-list="tmdbCurrentDetails.backdrops"
+                    :initial-index="index"
+                  />
+                  <el-button size="small" @click="copyUrl(backdrop)" class="copy-btn">
+                    复制链接
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </el-col>
+        </el-row>
+      </div>
+
+      <template #footer>
+        <div style="display: flex; justify-content: space-between; width: 100%;">
+          <el-button 
+            type="primary" 
+            :loading="creatingMapping"
+            @click="handleCreateMapping"
+          >
+            ✅ 添加到映射
+          </el-button>
+          <el-button @click="tmdbDetailsVisible = false">关闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <!-- 创建闲鱼商品对话框 -->
     <el-dialog v-model="xianyuVisible" title="🐟 创建闲鱼商品" width="600px">
       <el-form :model="xianyuForm" label-width="100px" v-if="xianyuForm.media">
@@ -407,6 +647,19 @@ const xianyuForm = ref({
   stock: 100
 })
 
+// TMDb 搜索相关
+const tmdbDialogVisible = ref(false)
+const tmdbSearchQuery = ref('')
+const tmdbMediaType = ref('multi')
+const tmdbSearching = ref(false)
+const tmdbSearchResults = ref([])
+
+const tmdbDetailsVisible = ref(false)
+const tmdbCurrentDetails = ref(null)
+const creatingMapping = ref(false)
+const checkingUpdates = ref(false)
+const autoFilling = ref(false)
+
 // 统计
 const stats = computed(() => {
   return {
@@ -479,9 +732,190 @@ const handleSearch = () => {
   loadMediaList()
 }
 
-// 去 TMDb 页面添加
-const goToTmdb = () => {
-  router.push('/tmdb')
+// 显示 TMDb 搜索对话框
+const showTmdbDialog = () => {
+  tmdbDialogVisible.value = true
+  tmdbSearchQuery.value = ''
+  tmdbSearchResults.value = []
+}
+
+// TMDb 搜索
+const handleTmdbSearch = async () => {
+  if (!tmdbSearchQuery.value.trim()) {
+    ElMessage.warning('请输入搜索关键词')
+    return
+  }
+
+  tmdbSearching.value = true
+  try {
+    const res = await api.searchTmdb({
+      query: tmdbSearchQuery.value,
+      media_type: tmdbMediaType.value
+    })
+
+    if (res.data.success) {
+      tmdbSearchResults.value = res.data.data
+      if (tmdbSearchResults.value.length === 0) {
+        ElMessage.info('未找到相关结果')
+      }
+    } else {
+      ElMessage.error('搜索失败')
+    }
+  } catch (error) {
+    console.error('搜索失败:', error)
+    ElMessage.error('搜索失败：' + (error.message || '未知错误'))
+  } finally {
+    tmdbSearching.value = false
+  }
+}
+
+// 显示 TMDb 详情
+const showTmdbDetails = async (item) => {
+  tmdbDetailsVisible.value = true
+  tmdbCurrentDetails.value = null
+
+  try {
+    const res = await api.getTmdbDetails(item.media_type, item.id)
+    if (res.data.success) {
+      tmdbCurrentDetails.value = res.data.data
+    } else {
+      ElMessage.error('获取详情失败')
+    }
+  } catch (error) {
+    console.error('获取详情失败:', error)
+    ElMessage.error('获取详情失败')
+  }
+}
+
+// 创建映射
+const handleCreateMapping = async () => {
+  if (!tmdbCurrentDetails.value) {
+    return
+  }
+
+  const { id, title, year, category, media_type, main_poster, overview } = tmdbCurrentDetails.value
+
+  if (!category) {
+    ElMessage.warning('该作品无法自动分类，请在映射管理中手动添加')
+    return
+  }
+
+  creatingMapping.value = true
+
+  try {
+    const res = await api.post('/tmdb/create-mapping', {
+      title,
+      year,
+      category,
+      media_type,
+      tmdb_id: id,
+      poster_url: main_poster,
+      overview: overview
+    })
+
+    if (res.data.success) {
+      ElMessage.success({
+        message: `✅ 映射创建成功！\n原始名: ${res.data.data.original_name}\n夸克名: ${res.data.data.quark_name}`,
+        duration: 5000,
+        showClose: true
+      })
+      
+      // 关闭对话框并刷新列表
+      tmdbDetailsVisible.value = false
+      tmdbDialogVisible.value = false
+      loadMediaList()
+    } else {
+      ElMessage.error(res.data.message || '创建失败')
+    }
+  } catch (error) {
+    console.error('创建映射失败:', error)
+    ElMessage.error('创建失败：' + (error.response?.data?.detail || error.message || '未知错误'))
+  } finally {
+    creatingMapping.value = false
+  }
+}
+
+// 检查剧集更新
+const handleCheckUpdates = async () => {
+  checkingUpdates.value = true
+  
+  try {
+    const res = await api.checkTmdbUpdates()
+    
+    if (res.data.success) {
+      ElMessage.success({
+        message: '🔔 已触发剧集更新检查！\n检查结果将通过企业微信通知您',
+        duration: 5000,
+        showClose: true
+      })
+    } else {
+      ElMessage.error(res.data.message || '触发失败')
+    }
+  } catch (error) {
+    console.error('触发检查失败:', error)
+    ElMessage.error('触发失败：' + (error.response?.data?.detail || error.message || '未知错误'))
+  } finally {
+    checkingUpdates.value = false
+  }
+}
+
+// 复制 URL
+const copyUrl = (url) => {
+  if (!url) {
+    ElMessage.warning('链接为空')
+    return
+  }
+
+  navigator.clipboard.writeText(url).then(() => {
+    ElMessage.success('链接已复制')
+  }).catch(() => {
+    ElMessage.error('复制失败')
+  })
+}
+
+// 补齐TMDB信息
+const handleAutoFillTmdb = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '将自动补全所有缺失的TMDB信息（分类、海报、简介等），是否继续？',
+      '确认补齐',
+      {
+        confirmButtonText: '开始补齐',
+        cancelButtonText: '取消',
+        type: 'info',
+      }
+    )
+    
+    autoFilling.value = true
+    ElMessage.info('开始补齐TMDB信息，请稍候...')
+    
+    const res = await api.post('/tmdb/auto-fill', {}, {
+      params: { only_missing: true }
+    })
+    
+    if (res.data.success) {
+      ElMessage.success({
+        message: `✅ 补齐完成！\n处理: ${res.data.total} 条\n更新: ${res.data.updated} 条\n失败: ${res.data.failed || 0} 条`,
+        duration: 5000,
+        showClose: true,
+        dangerouslyUseHTMLString: true
+      })
+      
+      // 刷新列表
+      loadMediaList()
+    } else {
+      ElMessage.error(res.data.message || '补齐失败')
+    }
+  } catch (error) {
+    if (error === 'cancel') {
+      ElMessage.info('已取消')
+    } else {
+      console.error('补齐失败:', error)
+      ElMessage.error('补齐失败：' + (error.response?.data?.detail || error.message || '未知错误'))
+    }
+  } finally {
+    autoFilling.value = false
+  }
 }
 
 // 显示详情
@@ -804,5 +1238,151 @@ onMounted(() => {
   color: #909399;
   margin-left: 4px;
 }
+
+/* TMDb 搜索对话框样式 */
+.tmdb-search-content {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.results-section h3 {
+  margin-bottom: 16px;
+  font-size: 18px;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+.result-item {
+  cursor: pointer;
+  transition: transform 0.2s;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #eee;
+}
+
+.result-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.result-item .poster {
+  width: 100%;
+  height: 270px;
+}
+
+.result-item .info {
+  padding: 12px;
+}
+
+.result-item .title {
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-item .meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #666;
+}
+
+.result-item .rating {
+  font-size: 12px;
+}
+
+.image-slot {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  background: #f5f7fa;
+  color: #909399;
+  font-size: 30px;
+}
+
+.main-poster {
+  width: 100%;
+  border-radius: 8px;
+}
+
+.info-box {
+  margin-top: 20px;
+}
+
+.overview-section {
+  margin-bottom: 20px;
+}
+
+.overview-section h3 {
+  margin-bottom: 12px;
+  font-size: 18px;
+}
+
+.overview-section p {
+  line-height: 1.8;
+  color: #606266;
+  text-align: justify;
+}
+
+.image-urls {
+  margin-bottom: 20px;
+}
+
+.image-urls h3 {
+  margin-bottom: 12px;
+  font-size: 16px;
+}
+
+.url-input {
+  margin-bottom: 10px;
+}
+
+.gallery h3 {
+  margin-bottom: 12px;
+  font-size: 16px;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.gallery-item {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #eee;
+}
+
+.gallery-image {
+  width: 100%;
+  height: 120px;
+  cursor: pointer;
+}
+
+.gallery-item .copy-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.gallery-item:hover .copy-btn {
+  opacity: 1;
+}
+
 </style>
 

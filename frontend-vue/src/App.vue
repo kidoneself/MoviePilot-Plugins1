@@ -221,53 +221,36 @@ onMounted(() => {
             <el-icon><Collection /></el-icon>
             <span>媒体库</span>
           </el-menu-item>
-          <el-menu-item index="tmdb">
-            <el-icon><Film /></el-icon>
-            <span>添加媒体</span>
+          <el-menu-item index="mappings">
+            <el-icon><Document /></el-icon>
+            <span>映射管理</span>
           </el-menu-item>
           <el-menu-item index="media-requests">
             <el-icon><Bell /></el-icon>
             <span>用户请求</span>
           </el-menu-item>
-          <el-menu-item index="config">
-            <el-icon><Setting /></el-icon>
-            <span>系统设置</span>
-          </el-menu-item>
-          
-          <el-divider style="margin: 10px 0;" />
-          <div style="padding: 0 20px; font-size: 12px; color: #909399; margin-bottom: 8px;">高级功能</div>
-          
-          <el-menu-item index="mappings">
-            <el-icon><Document /></el-icon>
-            <span>映射管理</span>
-          </el-menu-item>
-          <el-menu-item index="records">
-            <el-icon><List /></el-icon>
-            <span>链接记录</span>
-          </el-menu-item>
-          <el-menu-item index="tree">
-            <el-icon><Folder /></el-icon>
-            <span>目录树</span>
-          </el-menu-item>
           <el-menu-item index="share-links">
             <el-icon><Share /></el-icon>
             <span>分享链接</span>
           </el-menu-item>
-          
-          <el-divider style="margin: 10px 0;" />
-          <div style="padding: 0 20px; font-size: 12px; color: #909399; margin-bottom: 8px;">🐟 闲鱼管家</div>
-          
           <el-menu-item index="xianyu/auto-workflow">
             <el-icon><MagicStick /></el-icon>
-            <span>🤖 自动化工作流</span>
+            <span>自动化</span>
           </el-menu-item>
           <el-menu-item index="xianyu/products">
-            <el-icon><Document /></el-icon>
+            <el-icon><List /></el-icon>
             <span>商品管理</span>
           </el-menu-item>
-          <el-menu-item index="xianyu/kami">
-            <el-icon><List /></el-icon>
-            <span>卡密管理</span>
+          <el-menu-item index="records">
+            <el-icon><Document /></el-icon>
+            <span>链接记录</span>
+          </el-menu-item>
+          
+          <el-divider style="margin: 10px 0;" />
+          
+          <el-menu-item index="config">
+            <el-icon><Setting /></el-icon>
+            <span>系统设置</span>
           </el-menu-item>
         </el-menu>
       </el-aside>
