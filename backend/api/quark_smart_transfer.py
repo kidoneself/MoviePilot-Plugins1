@@ -116,20 +116,24 @@ def get_quark_stoken(cookie: str, pwd_id: str) -> str:
     params = {
         'pr': 'ucpro',
         'fr': 'pc',
-        'uc_param_str': '',
-        '__dt': int(time.time() * 1000),
-        '__t': int(time.time() * 1000)
+        'uc_param_str': ''
+    }
+    body = {
+        'pwd_id': pwd_id
     }
     headers = {
         'Cookie': cookie,
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': f'https://pan.quark.cn/s/{pwd_id}'
     }
-    body = {'pwd_id': pwd_id}
     
     resp = requests.post(url, params=params, json=body, headers=headers)
-    data = resp.json()
     
+    if resp.status_code != 200:
+        raise Exception(f"获取stoken失败: HTTP {resp.status_code}")
+    
+    data = resp.json()
     if data.get('code') != 0:
         raise Exception(f"获取stoken失败: {data.get('message')}")
     
@@ -140,20 +144,35 @@ def get_quark_file_list(cookie: str, pwd_id: str, stoken: str, pdir_fid: str) ->
     """获取夸克文件列表"""
     url = 'https://drive-h.quark.cn/1/clouddrive/share/sharepage/detail'
     params = {
-        'pr': 'ucpro', 'fr': 'pc', 'uc_param_str': '', 'ver': '2',
-        'pwd_id': pwd_id, 'stoken': stoken, 'pdir_fid': pdir_fid, 'force': '0',
-        '_page': 1, '_size': 50, '_fetch_banner': 1, '_fetch_share': 1,
-        'fetch_relate_conversation': 1, '_fetch_total': 1, '_sort': 'file_type:asc,file_name:asc',
-        '__dt': int(time.time() * 1000), '__t': int(time.time() * 1000)
+        'pr': 'ucpro',
+        'fr': 'pc',
+        'uc_param_str': '',
+        'ver': '2',
+        'pwd_id': pwd_id,
+        'stoken': stoken,
+        'pdir_fid': pdir_fid,
+        'force': '0',
+        '_page': 1,
+        '_size': 50,
+        '_fetch_banner': 1,
+        '_fetch_share': 1,
+        'fetch_relate_conversation': 1,
+        '_fetch_total': 1,
+        '_sort': 'file_type:asc,file_name:asc'
     }
     headers = {
         'Cookie': cookie,
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': f'https://pan.quark.cn/s/{pwd_id}',
+        'Accept': 'application/json, text/plain, */*'
     }
     
     resp = requests.get(url, params=params, headers=headers)
-    data = resp.json()
     
+    if resp.status_code != 200:
+        raise Exception(f"获取文件列表失败: HTTP {resp.status_code}")
+    
+    data = resp.json()
     if data.get('code') != 0:
         raise Exception(f"获取文件列表失败: {data.get('message')}")
     
@@ -278,20 +297,23 @@ def call_quark_transfer_api(cookie: str, stoken: str, pwd_id: str, pdir_fid: str
     """调用夸克转存API"""
     url = 'https://drive-pc.quark.cn/1/clouddrive/share/sharepage/save'
     query_params = {
-        'pr': 'ucpro', 'fr': 'pc', 'uc_param_str': '',
-        '__dt': int(time.time() * 1000), '__t': int(time.time() * 1000)
+        'pr': 'ucpro',
+        'fr': 'pc',
+        'uc_param_str': ''
     }
     body = {
         'pwd_id': pwd_id,
         'stoken': stoken,
         'pdir_fid': pdir_fid,
         'to_pdir_fid': to_pdir_fid,
+        'scene': 'link',
         **params
     }
     headers = {
         'Cookie': cookie,
         'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': f'https://pan.quark.cn/s/{pwd_id}'
     }
     
     logger.info(f"夸克转存参数: {body}")
@@ -310,7 +332,7 @@ def poll_quark_task(cookie: str, task_id: str, timeout: int = 60) -> dict:
     url = 'https://drive-pc.quark.cn/1/clouddrive/task'
     headers = {
         'Cookie': cookie,
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     
     start_time = time.time()
@@ -337,7 +359,7 @@ def poll_quark_task(cookie: str, task_id: str, timeout: int = 60) -> dict:
         if status == 2:  # 完成
             return data['data']
         elif status in [0, 1]:  # 进行中
-            time.sleep(0.5)
+            time.sleep(1)
             retry += 1
         else:  # 其他状态
             raise Exception(f"任务失败: {data['data'].get('message', '未知错误')}")
