@@ -4,13 +4,10 @@
 """
 import logging
 import re
-import requests
+import asyncio
 from typing import Optional, Dict
 
 logger = logging.getLogger(__name__)
-
-# API配置
-API_BASE = "http://127.0.0.1:9889/api"  # 本地API地址
 
 
 class QuarkTransferHandler:
@@ -87,28 +84,79 @@ class QuarkTransferHandler:
         self.wechat.send_text(user_id, "⏳ 正在解析链接...")
         
         try:
-            resp = requests.post(f"{API_BASE}/quark/parse-share", json={
-                "share_url": share_url
-            }, timeout=30)
+            # 直接导入并调用API函数
+            from backend.api.quark_smart_transfer import (
+                parse_share_url, get_cookie_from_db, get_quark_stoken, 
+                get_quark_file_list, is_ad_file, sessions
+            )
+            import uuid
+            from datetime import datetime
             
-            data = resp.json()
+            # 解析URL
+            pwd_id, pdir_fid = parse_share_url(share_url)
             
-            if not data.get('success'):
-                self.wechat.send_text(user_id, f"❌ 解析失败: {data.get('message', '未知错误')}")
-                return
+            # 获取Cookie
+            cookie = get_cookie_from_db()
             
-            # 保存会话
+            # 获取stoken
+            stoken = get_quark_stoken(cookie, pwd_id)
+            
+            # 获取文件列表
+            share_info = get_quark_file_list(cookie, pwd_id, stoken, pdir_fid)
+            
+            # 处理文件列表
+            files = []
+            ad_count = 0
+            clean_count = 0
+            
+            for idx, file in enumerate(share_info['files'], 1):
+                is_ad = is_ad_file(file['file_name'], file['size'])
+                
+                files.append({
+                    'index': idx,
+                    'fid': file['fid'],
+                    'name': file['file_name'],
+                    'size': file['size'],
+                    'is_ad': is_ad,
+                    'share_fid_token': file['share_fid_token']
+                })
+                
+                if is_ad:
+                    ad_count += 1
+                else:
+                    clean_count += 1
+            
+            # 创建会话
+            session_id = str(uuid.uuid4())
+            sessions[session_id] = {
+                'created_at': datetime.now(),
+                'share_url': share_url,
+                'pwd_id': pwd_id,
+                'pdir_fid': pdir_fid,
+                'stoken': stoken,
+                'cookie': cookie,
+                'files': files,
+                'selected_files': None,
+                'media_name': None,
+                'target_path': None,
+                'target_fid': None
+            }
+            
+            # 保存到本地会话
             self.user_sessions[user_id] = {
                 'state': 'waiting_file_selection',
-                'session_id': data['session_id'],
+                'session_id': session_id,
                 'share_url': share_url,
-                'files': data['files'],
-                'stats': data['stats']
+                'files': files,
+                'stats': {
+                    'total': len(files),
+                    'ad_count': ad_count,
+                    'clean_count': clean_count
+                }
             }
             
             # 构建文件列表消息
-            stats = data['stats']
-            files = data['files']
+            stats = self.user_sessions[user_id]['stats']
             
             message_parts = [
                 f"📦 文件列表（共{stats['total']}个）\n",
@@ -135,36 +183,56 @@ class QuarkTransferHandler:
             
             self.wechat.send_text(user_id, "\n".join(message_parts))
             
-        except requests.Timeout:
-            self.wechat.send_text(user_id, "❌ 请求超时，请稍后重试")
+            logger.info(f"✅ 用户 {user_id} 解析成功，会话ID: {session_id}")
+            
         except Exception as e:
             logger.error(f"解析链接失败: {e}", exc_info=True)
             self.wechat.send_text(user_id, f"❌ 解析失败: {str(e)}")
     
     def _handle_file_selection(self, user_id: str, content: str):
         """处理文件选择"""
-        session = self.user_sessions[user_id]
+        session_data = self.user_sessions[user_id]
         
         try:
-            resp = requests.post(f"{API_BASE}/quark/select-files", json={
-                "session_id": session['session_id'],
-                "selection": content
-            }, timeout=10)
+            # 直接调用API函数
+            from backend.api.quark_smart_transfer import sessions, parse_file_selection
             
-            data = resp.json()
+            session_id = session_data['session_id']
+            session = sessions.get(session_id)
             
-            if not data.get('success'):
-                self.wechat.send_text(user_id, f"❌ {data.get('message', '选择失败')}")
+            if not session:
+                self.wechat.send_text(user_id, "❌ 会话已过期，请重新发送链接")
+                del self.user_sessions[user_id]
                 return
             
-            # 更新状态
-            session['state'] = 'waiting_media_name'
-            session['selected_count'] = data['selected_count']
+            # 解析选择
+            total_files = len(session['files'])
+            selected_indices = parse_file_selection(content, total_files)
             
-            message = f"✅ 已选择 {data['selected_count']} 个文件\n\n🎬 请输入剧名（如：老舅）"
+            # 过滤文件（排除广告）
+            selected_files = []
+            skipped_ads = []
             
-            if data.get('skipped_ads'):
-                message += f"\n\n⚠️ 已自动跳过 {len(data['skipped_ads'])} 个广告文件"
+            for idx in selected_indices:
+                if 1 <= idx <= total_files:
+                    file = session['files'][idx - 1]
+                    
+                    if file['is_ad']:
+                        skipped_ads.append(file['name'])
+                    else:
+                        selected_files.append(file)
+            
+            # 保存选择
+            session['selected_files'] = selected_files
+            session_data['selected_count'] = len(selected_files)
+            session_data['state'] = 'waiting_media_name'
+            
+            logger.info(f"用户 {user_id}: 选择了 {len(selected_files)} 个文件")
+            
+            message = f"✅ 已选择 {len(selected_files)} 个文件\n\n🎬 请输入剧名（如：老舅）"
+            
+            if skipped_ads:
+                message += f"\n\n⚠️ 已自动跳过 {len(skipped_ads)} 个广告文件"
             
             self.wechat.send_text(user_id, message)
             
@@ -174,42 +242,69 @@ class QuarkTransferHandler:
     
     def _handle_media_name(self, user_id: str, content: str):
         """处理剧名输入"""
-        session = self.user_sessions[user_id]
+        session_data = self.user_sessions[user_id]
         media_name = content.strip()
         
         try:
-            resp = requests.post(f"{API_BASE}/quark/get-target-path", json={
-                "session_id": session['session_id'],
-                "media_name": media_name
-            }, timeout=10)
+            # 直接查询数据库
+            from backend.models import get_session, CustomNameMapping
+            from backend.api.quark_smart_transfer import QUARK_BASE_PATH, sessions
             
-            data = resp.json()
-            
-            if not data.get('success'):
-                error_msg = data.get('message', '未找到映射')
-                self.wechat.send_text(user_id, f"❌ {error_msg}\n\n💡 请重新输入剧名，或发送新链接重新开始")
-                return
-            
-            # 更新状态
-            session['state'] = 'waiting_confirm'
-            session['media_name'] = media_name
-            session['target_path'] = data['display_path']
-            
-            message = f"""✅ 找到保存位置
-            
-📂 {data['display_path']}
+            db = get_session()
+            try:
+                mapping = db.query(CustomNameMapping).filter(
+                    CustomNameMapping.original_name == media_name
+                ).first()
+                
+                if not mapping:
+                    self.wechat.send_text(
+                        user_id, 
+                        f"❌ 未找到'{media_name}'的保存位置\n\n💡 请重新输入剧名，或发送新链接重新开始"
+                    )
+                    return
+                
+                # 构建路径
+                quark_name = mapping.quark_name or media_name
+                category = mapping.category or ''
+                
+                # 用户看到的路径
+                display_path = f"/{category}/{quark_name}" if category else f"/{quark_name}"
+                
+                # OpenList完整路径
+                full_path = f"{QUARK_BASE_PATH}/{category}/{quark_name}" if category else f"{QUARK_BASE_PATH}/{quark_name}"
+                
+                # 保存到会话
+                session_id = session_data['session_id']
+                session = sessions.get(session_id)
+                if session:
+                    session['media_name'] = media_name
+                    session['display_path'] = display_path
+                    session['full_path'] = full_path
+                
+                session_data['state'] = 'waiting_confirm'
+                session_data['media_name'] = media_name
+                session_data['target_path'] = display_path
+                
+                logger.info(f"用户 {user_id}: 查询到路径 {display_path}")
+                
+                message = f"""✅ 找到保存位置
+                
+📂 {display_path}
 
 ━━━━━━━━━━━━━━━
 📋 转存信息：
-• 剧名：{data['media_name']}
-• 文件：{session['selected_count']}个
-• 位置：{data['display_path']}
+• 剧名：{media_name}
+• 文件：{session_data.get('selected_count', 0)}个
+• 位置：{display_path}
 
 ━━━━━━━━━━━━━━━
 确认转存请回复：确认
 取消请回复：取消"""
-            
-            self.wechat.send_text(user_id, message)
+                
+                self.wechat.send_text(user_id, message)
+                
+            finally:
+                db.close()
             
         except Exception as e:
             logger.error(f"查询路径失败: {e}", exc_info=True)
@@ -217,7 +312,7 @@ class QuarkTransferHandler:
     
     def _handle_confirm(self, user_id: str, content: str):
         """处理确认转存"""
-        session = self.user_sessions[user_id]
+        session_data = self.user_sessions[user_id]
         
         if content not in ['确认', '确定', 'ok', 'yes', 'y']:
             self.wechat.send_text(user_id, "❌ 已取消转存")
@@ -229,20 +324,69 @@ class QuarkTransferHandler:
             # 执行转存
             self.wechat.send_text(user_id, "⏳ 正在转存，请稍候...")
             
-            resp = requests.post(f"{API_BASE}/quark/execute-transfer", json={
-                "session_id": session['session_id']
-            }, timeout=10)
+            # 直接调用转存函数
+            from backend.api.quark_smart_transfer import (
+                sessions, get_target_fid_via_openlist, 
+                call_quark_transfer_api, poll_quark_task
+            )
             
-            data = resp.json()
+            session_id = session_data['session_id']
+            session = sessions.get(session_id)
             
-            if not data.get('success'):
-                self.wechat.send_text(user_id, f"❌ 转存失败: {data.get('message', '未知错误')}")
+            if not session:
+                self.wechat.send_text(user_id, "❌ 会话已过期")
+                del self.user_sessions[user_id]
                 return
             
-            task_id = data['task_id']
-            mode = data['mode']
+            # 获取目标文件夹ID
+            logger.info(f"获取目标文件夹ID: {session['full_path']}")
+            target_fid = get_target_fid_via_openlist(session['full_path'])
+            session['target_fid'] = target_fid
             
-            # 轮询任务状态
+            # 智能选择策略
+            all_files = session['files']
+            selected_files = session['selected_files']
+            
+            ratio = len(selected_files) / len(all_files)
+            
+            if ratio == 1:
+                # 全选模式
+                transfer_params = {'pdir_save_all': True, 'scene': 'link'}
+                mode = "全选模式"
+            elif ratio > 0.5:
+                # 排除模式
+                exclude_fids = [f['fid'] for f in all_files if f not in selected_files]
+                transfer_params = {
+                    'pdir_save_all': True,
+                    'exclude_fids': exclude_fids,
+                    'scene': 'link'
+                }
+                mode = "排除模式"
+            else:
+                # 包含模式
+                transfer_params = {
+                    'pdir_save_all': False,
+                    'fid_list': [f['fid'] for f in selected_files],
+                    'fid_token_list': [f['share_fid_token'] for f in selected_files],
+                    'scene': 'link'
+                }
+                mode = "包含模式"
+            
+            logger.info(f"使用策略: {mode}, 比例: {ratio:.1%}")
+            
+            # 调用转存API
+            task_id = call_quark_transfer_api(
+                cookie=session['cookie'],
+                stoken=session['stoken'],
+                pwd_id=session['pwd_id'],
+                pdir_fid=session['pdir_fid'],
+                to_pdir_fid=target_fid,
+                **transfer_params
+            )
+            
+            logger.info(f"用户 {user_id}: 任务创建成功 {task_id}")
+            
+            # 轮询任务状态（异步执行，避免阻塞）
             import time
             max_retries = 30
             
@@ -250,27 +394,33 @@ class QuarkTransferHandler:
                 time.sleep(2)  # 每2秒查询一次
                 
                 try:
-                    status_resp = requests.get(f"{API_BASE}/quark/task-status/{task_id}", timeout=10)
-                    status_data = status_resp.json()
+                    result = poll_quark_task(session['cookie'], task_id, timeout=2)
                     
-                    if status_data.get('status') == 'completed':
-                        # 转存完成
-                        message = f"""✅ 转存完成！
+                    # 转存完成
+                    ad_filtered = len(all_files) - len(selected_files)
+                    
+                    message = f"""✅ 转存完成！
 
-• 已保存：{status_data['transferred']}个文件
-• 已过滤：{status_data['ad_filtered']}个广告
-• 保存位置：{status_data['display_path']}
-• 转存策略：{status_data['mode']}"""
-                        
-                        self.wechat.send_text(user_id, message)
-                        
-                        # 清除会话
-                        del self.user_sessions[user_id]
-                        return
+• 已保存：{len(selected_files)}个文件
+• 已过滤：{ad_filtered}个广告
+• 保存位置：{session.get('display_path', '')}
+• 转存策略：{mode}"""
+                    
+                    self.wechat.send_text(user_id, message)
+                    logger.info(f"用户 {user_id}: 转存完成")
+                    
+                    # 清除会话
+                    del self.user_sessions[user_id]
+                    return
                     
                 except Exception as e:
-                    logger.warning(f"查询任务状态失败: {e}")
-                    continue
+                    # 任务还在进行中
+                    if i < max_retries - 1:
+                        continue
+                    else:
+                        # 最后一次还是失败，通知用户
+                        logger.warning(f"轮询超时: {e}")
+                        break
             
             # 超时
             self.wechat.send_text(user_id, "⚠️ 转存任务仍在进行中，请稍后在网盘中查看")
