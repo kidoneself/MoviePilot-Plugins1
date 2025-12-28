@@ -161,7 +161,6 @@ def get_quark_file_list(cookie: str, pwd_id: str, stoken: str, pdir_fid: str) ->
     total = data['data'].get('total', len(files))
     
     return {
-        'stoken': data['data']['stoken'],
         'files': files,
         'total': total
     }
