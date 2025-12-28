@@ -67,6 +67,8 @@ class QuarkTransferHandler:
             self._handle_file_selection(user_id, content)
         elif state == 'waiting_media_name':
             self._handle_media_name(user_id, content)
+        elif state == 'waiting_media_selection':
+            self._handle_media_selection(user_id, content)
         elif state == 'waiting_confirm':
             self._handle_confirm(user_id, content)
         else:
@@ -242,6 +244,63 @@ class QuarkTransferHandler:
             logger.error(f"选择文件失败: {e}", exc_info=True)
             self.wechat.send_text(user_id, f"❌ 操作失败: {str(e)}")
     
+    def _handle_media_selection(self, user_id: str, content: str):
+        """处理剧名选择（多个匹配时）"""
+        session_data = self.user_sessions[user_id]
+        
+        try:
+            # 解析用户选择的序号
+            selection = int(content.strip())
+            media_options = session_data.get('media_options', [])
+            
+            if selection < 1 or selection > len(media_options):
+                self.wechat.send_text(
+                    user_id,
+                    f"❌ 无效的序号，请输入 1-{len(media_options)} 之间的数字"
+                )
+                return
+            
+            # 获取选择的映射
+            mapping = media_options[selection - 1]
+            
+            from backend.api.quark_smart_transfer import QUARK_BASE_PATH, sessions
+            
+            # 构建路径
+            quark_name = mapping.quark_name or mapping.original_name
+            category = mapping.category or ''
+            
+            # 用户看到的路径
+            display_path = f"/{category}/{quark_name}" if category else f"/{quark_name}"
+            
+            # OpenList完整路径
+            full_path = f"{QUARK_BASE_PATH}/{category}/{quark_name}" if category else f"{QUARK_BASE_PATH}/{quark_name}"
+            
+            # 保存到会话
+            session_id = session_data['session_id']
+            sessions[session_id]['media_name'] = mapping.original_name
+            sessions[session_id]['target_path'] = full_path
+            
+            session_data['media_name'] = mapping.original_name
+            session_data['target_path'] = full_path
+            session_data['state'] = 'waiting_confirm'
+            
+            # 发送确认消息
+            self.wechat.send_text(
+                user_id,
+                f"✅ 已选择：{mapping.original_name}\n\n"
+                f"📂 目标路径：{display_path}\n\n"
+                f"💡 请回复\"确认\"开始转存，或\"取消\"放弃操作"
+            )
+            
+        except ValueError:
+            self.wechat.send_text(
+                user_id,
+                "❌ 请输入有效的数字序号"
+            )
+        except Exception as e:
+            logger.error(f"处理剧名选择失败: {e}", exc_info=True)
+            self.wechat.send_text(user_id, f"❌ 操作失败: {str(e)}")
+    
     def _handle_media_name(self, user_id: str, content: str):
         """处理剧名输入"""
         session_data = self.user_sessions[user_id]
@@ -261,9 +320,30 @@ class QuarkTransferHandler:
                 
                 # 如果精确匹配失败，尝试模糊匹配
                 if not mapping:
-                    mapping = db.query(CustomNameMapping).filter(
+                    mappings = db.query(CustomNameMapping).filter(
                         CustomNameMapping.original_name.like(f"%{media_name.strip()}%")
-                    ).first()
+                    ).all()
+                    
+                    if not mappings:
+                        self.wechat.send_text(
+                            user_id, 
+                            f"❌ 未找到'{media_name}'的保存位置\n\n💡 请重新输入剧名，或发送新链接重新开始"
+                        )
+                        return
+                    elif len(mappings) == 1:
+                        # 只有一个匹配，直接使用
+                        mapping = mappings[0]
+                    else:
+                        # 多个匹配，让用户选择
+                        options_text = "\n".join([f"{i+1}. {m.original_name}" for i, m in enumerate(mappings)])
+                        self.wechat.send_text(
+                            user_id,
+                            f"🔍 找到 {len(mappings)} 个匹配的剧名：\n\n{options_text}\n\n📝 请回复序号选择（如：1）"
+                        )
+                        # 保存匹配结果到会话，等待用户选择
+                        session_data['state'] = 'waiting_media_selection'
+                        session_data['media_options'] = mappings
+                        return
                 
                 if not mapping:
                     self.wechat.send_text(

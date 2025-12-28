@@ -547,9 +547,36 @@ async def get_target_path(request: GetTargetPathRequest):
             
             # 如果精确匹配失败，尝试模糊匹配
             if not mapping:
-                mapping = db.query(CustomNameMapping).filter(
+                mappings = db.query(CustomNameMapping).filter(
                     CustomNameMapping.original_name.like(f"%{request.media_name.strip()}%")
-                ).first()
+                ).all()
+                
+                if not mappings:
+                    return {
+                        'success': False,
+                        'error': '未找到剧名映射',
+                        'message': f"未找到'{request.media_name}'的保存位置，请先配置映射关系"
+                    }
+                elif len(mappings) > 1:
+                    # 多个匹配，返回选项列表
+                    options = [
+                        {
+                            'id': m.id,
+                            'original_name': m.original_name,
+                            'quark_name': m.quark_name or m.original_name,
+                            'category': m.category or ''
+                        }
+                        for m in mappings
+                    ]
+                    return {
+                        'success': False,
+                        'error': '多个匹配',
+                        'message': f"找到 {len(mappings)} 个匹配的剧名，请选择",
+                        'options': options
+                    }
+                else:
+                    # 只有一个匹配
+                    mapping = mappings[0]
             
             if not mapping:
                 return {
