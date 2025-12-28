@@ -254,9 +254,16 @@ class QuarkTransferHandler:
             
             db = get_session(self.db_engine)
             try:
+                # 先尝试精确匹配
                 mapping = db.query(CustomNameMapping).filter(
                     CustomNameMapping.original_name == media_name
                 ).first()
+                
+                # 如果精确匹配失败，尝试模糊匹配
+                if not mapping:
+                    mapping = db.query(CustomNameMapping).filter(
+                        CustomNameMapping.original_name.like(f"%{media_name.strip()}%")
+                    ).first()
                 
                 if not mapping:
                     self.wechat.send_text(

@@ -540,9 +540,16 @@ async def get_target_path(request: GetTargetPathRequest):
         # 查询映射表
         db = get_session(db_engine)
         try:
+            # 先尝试精确匹配
             mapping = db.query(CustomNameMapping).filter(
                 CustomNameMapping.original_name == request.media_name
             ).first()
+            
+            # 如果精确匹配失败，尝试模糊匹配
+            if not mapping:
+                mapping = db.query(CustomNameMapping).filter(
+                    CustomNameMapping.original_name.like(f"%{request.media_name.strip()}%")
+                ).first()
             
             if not mapping:
                 return {
