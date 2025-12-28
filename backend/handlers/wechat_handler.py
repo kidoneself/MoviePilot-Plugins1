@@ -28,7 +28,7 @@ class WeChatCommandHandler:
         # 缓存用户搜索结果（key: user_id, value: list of mappings）
         self.user_search_cache = {}
         # 初始化夸克转存处理器
-        self.quark_handler = QuarkTransferHandler(wechat_service)
+        self.quark_handler = QuarkTransferHandler(wechat_service, db_engine)
     
     def handle_message(self, user_id: str, content: str):
         """

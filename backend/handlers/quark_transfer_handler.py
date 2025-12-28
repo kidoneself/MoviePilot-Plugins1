@@ -13,14 +13,16 @@ logger = logging.getLogger(__name__)
 class QuarkTransferHandler:
     """夸克转存处理器"""
     
-    def __init__(self, wechat_service):
+    def __init__(self, wechat_service, db_engine):
         """
         初始化转存处理器
         
         Args:
             wechat_service: 企业微信服务实例
+            db_engine: 数据库引擎
         """
         self.wechat = wechat_service
+        self.db_engine = db_engine
         # 用户会话缓存（key: user_id, value: session_data）
         self.user_sessions = {}
     
@@ -250,7 +252,7 @@ class QuarkTransferHandler:
             from backend.models import get_session, CustomNameMapping
             from backend.api.quark_smart_transfer import QUARK_BASE_PATH, sessions
             
-            db = get_session()
+            db = get_session(self.db_engine)
             try:
                 mapping = db.query(CustomNameMapping).filter(
                     CustomNameMapping.original_name == media_name

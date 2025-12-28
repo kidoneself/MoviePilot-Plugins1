@@ -69,8 +69,9 @@ class FileInfo(BaseModel):
 def get_cookie_from_db() -> str:
     """从数据库获取夸克Cookie"""
     from backend.models import get_session, PanCookie
+    from backend.main import db_engine
     
-    db = get_session()
+    db = get_session(db_engine)
     try:
         cookie_obj = db.query(PanCookie).filter(
             PanCookie.pan_type == 'quark',
@@ -508,6 +509,7 @@ async def get_target_path(request: GetTargetPathRequest):
     """
     try:
         from backend.models import get_session, CustomNameMapping
+        from backend.main import db_engine
         
         # 获取会话
         session = sessions.get(request.session_id)
@@ -515,7 +517,7 @@ async def get_target_path(request: GetTargetPathRequest):
             raise HTTPException(status_code=404, detail="会话不存在或已过期")
         
         # 查询映射表
-        db = get_session()
+        db = get_session(db_engine)
         try:
             mapping = db.query(CustomNameMapping).filter(
                 CustomNameMapping.original_name == request.media_name
@@ -704,8 +706,9 @@ async def list_media_names():
     """
     try:
         from backend.models import get_session, CustomNameMapping
+        from backend.main import db_engine
         
-        db = get_session()
+        db = get_session(db_engine)
         try:
             mappings = db.query(CustomNameMapping).filter(
                 CustomNameMapping.enabled == True
