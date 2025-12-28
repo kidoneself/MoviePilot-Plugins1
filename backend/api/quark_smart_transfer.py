@@ -68,7 +68,7 @@ class FileInfo(BaseModel):
 
 def get_cookie_from_db() -> str:
     """从数据库获取夸克Cookie"""
-    from models import get_session, PanCookie
+    from backend.models import get_session, PanCookie
     
     db = get_session()
     try:
@@ -507,7 +507,7 @@ async def get_target_path(request: GetTargetPathRequest):
     步骤3: 根据剧名查询目标路径
     """
     try:
-        from models import get_session, CustomNameMapping
+        from backend.models import get_session, CustomNameMapping
         
         # 获取会话
         session = sessions.get(request.session_id)
@@ -703,7 +703,7 @@ async def list_media_names():
     辅助接口：获取所有可用的剧名列表
     """
     try:
-        from models import get_session, CustomNameMapping
+        from backend.models import get_session, CustomNameMapping
         
         db = get_session()
         try:
