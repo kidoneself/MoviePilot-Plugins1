@@ -11,7 +11,7 @@ import uvicorn
 
 from backend.models import init_database
 from backend.monitor import MonitorService
-from backend.api import records, tree, export, mapping, share_link, transfer, category, openlist, wechat, share_page, tmdb, media, xianyu, media_requests
+from backend.api import records, tree, export, mapping, share_link, transfer, category, openlist, wechat, share_page, tmdb, media, xianyu, media_requests, quark_smart_transfer
 from backend.api import config as config_api
 
 # 配置日志
@@ -127,6 +127,7 @@ app.include_router(transfer.router, prefix="/api", tags=["网盘转存"])
 app.include_router(category.router, prefix="/api", tags=["分类管理"])
 app.include_router(openlist.router, prefix="/api", tags=["OpenList"])
 app.include_router(wechat.router, prefix="/api", tags=["企业微信"])
+app.include_router(quark_smart_transfer.router, prefix="/api", tags=["夸克智能转存"])
 app.include_router(share_page.router, tags=["短链接分享"])
 app.include_router(tmdb.router, prefix="/api", tags=["TMDb搜索"])
 app.include_router(media.router, prefix="/api", tags=["媒体管理"])
@@ -422,13 +423,10 @@ frontend_routes = [
     "/media",
     "/mappings",
     "/records",
-    "/tree",
     "/share-links",
-    "/tmdb",
     "/media-requests",
     "/config",
     "/xianyu/products",
-    "/xianyu/kami",
     "/xianyu/create-product",
     "/xianyu/auto-workflow"
 ]

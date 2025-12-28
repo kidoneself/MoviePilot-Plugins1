@@ -1,5 +1,6 @@
 """
 OpenList文件夹管理API
+修复了content可能为None的问题
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -64,7 +65,8 @@ async def get_folder_id(request: GetFolderIdRequest):
             if result.get('code') != 200:
                 raise Exception(f"列出目录失败: {result.get('message')}")
             
-            content = result.get('data', {}).get('content', [])
+            # 处理content可能为None的情况
+            content = result.get('data', {}).get('content', []) or []
             
             # 记录父目录下所有文件夹（调试用）
             existing_folders = [(item.get('name'), item.get('is_dir'), item.get('mount_details') is not None) for item in content]
@@ -117,7 +119,7 @@ async def get_folder_id(request: GetFolderIdRequest):
                 # 重新列出父目录，获取新建目录的ID
                 list_response = requests.post(list_url, json=list_body, headers=list_headers)
                 result = list_response.json()
-                content = result.get('data', {}).get('content', [])
+                content = result.get('data', {}).get('content', []) or []
                 
                 for item in content:
                     item_name = item.get('name', '').strip()
@@ -127,7 +129,7 @@ async def get_folder_id(request: GetFolderIdRequest):
                         break
                 
                 if not folder_id:
-                    logger.error(f"❌ 创建目录后无法获取ID，父目录={parent_path}，目标={part}，现有内容: {[i.get('name') for i in content]}")
+                    logger.error(f"❌ 创建目录后无法获取ID，父目录={parent_path}，目标={part}，现有内容: {[i.get('name') for i in content] if content else []}")
                     raise Exception(f"创建目录成功但无法获取ID: {part}")
             
             # 如果是最后一级，返回结果

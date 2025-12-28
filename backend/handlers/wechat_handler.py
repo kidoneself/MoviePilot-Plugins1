@@ -7,6 +7,7 @@ from typing import Optional
 from datetime import date
 from backend.models import CustomNameMapping, LinkRecord, get_session
 from backend.services.wechat_service import WeChatService
+from backend.handlers.quark_transfer_handler import QuarkTransferHandler
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,8 @@ class WeChatCommandHandler:
         self.db_engine = db_engine
         # 缓存用户搜索结果（key: user_id, value: list of mappings）
         self.user_search_cache = {}
+        # 初始化夸克转存处理器
+        self.quark_handler = QuarkTransferHandler(wechat_service)
     
     def handle_message(self, user_id: str, content: str):
         """
@@ -39,6 +42,11 @@ class WeChatCommandHandler:
         
         # 空消息
         if not content:
+            return
+        
+        # 优先处理夸克转存（检测分享链接或转存流程中的消息）
+        if self.quark_handler.can_handle(content) or user_id in self.quark_handler.user_sessions:
+            self.quark_handler.handle(user_id, content)
             return
         
         # 帮助指令
@@ -71,6 +79,10 @@ class WeChatCommandHandler:
 🔍 **使用方法**
 直接发送剧名即可搜索
 例：唐朝
+
+📦 **夸克转存**
+直接发送夸克分享链接
+系统会引导你完成转存
 
 📝 **多个结果时**
 1️⃣ 系统返回编号列表
