@@ -4,8 +4,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Tuple
 import logging
+import requests
 
 from backend.models import PanCookie, CustomNameMapping, get_session
 from backend.utils.baidu_api import BaiduPanAPI
@@ -14,6 +15,98 @@ from backend.utils.xunlei_api import XunleiAPI
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+# OpenList配置
+OPENLIST_URL = "http://10.10.10.17:5255"
+OPENLIST_TOKEN = "openlist-1e33e197-915f-4894-adfb-514387a5054dLjiXDkXmIe21Yub5F9g9b6REyJLNVuB2DxV9vc4fnDcKiZwLMbivLsN7y8K7oum4"
+PATH_PREFIX = "/A-闲鱼影视（自动更新）"
+
+
+def find_file_id_via_openlist(mapping: CustomNameMapping) -> Tuple[Optional[str], Optional[str]]:
+    """
+    通过OpenList查找迅雷文件ID
+    
+    Args:
+        mapping: 映射记录
+        
+    Returns:
+        (file_id, error): 成功返回(文件ID, None)，失败返回(None, 错误信息)
+    """
+    try:
+        # 1. 检查必要字段
+        if not mapping.category:
+            return None, "mapping记录缺少category字段"
+        
+        if not mapping.xunlei_name:
+            return None, "mapping记录缺少xunlei_name字段"
+        
+        # 2. 构建OpenList路径
+        full_path = f"/xunlei{PATH_PREFIX}/{mapping.category}"
+        
+        # 3. 调用OpenList API
+        list_url = f"{OPENLIST_URL}/api/fs/list"
+        headers = {
+            "Authorization": OPENLIST_TOKEN,
+            "Content-Type": "application/json"
+        }
+        body = {
+            "path": full_path,
+            "refresh": False,
+            "page": 1,
+            "per_page": 1000
+        }
+        
+        response = requests.post(list_url, json=body, headers=headers, timeout=30)
+        result = response.json()
+        
+        if result.get('code') != 200:
+            return None, f"OpenList查询失败: {result.get('message')}"
+        
+        content = result.get('data', {}).get('content', []) or []
+        
+        # 4. 查找文件
+        target_name = mapping.xunlei_name
+        
+        # 精确匹配
+        for file in content:
+            if file.get('name') == target_name:
+                file_id = file.get('id', '')
+                logger.info(f"✅ OpenList找到文件: {target_name}, ID: {file_id}")
+                return file_id, None
+        
+        # 模糊匹配（包含关键词，跳过文件夹）
+        for file in content:
+            file_name = file.get('name', '')
+            if target_name in file_name and not file.get('is_dir'):
+                file_id = file.get('id', '')
+                logger.info(f"✅ OpenList模糊匹配: {file_name}, ID: {file_id}")
+                return file_id, None
+        
+        return None, f"OpenList未找到文件: {target_name}"
+        
+    except Exception as e:
+        return None, f"OpenList查询异常: {str(e)}"
+
+
+def generate_xunlei_share_via_openlist(api: XunleiAPI, mapping: CustomNameMapping) -> Tuple[Optional[str], Optional[str]]:
+    """
+    通过OpenList获取文件ID，然后创建迅雷分享链接
+    
+    Args:
+        api: XunleiAPI实例
+        mapping: 映射记录
+        
+    Returns:
+        (share_link, error): 成功返回(分享链接, None)，失败返回(None, 错误信息)
+    """
+    # 1. 通过OpenList查找文件ID
+    file_id, error = find_file_id_via_openlist(mapping)
+    if error:
+        return None, error
+    
+    # 2. 使用文件ID创建分享链接
+    return api.create_share_link_by_file_id(file_id)
 
 
 class UpdateCookieRequest(BaseModel):
@@ -186,7 +279,12 @@ async def generate_share_link(request: GenerateLinkRequest, db: Session = Depend
             logger.info(f"处理: {mapping.original_name} -> {folder_name}")
             
             # 生成链接
-            link, error = api.generate_share_link(folder_name)
+            if pan_type == 'xunlei':
+                # 迅雷使用新流程：通过OpenList获取文件ID
+                link, error = generate_xunlei_share_via_openlist(api, mapping)
+            else:
+                # 百度和夸克使用旧流程（搜索）
+                link, error = api.generate_share_link(folder_name)
             
             if error:
                 # 失败
