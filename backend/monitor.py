@@ -417,6 +417,7 @@ class MonitorService:
                         
                         # 查询自定义名称映射，检查同步开关
                         from backend.utils.obfuscator import FolderObfuscator
+                        from backend.models import CustomNameMapping
                         original_name = FolderObfuscator.extract_show_name(file_path)
                         name_mapping = session.query(CustomNameMapping).filter(
                             CustomNameMapping.original_name == original_name
