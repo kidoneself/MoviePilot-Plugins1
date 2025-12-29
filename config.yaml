@@ -58,6 +58,7 @@ wechat:
   agent_id: 1000004
   callback_url: https://link.frp.naspt.vip/api/wechat/callback
   corp_id: wwdf6106d7f613ab4d
+  default_user: '@all'
   enabled: true
   encoding_aes_key: SsZwYFgwmDOfAKIqqQ6GEPjU1ohLVLK2rNcISxYzbOn
   proxy:
@@ -66,3 +67,6 @@ wechat:
     https: ''
   secret: 81qGwjsand45s-UluYPA16hroksblUVZ6d5w8eVXEkw
   token: zFYzEyQDonVV
+share_link_checker:
+  enabled: true
+  check_interval_hours: 24

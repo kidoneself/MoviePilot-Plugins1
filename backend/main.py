@@ -90,6 +90,23 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ TMDB检查器启动失败: {e}")
     
+    # 启动分享链接检查器
+    try:
+        from backend.services.share_link_checker import init_checker as init_link_checker
+        # 从配置读取检查间隔（小时），默认24小时
+        share_link_config = config.get('share_link_checker', {})
+        check_interval = share_link_config.get('check_interval_hours', 24)
+        enabled = share_link_config.get('enabled', True)
+        
+        if enabled:
+            link_checker = init_link_checker(wechat_service, check_interval)
+            await link_checker.start()
+            logger.info(f"✅ 分享链接检查器已启动 (间隔: {check_interval}小时)")
+        else:
+            logger.info("⏸️  分享链接检查器已禁用")
+    except Exception as e:
+        logger.warning(f"⚠️ 分享链接检查器启动失败: {e}")
+    
     yield
     
     # 关闭时
@@ -112,6 +129,16 @@ async def lifespan(app: FastAPI):
         tmdb_checker = get_checker()
         await tmdb_checker.stop()
         logger.info("✅ TMDB检查器已停止")
+    except:
+        pass
+    
+    # 停止分享链接检查器
+    try:
+        from backend.services.share_link_checker import get_checker as get_link_checker
+        link_checker = get_link_checker()
+        if link_checker:
+            await link_checker.stop()
+            logger.info("✅ 分享链接检查器已停止")
     except:
         pass
     

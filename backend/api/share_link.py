@@ -549,3 +549,68 @@ def get_all_share_links(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"获取分享链接失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/check-missing-links")
+async def check_missing_links(send_notification: bool = True):
+    """
+    检查缺失的分享链接
+    
+    Args:
+        send_notification: 是否发送微信通知
+    """
+    try:
+        from backend.services.share_link_checker import get_checker
+        
+        checker = get_checker()
+        if not checker:
+            raise HTTPException(status_code=503, detail="分享链接检查器未启动")
+        
+        result = await checker.check_missing_links(send_notification=send_notification)
+        
+        if not result.get('success'):
+            raise HTTPException(status_code=500, detail=result.get('error', '检查失败'))
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"检查缺失链接失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/missing-links/{pan_type}")
+async def get_missing_links(pan_type: str):
+    """
+    获取指定网盘缺失链接的资源
+    
+    Args:
+        pan_type: 网盘类型 (baidu/quark/xunlei/all)
+    """
+    try:
+        if pan_type not in ['baidu', 'quark', 'xunlei', 'all']:
+            raise HTTPException(status_code=400, detail="不支持的网盘类型，请使用: baidu/quark/xunlei/all")
+        
+        from backend.services.share_link_checker import get_checker
+        
+        checker = get_checker()
+        if not checker:
+            raise HTTPException(status_code=503, detail="分享链接检查器未启动")
+        
+        result = await checker.get_missing_links_by_category(pan_type)
+        
+        if not result.get('success'):
+            raise HTTPException(status_code=500, detail=result.get('error', '查询失败'))
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取缺失链接失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
