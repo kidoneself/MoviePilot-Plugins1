@@ -8,19 +8,14 @@ from typing import Optional, Tuple
 import logging
 import requests
 
-from backend.models import PanCookie, CustomNameMapping, get_session
+from backend.models import PanCookie, CustomNameMapping, get_session, get_db
 from backend.utils.baidu_api import BaiduPanAPI
 from backend.utils.quark_api import QuarkAPI
 from backend.utils.xunlei_api import XunleiAPI
+from backend.common.constants import OPENLIST_URL, OPENLIST_TOKEN, OPENLIST_PATH_PREFIX, DEFAULT_TIMEOUT
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-# OpenList配置
-OPENLIST_URL = "http://10.10.10.17:5255"
-OPENLIST_TOKEN = "openlist-1e33e197-915f-4894-adfb-514387a5054dLjiXDkXmIe21Yub5F9g9b6REyJLNVuB2DxV9vc4fnDcKiZwLMbivLsN7y8K7oum4"
-PATH_PREFIX = "/A-闲鱼影视（自动更新）"
 
 
 def find_file_id_via_openlist(mapping: CustomNameMapping) -> Tuple[Optional[str], Optional[str]]:
@@ -42,7 +37,7 @@ def find_file_id_via_openlist(mapping: CustomNameMapping) -> Tuple[Optional[str]
             return None, "mapping记录缺少xunlei_name字段"
         
         # 2. 构建OpenList路径
-        full_path = f"/xunlei{PATH_PREFIX}/{mapping.category}"
+        full_path = f"/xunlei{OPENLIST_PATH_PREFIX}/{mapping.category}"
         
         # 3. 调用OpenList API
         list_url = f"{OPENLIST_URL}/api/fs/list"
@@ -57,7 +52,11 @@ def find_file_id_via_openlist(mapping: CustomNameMapping) -> Tuple[Optional[str]
             "per_page": 1000
         }
         
-        response = requests.post(list_url, json=body, headers=headers, timeout=30)
+        try:
+            response = requests.post(list_url, json=body, headers=headers, timeout=DEFAULT_TIMEOUT)
+        except requests.RequestException as e:
+            logger.error(f"夸克API请求失败: {e}")
+            raise HTTPException(status_code=503, detail=f"夸克网盘服务异常: {str(e)}")
         result = response.json()
         
         if result.get('code') != 200:
@@ -121,14 +120,6 @@ class GenerateLinkRequest(BaseModel):
     original_name: Optional[str] = None  # 指定单个剧集，为空则批量处理
 
 
-def get_db():
-    """依赖注入：获取数据库会话"""
-    from backend.main import db_engine
-    session = get_session(db_engine)
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 @router.post('/cookie')
@@ -334,12 +325,11 @@ async def generate_share_link(request: GenerateLinkRequest, db: Session = Depend
 
 @router.post("/pansou-search")
 async def pansou_search(request: Request, db: Session = Depends(get_db)):
-    """通过 PanSou API 搜索网盘资源"""
+    """通过 PanSou API 搜索网盘资源（使用配置缓存）"""
     try:
         import requests
-        import yaml
-        import os
-        from pathlib import Path
+        import asyncio
+        from backend.common.config_cache import ConfigCache
         
         # 获取请求参数
         body = await request.json()
@@ -348,16 +338,8 @@ async def pansou_search(request: Request, db: Session = Depends(get_db)):
         if not keyword:
             raise HTTPException(status_code=400, detail="缺少搜索关键词")
         
-        # 读取配置文件
-        config_path = os.getenv('CONFIG_PATH', 'config.yaml')
-        if not os.path.isabs(config_path):
-            base_dir = Path(__file__).parent.parent.parent
-            config_path = base_dir / config_path
-        
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f)
-        
-        pansou_config = config.get("pansou", {})
+        # ✅ 使用缓存的配置，避免重复读取文件
+        pansou_config = await asyncio.to_thread(ConfigCache.get_pansou_config)
         
         if not pansou_config.get("enabled"):
             raise HTTPException(status_code=400, detail="PanSou 功能未启用")
@@ -385,11 +367,15 @@ async def pansou_search(request: Request, db: Session = Depends(get_db)):
         logger.info(f"搜索关键词: {keyword}, 网盘类型: {cloud_types}")
         
         # 第一次搜索：快速返回缓存结果
-        response = requests.post(api_url, json=payload, headers=headers, timeout=10)
-        
-        if response.status_code != 200:
-            logger.error(f"PanSou API 请求失败: {response.status_code}, {response.text}")
-            raise HTTPException(status_code=500, detail=f"搜索失败: {response.text}")
+        try:
+            response = requests.post(api_url, json=payload, headers=headers, timeout=DEFAULT_TIMEOUT)
+            
+            if response.status_code != 200:
+                logger.error(f"PanSou API 请求失败: {response.status_code}, {response.text}")
+                raise HTTPException(status_code=500, detail=f"搜索失败: {response.text}")
+        except requests.RequestException as e:
+            logger.error(f"PanSou API 请求异常: {e}")
+            raise HTTPException(status_code=503, detail=f"PanSou服务异常: {str(e)}")
         
         data = response.json()
         result_data = data.get("data", {})
@@ -397,14 +383,18 @@ async def pansou_search(request: Request, db: Session = Depends(get_db)):
         
         logger.info(f"首次搜索: 找到 {first_total} 条缓存结果，等待异步搜索完成...")
         
-        # 等待3秒，让异步插件搜索完成
-        import time
-        time.sleep(3)
+        # ✅ 使用 asyncio.sleep 代替 time.sleep，避免阻塞事件循环
+        import asyncio
+        await asyncio.sleep(3)
         
         # 第二次搜索：获取完整结果
-        response2 = requests.post(api_url, json=payload, headers=headers, timeout=10)
+        try:
+            response2 = http_client.post(api_url, json=payload, headers=headers, timeout=DEFAULT_TIMEOUT)
+        except requests.RequestException as e:
+            logger.warning(f"第二次搜索请求失败: {e}，使用首次结果")
+            response2 = None
         
-        if response2.status_code != 200:
+        if response2 is None or response2.status_code != 200:
             logger.warning(f"第二次搜索失败，使用首次结果")
             final_data = data
         else:

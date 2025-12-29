@@ -1,11 +1,12 @@
 """
 夸克网盘API封装
-提供搜索文件和创建分享链接功能
+提供搜索文件、创建分享链接和转存功能
 """
 import requests
 import time
 import logging
-from typing import Tuple, Optional
+import re
+from typing import Tuple, Optional, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -345,3 +346,161 @@ class QuarkAPI:
         
         logger.info(f"✅ 分享链接生成成功: {filename} -> {share_link}")
         return share_link, None
+    
+    # ============ 转存功能 ============
+    
+    def transfer(self, share_url: str, pass_code: Optional[str], target_fid: str) -> Dict:
+        """
+        转存文件（从pan_transfer_api.py迁移过来）
+        
+        Args:
+            share_url: 分享链接
+            pass_code: 提取码
+            target_fid: 目标文件夹ID
+        
+        Returns:
+            {
+                'success': bool,
+                'file_count': int,
+                'file_ids': List[str],
+                'message': str
+            }
+        """
+        from backend.common.response import ResponseUtil
+        
+        try:
+            # 1. 解析分享链接
+            pwd_id = self._parse_transfer_url(share_url)
+            
+            # 2. 获取 stoken
+            stoken = self._get_stoken(pwd_id, pass_code)
+            
+            # 3. 获取文件列表
+            pdir_fid, file_count = self._get_file_list_for_transfer(pwd_id, stoken)
+            
+            # 4. 转存
+            task_id = self._do_transfer(pwd_id, stoken, pdir_fid, target_fid)
+            
+            # 5. 轮询任务
+            result = self._poll_transfer_task(task_id)
+            
+            return ResponseUtil.pan_transfer_success(
+                pan_type='quark',
+                file_count=file_count,
+                file_ids=result.get('save_as', {}).get('save_as_top_fids', []),
+                message='转存成功'
+            )
+        except Exception as e:
+            logger.error(f"夸克转存失败: {e}")
+            return ResponseUtil.pan_transfer_error('quark', f'转存失败: {str(e)}')
+    
+    def _parse_transfer_url(self, share_url: str) -> str:
+        """解析分享链接"""
+        match = re.search(r'/s/([a-zA-Z0-9]+)', share_url)
+        if not match:
+            raise Exception("无效的夸克分享链接")
+        return match.group(1)
+    
+    def _get_transfer_headers(self) -> Dict:
+        """获取转存请求头"""
+        return {
+            'accept': 'application/json, text/plain, */*',
+            'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'cache-control': 'no-cache',
+            'content-type': 'application/json',
+            'cookie': self.cookie,
+            'origin': 'https://pan.quark.cn',
+            'referer': 'https://pan.quark.cn/',
+            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        }
+    
+    def _get_stoken(self, pwd_id: str, pass_code: Optional[str]) -> str:
+        """获取 stoken"""
+        url = "https://drive-h.quark.cn/1/clouddrive/share/sharepage/token"
+        data = {"pwd_id": pwd_id}
+        if pass_code:
+            data["passcode"] = pass_code
+        
+        response = requests.post(url, json=data, headers=self._get_transfer_headers())
+        result = response.json()
+        
+        if result.get('code') != 0:
+            raise Exception(f"获取 stoken 失败: {result}")
+        
+        return result['data']['stoken']
+    
+    def _get_file_list_for_transfer(self, pwd_id: str, stoken: str) -> Tuple[str, int]:
+        """获取文件列表"""
+        url = "https://drive-h.quark.cn/1/clouddrive/share/sharepage/detail"
+        params = {
+            "pwd_id": pwd_id,
+            "stoken": stoken,
+            "_page": 1,
+            "_size": 50,
+            "_fetch_total": 1
+        }
+        
+        response = requests.get(url, params=params, headers=self._get_transfer_headers())
+        result = response.json()
+        
+        if result.get('code') != 0:
+            raise Exception(f"获取文件列表失败: {result}")
+        
+        metadata = result.get('metadata', {})
+        pdir_fid = metadata.get('fid', metadata.get('_pdir_fid', '0'))
+        file_count = metadata.get('_total', len(result.get('data', {}).get('list', [])))
+        
+        return pdir_fid, file_count
+    
+    def _do_transfer(self, pwd_id: str, stoken: str, pdir_fid: str, to_pdir_fid: str) -> str:
+        """执行转存"""
+        url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/save"
+        params = {'pr': 'ucpro', 'fr': 'pc', 'uc_param_str': ''}
+        
+        data = {
+            "pwd_id": pwd_id,
+            "stoken": stoken,
+            "pdir_fid": pdir_fid,
+            "to_pdir_fid": to_pdir_fid,
+            "pdir_save_all": True,
+            "scene": "link"
+        }
+        
+        response = requests.post(url, params=params, json=data, headers=self._get_transfer_headers())
+        result = response.json()
+        
+        if result.get('code') != 0:
+            raise Exception(f"转存失败: {result}")
+        
+        return result['data']['task_id']
+    
+    def _poll_transfer_task(self, task_id: str) -> Dict:
+        """轮询任务"""
+        url = "https://drive-pc.quark.cn/1/clouddrive/task"
+        
+        for retry in range(120):
+            time.sleep(0.5)
+            
+            params = {
+                'pr': 'ucpro',
+                'fr': 'pc',
+                'uc_param_str': '',
+                'task_id': task_id,
+                'retry_index': retry
+            }
+            
+            response = requests.get(url, params=params, headers=self._get_transfer_headers())
+            result = response.json()
+            
+            if result.get('code') != 0:
+                raise Exception(f"查询任务失败: {result}")
+            
+            task_data = result.get('data', {})
+            status = task_data.get('status')
+            
+            if status == 2:  # 成功
+                return task_data
+            elif status == 1:  # 失败
+                raise Exception("转存任务失败")
+        
+        raise Exception("任务超时")

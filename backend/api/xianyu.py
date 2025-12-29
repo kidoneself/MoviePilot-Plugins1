@@ -528,14 +528,14 @@ async def sync_products(page_no: int = 1, page_size: int = 50, product_status: O
                     continue
                 
                 # 由于已清除历史数据，直接创建新记录
-                    db_product = GoofishProduct(
-                        product_id=product_id,
-                        title=item.get('title'),
+                db_product = GoofishProduct(
+                    product_id=product_id,
+                    title=item.get('title'),
                     outer_id=item.get('outer_id'),
-                        price=item.get('price'),
+                    price=item.get('price'),
                     original_price=item.get('original_price'),
-                        stock=item.get('stock'),
-                        sold=item.get('sold'),
+                    stock=item.get('stock'),
+                    sold=item.get('sold'),
                     product_status=item.get('product_status'),
                     item_biz_type=item.get('item_biz_type'),
                     sp_biz_type=item.get('sp_biz_type'),
@@ -544,14 +544,14 @@ async def sync_products(page_no: int = 1, page_size: int = 50, product_status: O
                     stuff_status=item.get('stuff_status'),
                     express_fee=item.get('express_fee'),
                     spec_type=item.get('spec_type'),
-                        source=item.get('source'),
+                    source=item.get('source'),
                     online_time=item.get('online_time'),
                     offline_time=item.get('offline_time'),
                     update_time_remote=item.get('update_time'),
                     create_time_remote=item.get('create_time'),
                     sync_time=datetime.now()  # 设置同步时间
-                    )
-                    session.add(db_product)
+                )
+                session.add(db_product)
                 saved_count += 1
             
             session.commit()

@@ -1,16 +1,14 @@
 database:
-  type: mysql  # mysql 或 sqlite
-  # MySQL配置
   mysql:
+    charset: utf8mb4
+    database: file_link_monitor_v2
     host: 101.35.224.59
+    password: e0237e873f08ad0b
     port: 3306
     user: root
-    password: e0237e873f08ad0b
-    database: file_link_monitor_v2
-    charset: utf8mb4
-  # SQLite配置（备用）
   sqlite:
     path: ./data/database.db
+  type: mysql
 monitors:
 - enabled: true
   exclude_patterns:
@@ -31,6 +29,18 @@ notification:
   enabled: true
   serverchan_sendkey: sctp13922twpjwr8sh4gr8bdeupbzjda
   serverchan_url: https://13922.push.ft07.com/send/sctp13922twpjwr8sh4gr8bdeupbzjda.send
+openlist:
+  path_prefix: /A-闲鱼影视（自动更新）
+  token: openlist-1e33e197-915f-4894-adfb-514387a5054dLjiXDkXmIe21Yub5F9g9b6REyJLNVuB2DxV9vc4fnDcKiZwLMbivLsN7y8K7oum4
+  url: http://10.10.10.17:5255
+pansou:
+  cloud_types:
+  - baidu
+  - quark
+  - xunlei
+  enabled: true
+  token: ''
+  url: http://10.10.10.17:9978
 server:
   debug: false
   host: 0.0.0.0
@@ -38,27 +48,21 @@ server:
 taosync:
   check_interval: 60
   enabled: true
-  job_id: [1, 2]
+  job_id:
+  - 1
+  - 2
   password: a123456!@
   url: http://10.10.10.17:8023
   username: admin
-pansou:
-  enabled: true
-  url: http://10.10.10.17:9978
-  token: ""  # 如果启用了认证，填写token
-  cloud_types: [baidu, quark, xunlei]  # 搜索的网盘类型
-
-# 企业微信应用配置
 wechat:
-  enabled: true
-  corp_id: "wwdf6106d7f613ab4d"
   agent_id: 1000004
-  secret: "81qGwjsand45s-UluYPA16hroksblUVZ6d5w8eVXEkw"
-  token: "zFYzEyQDonVV"
-  encoding_aes_key: "SsZwYFgwmDOfAKIqqQ6GEPjU1ohLVLK2rNcISxYzbOn"
-  callback_url: "https://link.frp.naspt.vip/api/wechat/callback"
-  # 代理配置（可选，用于解决IP白名单问题）
+  callback_url: https://link.frp.naspt.vip/api/wechat/callback
+  corp_id: wwdf6106d7f613ab4d
+  enabled: true
+  encoding_aes_key: SsZwYFgwmDOfAKIqqQ6GEPjU1ohLVLK2rNcISxYzbOn
   proxy:
-    enabled: false  # 是否启用代理
-    http: ""  # HTTP代理，格式：http://ip:port
-    https: ""  # HTTPS代理，格式：http://ip:port
+    enabled: false
+    http: ''
+    https: ''
+  secret: 81qGwjsand45s-UluYPA16hroksblUVZ6d5w8eVXEkw
+  token: zFYzEyQDonVV

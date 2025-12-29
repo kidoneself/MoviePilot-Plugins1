@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from pydantic import BaseModel
 
-from backend.models import CustomNameMapping, get_session
+from backend.models import CustomNameMapping, get_session, get_db
 from backend.utils.obfuscator import FolderObfuscator
 
 router = APIRouter()
@@ -20,29 +20,25 @@ TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 TMDB_IMAGE_W500 = "https://image.tmdb.org/t/p/w500"  # 中等尺寸（详情页用）
 TMDB_IMAGE_W300 = "https://image.tmdb.org/t/p/w300"  # 小尺寸（列表用）
 
-# 加载分类配置
-try:
-    cat_file = Path(__file__).parent.parent / "cat.yaml"
-    with open(cat_file, 'r', encoding='utf-8') as f:
-        CATEGORIES = yaml.safe_load(f)
-except Exception as e:
-    logger.error(f"加载分类配置失败: {e}")
-    CATEGORIES = {"movie": {}, "tv": {}}
+# ✅ 使用配置缓存，避免启动时阻塞
+from backend.common.config_cache import ConfigCache
+# ✅ 使用TMDB缓存，减少外部API调用
+from backend.common.tmdb_cache import tmdb_cache
 
-
-def get_db():
-    """依赖注入：获取数据库会话"""
-    from backend.main import db_engine
-    session = get_session(db_engine)
+def _get_categories():
+    """获取分类配置（懒加载）"""
     try:
-        yield session
-    finally:
-        session.close()
+        return ConfigCache.get_cat_config()
+    except Exception as e:
+        logger.error(f"加载分类配置失败: {e}")
+        return {"movie": {}, "tv": {}}
+
+
 
 
 def classify_media(details: Dict, media_type: str) -> Optional[str]:
     """
-    根据 cat.yaml 规则进行分类（兼容 MoviePilot 逻辑）
+    根据 cat.yaml 规则进行分类（兼容 MoviePilot 逻辑，使用缓存）
     
     Args:
         details: 媒体详细信息
@@ -58,7 +54,8 @@ def classify_media(details: Dict, media_type: str) -> Optional[str]:
     4. origin_country 为 null 时，使用排除法（非亚洲国家）
     5. 同时有多个条件时，必须全部满足（AND关系）
     """
-    if media_type not in CATEGORIES:
+    categories = _get_categories()
+    if media_type not in categories:
         return None
     
     # 获取媒体的类型ID和来源国家
@@ -72,7 +69,7 @@ def classify_media(details: Dict, media_type: str) -> Optional[str]:
     logger.debug(f"分类匹配 - 类型:{media_type}, genre_ids:{genre_ids}, countries:{all_countries}")
     
     # 遍历分类规则（保持 YAML 顺序）
-    for cat_name, cat_rule in CATEGORIES[media_type].items():
+    for cat_name, cat_rule in categories[media_type].items():
         # 获取规则
         rule_genre_ids = cat_rule.get('genre_ids')
         
@@ -129,17 +126,23 @@ async def search_media(
         language: 语言
     """
     try:
-        url = f"{TMDB_BASE_URL}/search/{media_type}"
-        params = {
-            "api_key": TMDB_API_KEY,
-            "query": query,
-            "language": language,
-            "include_adult": False
-        }
-        
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+        # ✅ 使用缓存的搜索方法
+        if media_type == "movie":
+            data = tmdb_cache.search_movie(query, language=language)
+        elif media_type == "tv":
+            data = tmdb_cache.search_tv(query, language=language)
+        else:
+            # multi类型，先搜电影再搜剧集
+            url = f"{TMDB_BASE_URL}/search/{media_type}"
+            params = {
+                "api_key": TMDB_API_KEY,
+                "query": query,
+                "language": language,
+                "include_adult": False
+            }
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
         
         # 处理结果
         results = []
@@ -191,26 +194,9 @@ async def get_media_details(
         language: 语言
     """
     try:
-        # 获取详细信息
-        url = f"{TMDB_BASE_URL}/{media_type}/{media_id}"
-        params = {
-            "api_key": TMDB_API_KEY,
-            "language": language
-        }
-        
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        details = response.json()
-        
-        # 获取图片
-        images_url = f"{TMDB_BASE_URL}/{media_type}/{media_id}/images"
-        images_params = {
-            "api_key": TMDB_API_KEY,
-            "include_image_language": "zh,en,null"
-        }
-        
-        images_response = requests.get(images_url, params=images_params, timeout=10)
-        images_data = images_response.json() if images_response.ok else {}
+        # ✅ 使用缓存获取详细信息和图片
+        details = tmdb_cache.get_details(media_type, media_id, language)
+        images_data = tmdb_cache.get_images(media_type, media_id)
         
         # 处理海报和剧照（使用 w500 尺寸，加载更快）
         posters = [f"{TMDB_IMAGE_W500}{img['file_path']}" 
@@ -323,9 +309,10 @@ async def get_categories():
     获取所有分类配置
     """
     try:
+        categories = _get_categories()
         return {
             "success": True,
-            "data": CATEGORIES
+            "data": categories
         }
     except Exception as e:
         logger.error(f"获取分类配置失败: {e}")

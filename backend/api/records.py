@@ -7,20 +7,12 @@ from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 
-from backend.models import LinkRecord, get_session
+from backend.models import LinkRecord, get_session, get_db
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def get_db():
-    """依赖注入：获取数据库会话"""
-    from backend.main import db_engine
-    session = get_session(db_engine)
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 @router.get("/records")

@@ -1,9 +1,9 @@
 """
 分类管理API
 """
-import yaml
-from pathlib import Path
+import asyncio
 from fastapi import APIRouter, HTTPException
+from backend.common.config_cache import get_cat_config
 
 router = APIRouter()
 
@@ -11,23 +11,18 @@ router = APIRouter()
 @router.get("/categories")
 async def get_categories():
     """
-    获取所有二级分类列表
+    获取所有二级分类列表（从 cat.yaml 提取，使用缓存）
     """
     try:
-        # 读取二级分类配置
-        config_path = Path(__file__).parent.parent / 'categories.yaml'
+        # ✅ 在线程池中读取缓存配置，避免阻塞事件循环
+        cat_config = await asyncio.to_thread(get_cat_config)
         
-        if not config_path.exists():
-            return {
-                "success": False,
-                "message": "分类配置文件不存在"
-            }
-        
-        with open(config_path, 'r', encoding='utf-8') as f:
-            categories_config = yaml.safe_load(f)
-        
-        # 提取分类列表
-        categories = list(categories_config.keys()) if categories_config else []
+        # 从 cat.yaml 提取所有分类（movie + tv）
+        categories = []
+        if cat_config:
+            for media_type in ['movie', 'tv']:
+                if media_type in cat_config:
+                    categories.extend(cat_config[media_type].keys())
         
         # 按一级分类分组
         grouped = {

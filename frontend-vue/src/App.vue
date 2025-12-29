@@ -241,6 +241,10 @@ onMounted(() => {
             <el-icon><List /></el-icon>
             <span>商品管理</span>
           </el-menu-item>
+          <el-menu-item index="xianyu/schedule-tasks">
+            <el-icon><Bell /></el-icon>
+            <span>定时任务</span>
+          </el-menu-item>
           <el-menu-item index="records">
             <el-icon><Document /></el-icon>
             <span>链接记录</span>

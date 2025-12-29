@@ -329,6 +329,7 @@ def call_quark_transfer_api(cookie: str, stoken: str, pwd_id: str, pdir_fid: str
 
 def poll_quark_task(cookie: str, task_id: str, timeout: int = 60) -> dict:
     """轮询夸克任务状态"""
+    from backend.common.constants import TRANSFER_TIMEOUT
     url = 'https://drive-pc.quark.cn/1/clouddrive/task'
     headers = {
         'Cookie': cookie,
@@ -347,8 +348,12 @@ def poll_quark_task(cookie: str, task_id: str, timeout: int = 60) -> dict:
             'retry_index': retry
         }
         
-        resp = requests.get(url, params=params, headers=headers)
-        data = resp.json()
+        try:
+            resp = requests.get(url, params=params, headers=headers, timeout=TRANSFER_TIMEOUT)
+            data = resp.json()
+        except requests.RequestException as e:
+            logger.error(f"查询任务状态失败: {e}")
+            raise Exception(f"网络请求失败: {str(e)}")
         
         if data.get('code') != 0:
             raise Exception(f"查询任务失败: {data.get('message')}")

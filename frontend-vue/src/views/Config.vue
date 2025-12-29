@@ -4,7 +4,7 @@ import { ElMessage } from 'element-plus'
 import api from '../api'
 
 const loading = ref(false)
-const activeNames = ref(['monitor', 'notification', 'taosync'])
+const activeNames = ref(['monitor', 'notification', 'taosync', 'pansou', 'openlist', 'wechat'])
 const formData = ref({
   // 监控配置
   source_dir: '',
@@ -26,7 +26,30 @@ const formData = ref({
   taosync_username: '',
   taosync_password: '',
   taosync_job_id: 1,
-  taosync_check_interval: 60
+  taosync_check_interval: 60,
+  
+  // 盘搜配置
+  pansou_enabled: false,
+  pansou_url: '',
+  pansou_token: '',
+  pansou_cloud_types: ['baidu', 'quark', 'xunlei'],
+  
+  // OpenList配置
+  openlist_url: '',
+  openlist_token: '',
+  openlist_path_prefix: '',
+  
+  // 企业微信配置
+  wechat_enabled: false,
+  wechat_corp_id: '',
+  wechat_agent_id: '',
+  wechat_secret: '',
+  wechat_token: '',
+  wechat_encoding_aes_key: '',
+  wechat_callback_url: '',
+  wechat_proxy_enabled: false,
+  wechat_proxy_http: '',
+  wechat_proxy_https: ''
 })
 
 const loadConfig = async () => {
@@ -185,6 +208,99 @@ onMounted(() => {
               <el-input-number v-model="formData.taosync_check_interval" :min="10" :max="3600" />
               <span style="margin-left: 10px; color: #909399;">秒</span>
               <div class="form-tip">当任务执行中时，每隔N秒检查是否空闲并重试</div>
+            </el-form-item>
+          </el-form>
+        </el-collapse-item>
+
+        <!-- 盘搜配置 -->
+        <el-collapse-item title="盘搜配置" name="pansou">
+          <el-form :model="formData" label-width="140px">
+            <el-form-item label="启用盘搜">
+              <el-switch v-model="formData.pansou_enabled" />
+            </el-form-item>
+            
+            <el-form-item label="盘搜 URL">
+              <el-input v-model="formData.pansou_url" placeholder="http://10.10.10.17:9978" />
+            </el-form-item>
+            
+            <el-form-item label="Token">
+              <el-input v-model="formData.pansou_token" placeholder="如果启用了认证，填写token" />
+              <div class="form-tip">选填，如果盘搜启用了认证</div>
+            </el-form-item>
+            
+            <el-form-item label="搜索网盘类型">
+              <el-checkbox-group v-model="formData.pansou_cloud_types">
+                <el-checkbox label="baidu">百度网盘</el-checkbox>
+                <el-checkbox label="quark">夸克网盘</el-checkbox>
+                <el-checkbox label="xunlei">迅雷网盘</el-checkbox>
+              </el-checkbox-group>
+              <div class="form-tip">选择要搜索的网盘类型</div>
+            </el-form-item>
+          </el-form>
+        </el-collapse-item>
+
+        <!-- OpenList配置 -->
+        <el-collapse-item title="OpenList 文件管理配置" name="openlist">
+          <el-form :model="formData" label-width="140px">
+            <el-form-item label="OpenList URL">
+              <el-input v-model="formData.openlist_url" placeholder="http://10.10.10.17:5255" />
+            </el-form-item>
+            
+            <el-form-item label="Token">
+              <el-input v-model="formData.openlist_token" placeholder="openlist-xxxx..." type="password" show-password />
+            </el-form-item>
+            
+            <el-form-item label="路径前缀">
+              <el-input v-model="formData.openlist_path_prefix" placeholder="/A-闲鱼影视（自动更新）" />
+              <div class="form-tip">OpenList中的默认路径前缀</div>
+            </el-form-item>
+          </el-form>
+        </el-collapse-item>
+
+        <!-- 企业微信配置 -->
+        <el-collapse-item title="企业微信应用配置" name="wechat">
+          <el-form :model="formData" label-width="160px">
+            <el-form-item label="启用企业微信">
+              <el-switch v-model="formData.wechat_enabled" />
+            </el-form-item>
+            
+            <el-form-item label="企业ID (CorpID)">
+              <el-input v-model="formData.wechat_corp_id" placeholder="wwxxxxxxxxxxxxxxxx" />
+            </el-form-item>
+            
+            <el-form-item label="应用ID (AgentID)">
+              <el-input-number v-model="formData.wechat_agent_id" :min="1" placeholder="1000004" style="width: 100%;" />
+            </el-form-item>
+            
+            <el-form-item label="应用Secret">
+              <el-input v-model="formData.wechat_secret" type="password" placeholder="xxxxxxxxxx" show-password />
+            </el-form-item>
+            
+            <el-form-item label="Token">
+              <el-input v-model="formData.wechat_token" placeholder="用于验证回调消息" />
+            </el-form-item>
+            
+            <el-form-item label="EncodingAESKey">
+              <el-input v-model="formData.wechat_encoding_aes_key" type="password" placeholder="43位字符的加密密钥" show-password />
+            </el-form-item>
+            
+            <el-form-item label="回调URL">
+              <el-input v-model="formData.wechat_callback_url" placeholder="https://your-domain.com/api/wechat/callback" />
+            </el-form-item>
+            
+            <el-divider />
+            
+            <el-form-item label="启用代理">
+              <el-switch v-model="formData.wechat_proxy_enabled" />
+              <div class="form-tip">用于解决IP白名单问题</div>
+            </el-form-item>
+            
+            <el-form-item label="HTTP代理" v-if="formData.wechat_proxy_enabled">
+              <el-input v-model="formData.wechat_proxy_http" placeholder="http://ip:port" />
+            </el-form-item>
+            
+            <el-form-item label="HTTPS代理" v-if="formData.wechat_proxy_enabled">
+              <el-input v-model="formData.wechat_proxy_https" placeholder="http://ip:port" />
             </el-form-item>
           </el-form>
         </el-collapse-item>

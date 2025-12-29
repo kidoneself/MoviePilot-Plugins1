@@ -24,8 +24,8 @@ class LinkRecord(Base):
     __tablename__ = "link_records"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    source_file = Column(String(768), nullable=False, unique=True)
-    original_name = Column(String(191))
+    source_file = Column(String(768), nullable=False, unique=True, index=True)  # ✅ 添加索引
+    original_name = Column(String(191), index=True)  # ✅ 添加索引（用于分组查询）
     file_size = Column(BigInteger)
     
     # 网盘1（夸克）
@@ -40,7 +40,7 @@ class LinkRecord(Base):
     xunlei_target_file = Column(String(1000))
     xunlei_synced_at = Column(DateTime)
     
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=datetime.now, index=True)  # ✅ 添加索引（用于排序）
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
@@ -49,8 +49,8 @@ class CustomNameMapping(Base):
     __tablename__ = "custom_name_mapping"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    original_name = Column(String(191), nullable=False, unique=True)
-    category = Column(String(100), comment='二级分类：电影/国产电影')
+    original_name = Column(String(191), nullable=False, unique=True, index=True)  # ✅ 已有索引
+    category = Column(String(100), index=True, comment='二级分类：电影/国产电影')  # ✅ 添加索引
     
     # 三网盘显示名
     quark_name = Column(String(500))
@@ -67,12 +67,12 @@ class CustomNameMapping(Base):
     sync_to_baidu = Column(Boolean, default=True, comment='是否同步到百度')
     sync_to_xunlei = Column(Boolean, default=True, comment='是否同步到迅雷')
     
-    enabled = Column(Boolean, default=True)
-    is_completed = Column(Boolean, default=False, comment='是否完结')
+    enabled = Column(Boolean, default=True, index=True)  # ✅ 添加索引（用于筛选）
+    is_completed = Column(Boolean, default=False, index=True, comment='是否完结')  # ✅ 添加索引
     note = Column(String(500))
     
     # TMDb 元数据
-    tmdb_id = Column(Integer, comment='TMDb媒体ID')
+    tmdb_id = Column(Integer, index=True, comment='TMDb媒体ID')  # ✅ 添加索引
     poster_url = Column(String(500), comment='海报链接')
     overview = Column(Text, comment='剧情简介')
     media_type = Column(String(20), comment='媒体类型: movie/tv')
@@ -125,22 +125,30 @@ class MediaRequest(Base):
 def init_database(db_config: dict = None):
     """
     初始化数据库
-    支持MySQL和SQLite，从配置文件读取
+    支持MySQL和SQLite，从config.yaml读取配置
     """
+    from backend.common.config import ConfigManager
+    
+    # 优先使用传入的db_config，否则从ConfigManager读取
     if not db_config:
-        db_config = {}
+        config_manager = ConfigManager()
+        config_manager.load()
+        db_config = config_manager.get('database', {})
     
     db_type = db_config.get('type', 'mysql')
     
     if db_type == 'mysql':
         # MySQL配置
         mysql_config = db_config.get('mysql', {})
-        host = mysql_config.get('host', '101.35.224.59')
+        host = mysql_config.get('host')
         port = mysql_config.get('port', 3306)
-        user = mysql_config.get('user', 'root')
-        password = mysql_config.get('password', 'e0237e873f08ad0b')
-        database = mysql_config.get('database', 'file_link_monitor_v2')
+        user = mysql_config.get('user')
+        password = mysql_config.get('password')
+        database = mysql_config.get('database')
         charset = mysql_config.get('charset', 'utf8mb4')
+        
+        if not all([host, user, password, database]):
+            raise ValueError("MySQL配置不完整，请检查config.yaml中的database.mysql配置")
         
         db_url = f'mysql+pymysql://{user}:{password}@{host}:{port}/{database}?charset={charset}'
         

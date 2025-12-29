@@ -5,21 +5,19 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import uvicorn
+from backend.common.static_files import CachedStaticFiles
 
 from backend.models import init_database
 from backend.monitor import MonitorService
-from backend.api import records, tree, export, mapping, share_link, transfer, category, openlist, wechat, share_page, tmdb, media, xianyu, media_requests, quark_smart_transfer
+from backend.api import records, tree, export, mapping, share_link, transfer, category, openlist, wechat, share_page, tmdb, media, xianyu, media_requests, quark_smart_transfer, rate_limit_admin
 from backend.api import config as config_api
+from backend.common.rate_limiter import RateLimitMiddleware, rate_limiter
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# ✅ 使用统一的日志配置（支持环境变量控制）
+from backend.common.logger import setup_logging
+logger = setup_logging()
 
 # 全局变量
 db_engine = None
@@ -36,7 +34,18 @@ async def lifespan(app: FastAPI):
     # 启动时
     logger.info("🚀 启动文件监控硬链接系统...")
     
-    # 加载配置
+    # ✅ 预加载配置到缓存（提升后续请求性能）
+    from backend.common.config_cache import ConfigCache
+    from backend.common.thread_pool import get_executor
+    
+    ConfigCache.load_main_config()
+    ConfigCache.load_cat_config()
+    logger.info("✅ 配置缓存已预加载")
+    
+    # 初始化全局线程池
+    get_executor()
+    
+    # 加载配置（兼容现有代码）
     config_path = os.getenv('CONFIG_PATH', 'config.yaml')
     if not os.path.isabs(config_path):
         # 如果是相对路径，转换为绝对路径
@@ -106,6 +115,10 @@ async def lifespan(app: FastAPI):
     except:
         pass
     
+    # ✅ 关闭全局线程池
+    from backend.common.thread_pool import shutdown_executor
+    shutdown_executor()
+    
     logger.info("👋 系统已关闭")
 
 
@@ -134,21 +147,30 @@ app.include_router(media.router, prefix="/api", tags=["媒体管理"])
 app.include_router(xianyu.router, prefix="/api", tags=["闲鱼管家"])
 app.include_router(media_requests.router, prefix="/api", tags=["资源请求"])
 app.include_router(config_api.router, prefix="/api", tags=["配置管理"])
+app.include_router(rate_limit_admin.router, prefix="/api", tags=["限流管理"])
+
+# ✅ 添加中间件（注意顺序：先添加的后执行）
+# 1. 限流中间件（最先执行，过滤恶意请求）
+app.add_middleware(RateLimitMiddleware, limiter=rate_limiter)
+
+# 2. Gzip压缩中间件（最后执行，压缩响应）
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # 静态文件
 frontend_path = Path(__file__).parent.parent / "frontend-vue" / "dist"
-# 挂载静态资源（CSS/JS等）
-app.mount("/assets", StaticFiles(directory=str(frontend_path / "assets")), name="assets")
+# 挂载静态资源（CSS/JS等）- 使用长缓存（1年）
+app.mount("/assets", CachedStaticFiles(directory=str(frontend_path / "assets"), max_age=31536000), name="assets")
 
-# 挂载上传文件目录
+# 挂载上传文件目录 - 使用中等缓存（7天）
 uploads_path = Path(__file__).parent.parent / "uploads"
 uploads_path.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
+app.mount("/uploads", CachedStaticFiles(directory=str(uploads_path), max_age=604800), name="uploads")
 
-# 挂载SVG文件目录（网盘Logo等）
+# 挂载SVG文件目录（网盘Logo等）- 使用长缓存（1年）
 svg_path = frontend_path / "svg"
 if svg_path.exists():
-    app.mount("/svg", StaticFiles(directory=str(svg_path)), name="svg")
+    app.mount("/svg", CachedStaticFiles(directory=str(svg_path), max_age=31536000), name="svg")
     logger.info(f"✅ SVG目录已挂载: {svg_path}")
 else:
     logger.warning(f"⚠️ SVG目录不存在: {svg_path}")
@@ -166,6 +188,9 @@ async def get_config():
     monitors = config.get('monitors', [])
     notification = config.get('notification', {})
     taosync = config.get('taosync', {})
+    pansou = config.get('pansou', {})
+    openlist = config.get('openlist', {})
+    wechat = config.get('wechat', {})
     
     if monitors:
         # 提取第一个监控配置
@@ -193,7 +218,30 @@ async def get_config():
                 "taosync_username": taosync.get('username', ''),
                 "taosync_password": taosync.get('password', ''),
                 "taosync_job_id": taosync.get('job_id', 1),
-                "taosync_check_interval": taosync.get('check_interval', 60)
+                "taosync_check_interval": taosync.get('check_interval', 60),
+                
+                # 盘搜配置
+                "pansou_enabled": pansou.get('enabled', False),
+                "pansou_url": pansou.get('url', ''),
+                "pansou_token": pansou.get('token', ''),
+                "pansou_cloud_types": pansou.get('cloud_types', ['baidu', 'quark', 'xunlei']),
+                
+                # OpenList配置
+                "openlist_url": openlist.get('url', ''),
+                "openlist_token": openlist.get('token', ''),
+                "openlist_path_prefix": openlist.get('path_prefix', ''),
+                
+                # 企业微信配置
+                "wechat_enabled": wechat.get('enabled', False),
+                "wechat_corp_id": wechat.get('corp_id', ''),
+                "wechat_agent_id": wechat.get('agent_id', ''),
+                "wechat_secret": wechat.get('secret', ''),
+                "wechat_token": wechat.get('token', ''),
+                "wechat_encoding_aes_key": wechat.get('encoding_aes_key', ''),
+                "wechat_callback_url": wechat.get('callback_url', ''),
+                "wechat_proxy_enabled": wechat.get('proxy', {}).get('enabled', False),
+                "wechat_proxy_http": wechat.get('proxy', {}).get('http', ''),
+                "wechat_proxy_https": wechat.get('proxy', {}).get('https', '')
             }
         }
     
@@ -215,7 +263,24 @@ async def get_config():
             "taosync_username": '',
             "taosync_password": '',
             "taosync_job_id": 1,
-            "taosync_check_interval": 60
+            "taosync_check_interval": 60,
+            "pansou_enabled": False,
+            "pansou_url": '',
+            "pansou_token": '',
+            "pansou_cloud_types": ['baidu', 'quark', 'xunlei'],
+            "openlist_url": '',
+            "openlist_token": '',
+            "openlist_path_prefix": '',
+            "wechat_enabled": False,
+            "wechat_corp_id": '',
+            "wechat_agent_id": '',
+            "wechat_secret": '',
+            "wechat_token": '',
+            "wechat_encoding_aes_key": '',
+            "wechat_callback_url": '',
+            "wechat_proxy_enabled": False,
+            "wechat_proxy_http": '',
+            "wechat_proxy_https": ''
         }
     }
 
@@ -284,6 +349,37 @@ async def update_config(request: dict):
             'password': request.get('taosync_password', ''),
             'job_id': request.get('taosync_job_id', 1),
             'check_interval': request.get('taosync_check_interval', 60)
+        }
+        
+        # 更新盘搜配置
+        full_config['pansou'] = {
+            'enabled': request.get('pansou_enabled', False),
+            'url': request.get('pansou_url', ''),
+            'token': request.get('pansou_token', ''),
+            'cloud_types': request.get('pansou_cloud_types', ['baidu', 'quark', 'xunlei'])
+        }
+        
+        # 更新OpenList配置
+        full_config['openlist'] = {
+            'url': request.get('openlist_url', ''),
+            'token': request.get('openlist_token', ''),
+            'path_prefix': request.get('openlist_path_prefix', '')
+        }
+        
+        # 更新企业微信配置
+        full_config['wechat'] = {
+            'enabled': request.get('wechat_enabled', False),
+            'corp_id': request.get('wechat_corp_id', ''),
+            'agent_id': request.get('wechat_agent_id', ''),
+            'secret': request.get('wechat_secret', ''),
+            'token': request.get('wechat_token', ''),
+            'encoding_aes_key': request.get('wechat_encoding_aes_key', ''),
+            'callback_url': request.get('wechat_callback_url', ''),
+            'proxy': {
+                'enabled': request.get('wechat_proxy_enabled', False),
+                'http': request.get('wechat_proxy_http', ''),
+                'https': request.get('wechat_proxy_https', '')
+            }
         }
         
         # 保存配置文件
@@ -428,7 +524,8 @@ frontend_routes = [
     "/config",
     "/xianyu/products",
     "/xianyu/create-product",
-    "/xianyu/auto-workflow"
+    "/xianyu/auto-workflow",
+    "/xianyu/schedule-tasks"
 ]
 
 for route in frontend_routes:

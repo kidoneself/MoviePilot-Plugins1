@@ -8,6 +8,7 @@ import MediaRequests from '../views/MediaRequests.vue'
 import XianyuProducts from '../views/XianyuProducts.vue'
 import XianyuCreateProduct from '../views/XianyuCreateProduct.vue'
 import XianyuAutoWorkflow from '../views/XianyuAutoWorkflow.vue'
+import XianyuScheduleTasks from '../views/XianyuScheduleTasks.vue'
 
 const routes = [
   {
@@ -58,6 +59,11 @@ const routes = [
     path: '/xianyu/auto-workflow',
     name: 'XianyuAutoWorkflow',
     component: XianyuAutoWorkflow
+  },
+  {
+    path: '/xianyu/schedule-tasks',
+    name: 'XianyuScheduleTasks',
+    component: XianyuScheduleTasks
   }
 ]
 

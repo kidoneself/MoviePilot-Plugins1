@@ -1,7 +1,7 @@
 """
 自定义名称映射管理API
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, and_, distinct
@@ -16,21 +16,13 @@ import uuid
 import os
 from pathlib import Path
 
-from backend.models import CustomNameMapping, LinkRecord, get_session
+from backend.models import CustomNameMapping, LinkRecord, get_session, get_db
 from backend.utils.linker import FileLinker
 from backend.utils.obfuscator import FolderObfuscator
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-def get_db():
-    """依赖注入：获取数据库会话"""
-    from backend.main import db_engine
-    session = get_session(db_engine)
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 class MappingCreate(BaseModel):
@@ -687,18 +679,17 @@ async def obfuscate_name(
         }
 
 
-@router.post("/mappings/resync")
-async def resync_to_target(
-    request: ResyncRequest,
-    db: Session = Depends(get_db)
+def _do_resync_task(
+    original_name: str,
+    target_type: str
 ):
     """
-    重转剧集到指定网盘
-    1. 查询该剧集的所有文件记录
-    2. 查询映射表获取显示名称
-    3. 删除目标网盘的文件
-    4. 用新名称重新硬链接
+    后台任务：执行重转操作
     """
+    from backend.main import db_engine
+    from backend.models import get_session
+    
+    db = get_session(db_engine)
     try:
         from pathlib import Path
         import shutil
@@ -707,50 +698,46 @@ async def resync_to_target(
         
         # 查询映射获取显示名称
         mapping = db.query(CustomNameMapping).filter(
-            CustomNameMapping.original_name == request.original_name
+            CustomNameMapping.original_name == original_name
         ).first()
         
         if not mapping:
-            return {
-                "success": False,
-                "message": f"未找到 '{request.original_name}' 的映射配置"
-            }
+            logger.error(f"未找到映射: {original_name}")
+            return
         
         # 清空对应网盘的链接字段
-        if request.target_type == 'quark':
+        if target_type == 'quark':
             mapping.quark_link = None
-            logger.info(f"✅ 已清空 '{request.original_name}' 的夸克链接")
-        elif request.target_type == 'baidu':
+            logger.info(f"✅ 已清空 '{original_name}' 的夸克链接")
+        elif target_type == 'baidu':
             mapping.baidu_link = None
-            logger.info(f"✅ 已清空 '{request.original_name}' 的百度链接")
-        elif request.target_type == 'xunlei':
+            logger.info(f"✅ 已清空 '{original_name}' 的百度链接")
+        elif target_type == 'xunlei':
             mapping.xunlei_link = None
-            logger.info(f"✅ 已清空 '{request.original_name}' 的迅雷链接")
+            logger.info(f"✅ 已清空 '{original_name}' 的迅雷链接")
         db.commit()
         
         # 获取显示名称
-        if request.target_type == 'quark':
+        if target_type == 'quark':
             display_name = mapping.quark_name
-        elif request.target_type == 'baidu':
+        elif target_type == 'baidu':
             display_name = mapping.baidu_name
-        elif request.target_type == 'xunlei':
+        elif target_type == 'xunlei':
             display_name = mapping.xunlei_name
         else:
             display_name = None
         
         if not display_name:
-            display_name = request.original_name
+            display_name = original_name
         
         # 查询所有该剧集的记录
         records = db.query(LinkRecord).filter(
-            LinkRecord.original_name == request.original_name
+            LinkRecord.original_name == original_name
         ).all()
         
         if not records:
-            return {
-                "success": False,
-                "message": f"未找到 '{request.original_name}' 的同步记录"
-            }
+            logger.error(f"未找到同步记录: {original_name}")
+            return
         
         # 获取配置
         monitors = config.get('monitors', [])
@@ -765,14 +752,15 @@ async def resync_to_target(
             return {"success": False, "message": "目标配置不足"}
         
         # 确定目标路径
-        if request.target_type == 'quark':
+        if target_type == 'quark':
             target_idx = 0
-        elif request.target_type == 'baidu':
+        elif target_type == 'baidu':
             target_idx = 1
-        elif request.target_type == 'xunlei':
+        elif target_type == 'xunlei':
             target_idx = 2
         else:
-            return {"success": False, "message": "不支持的网盘类型"}
+            logger.error(f"不支持的网盘类型: {target_type}")
+            return
         
         if len(targets) <= target_idx:
             return {"success": False, "message": f"目标配置不足，需要至少{target_idx + 1}个目标"}
@@ -785,13 +773,13 @@ async def resync_to_target(
         linker = FileLinker(obfuscate_enabled=obfuscate_enabled, db_engine=db_engine)
         
         # 临时更新映射表，让混淆器使用新名称
-        if request.target_type == 'quark':
+        if target_type == 'quark':
             old_name = mapping.quark_name
             mapping.quark_name = display_name
-        elif request.target_type == 'baidu':
+        elif target_type == 'baidu':
             old_name = mapping.baidu_name
             mapping.baidu_name = display_name
-        elif request.target_type == 'xunlei':
+        elif target_type == 'xunlei':
             old_name = mapping.xunlei_name
             mapping.xunlei_name = display_name
         db.commit()
@@ -808,11 +796,11 @@ async def resync_to_target(
                     continue
                 
                 # 获取旧的目标文件路径
-                if request.target_type == 'quark':
+                if target_type == 'quark':
                     old_target_file = record.quark_target_file
-                elif request.target_type == 'baidu':
+                elif target_type == 'baidu':
                     old_target_file = record.baidu_target_file
-                elif request.target_type == 'xunlei':
+                elif target_type == 'xunlei':
                     old_target_file = record.xunlei_target_file
                 else:
                     old_target_file = None
@@ -837,13 +825,13 @@ async def resync_to_target(
                 
                 if success and actual_target:
                     # 更新记录
-                    if request.target_type == 'quark':
+                    if target_type == 'quark':
                         record.quark_target_file = str(actual_target)
                         record.quark_synced_at = datetime.now()
-                    elif request.target_type == 'baidu':
+                    elif target_type == 'baidu':
                         record.baidu_target_file = str(actual_target)
                         record.baidu_synced_at = datetime.now()
-                    elif request.target_type == 'xunlei':
+                    elif target_type == 'xunlei':
                         record.xunlei_target_file = str(actual_target)
                         record.xunlei_synced_at = datetime.now()
                     
@@ -885,17 +873,17 @@ async def resync_to_target(
             try:
                 # 从已重转的文件记录中提取实际的剧集根目录
                 sample_record = db.query(LinkRecord).filter(
-                    LinkRecord.original_name == request.original_name
+                    LinkRecord.original_name == original_name
                 ).first()
                 
                 if sample_record:
                     # 根据target_type获取对应的target_file
                     target_file_str = None
-                    if request.target_type == 'quark':
+                    if target_type == 'quark':
                         target_file_str = sample_record.quark_target_file
-                    elif request.target_type == 'baidu':
+                    elif target_type == 'baidu':
                         target_file_str = sample_record.baidu_target_file
-                    elif request.target_type == 'xunlei':
+                    elif target_type == 'xunlei':
                         target_file_str = sample_record.xunlei_target_file
                     
                     if target_file_str:
@@ -935,22 +923,78 @@ async def resync_to_target(
                 logger.error(f"触发TaoSync失败: {e}")
         
         target_names = {'quark': '夸克', 'baidu': '百度', 'xunlei': '迅雷'}
-        target_name = target_names.get(request.target_type, '未知')
-        return {
-            "success": True,
-            "message": f"重转完成: 成功 {success_count} 个文件，失败 {failed_count} 个",
-            "data": {
-                "success_count": success_count,
-                "failed_count": failed_count,
-                "target_type": target_name,
-                "display_name": display_name
-            }
-        }
+        target_name = target_names.get(target_type, '未知')
+        logger.info(f"✅ 重转完成: {original_name} -> {target_name}, 成功 {success_count} 个，失败 {failed_count} 个")
         
     except Exception as e:
-        logger.error(f"重转失败: {e}")
+        logger.error(f"重转任务异常: {e}")
         db.rollback()
-        return {
-            "success": False,
-            "message": f"重转失败: {str(e)}"
+        import traceback
+        traceback.print_exc()
+    finally:
+        db.close()
+
+
+@router.post("/mappings/resync")
+async def resync_to_target(
+    request: ResyncRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    重转剧集到指定网盘（后台任务）
+    
+    1. 立即返回响应，不阻塞请求
+    2. 在后台执行重转操作
+    3. 前端可以继续操作，不会卡死
+    
+    操作流程：
+    - 查询该剧集的所有文件记录
+    - 查询映射表获取显示名称
+    - 删除目标网盘的旧文件
+    - 用新名称重新创建硬链接
+    - 触发防失效处理和TaoSync同步
+    """
+    # 验证映射是否存在
+    mapping = db.query(CustomNameMapping).filter(
+        CustomNameMapping.original_name == request.original_name
+    ).first()
+    
+    if not mapping:
+        raise HTTPException(
+            status_code=404,
+            detail=f"未找到 '{request.original_name}' 的映射配置"
+        )
+    
+    # 验证是否有记录
+    records_count = db.query(LinkRecord).filter(
+        LinkRecord.original_name == request.original_name
+    ).count()
+    
+    if records_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=f"未找到 '{request.original_name}' 的同步记录"
+        )
+    
+    # 添加后台任务
+    background_tasks.add_task(
+        _do_resync_task,
+        request.original_name,
+        request.target_type
+    )
+    
+    target_names = {'quark': '夸克', 'baidu': '百度', 'xunlei': '迅雷'}
+    target_name = target_names.get(request.target_type, '未知')
+    
+    logger.info(f"🚀 重转任务已启动: {request.original_name} -> {target_name} ({records_count}个文件)")
+    
+    return {
+        "success": True,
+        "message": f"重转任务已启动，正在后台处理 {records_count} 个文件...",
+        "data": {
+            "target_type": target_name,
+            "file_count": records_count,
+            "original_name": request.original_name
         }
+    }

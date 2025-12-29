@@ -507,6 +507,170 @@ class XunleiAPI:
             error_msg = f"创建分享链接时发生错误: {str(e)}"
             logger.error(error_msg)
             return None, error_msg
+    
+    # ============ 转存功能 ============
+    
+    def transfer(self, share_url: str, pass_code: Optional[str], target_folder_id: str) -> Dict:
+        """
+        转存文件（从pan_transfer_api.py迁移过来）
+        
+        Args:
+            share_url: 分享链接
+            pass_code: 提取码
+            target_folder_id: 目标文件夹ID（空字符串表示根目录）
+        
+        Returns:
+            {
+                'success': bool,
+                'file_count': int,
+                'file_ids': List[str],
+                'message': str
+            }
+        """
+        from backend.common.response import ResponseUtil
+        import re
+        
+        try:
+            # 1. 获取token
+            def refresh_in_thread():
+                page, auth_info = _browser_manager.get_page(self.cookies)
+                return self._refresh_token_sync(page, auth_info), auth_info
+            
+            success, auth_info = _browser_manager.run_in_thread(refresh_in_thread)
+            if not success:
+                raise XunleiAPIError("Token刷新失败")
+            
+            # 2. 解析分享链接
+            share_url = share_url.rstrip('#')
+            match = re.search(r'/s/([^?#]+)', share_url)
+            if not match:
+                raise XunleiAPIError("无效的迅雷分享链接")
+            share_id = match.group(1)
+            
+            # 3. 验证提取码并获取文件列表
+            pass_code_token, file_ids, file_count = self._verify_and_get_files(
+                share_id, pass_code, auth_info
+            )
+            
+            # 4. 执行转存
+            task_id = self._do_transfer(
+                share_id, pass_code_token, file_ids, target_folder_id, auth_info
+            )
+            
+            # 5. 轮询任务
+            self._poll_xunlei_task(task_id, auth_info)
+            
+            return ResponseUtil.pan_transfer_success(
+                pan_type='xunlei',
+                file_count=file_count,
+                file_ids=file_ids,
+                message='转存成功'
+            )
+        except Exception as e:
+            logger.error(f"迅雷转存失败: {e}")
+            return ResponseUtil.pan_transfer_error('xunlei', f'转存失败: {str(e)}')
+    
+    def _verify_and_get_files(self, share_id: str, pass_code: Optional[str], auth_info: Dict):
+        """验证提取码并获取文件列表"""
+        url = "https://api-pan.xunlei.com/drive/v1/share"
+        params = {
+            "share_id": share_id,
+            "pass_code": pass_code or "",
+            "limit": 100,
+            "thumbnail_size": "SIZE_SMALL"
+        }
+        
+        headers = self._get_transfer_headers(auth_info)
+        response = requests.get(url, params=params, headers=headers)
+        result = response.json()
+        
+        if result.get('share_status') != 'OK':
+            raise XunleiAPIError(f"验证提取码失败: {result}")
+        
+        pass_code_token = result['pass_code_token']
+        file_list = result.get('files', [])
+        
+        # 如果是文件夹，获取内部文件
+        if len(file_list) == 1 and file_list[0].get('kind') == 'drive#folder':
+            folder_id = file_list[0]['id']
+            detail_url = "https://api-pan.xunlei.com/drive/v1/share/detail"
+            detail_params = {
+                "share_id": share_id,
+                "parent_id": folder_id,
+                "pass_code_token": pass_code_token,
+                "limit": 100
+            }
+            
+            detail_resp = requests.get(detail_url, params=detail_params, headers=headers)
+            detail_result = detail_resp.json()
+            
+            if detail_result.get('share_status') != 'OK':
+                raise XunleiAPIError(f"获取文件夹内容失败")
+            
+            file_list = detail_result.get('files', [])
+        
+        file_ids = [f['id'] for f in file_list]
+        return pass_code_token, file_ids, len(file_ids)
+    
+    def _get_transfer_headers(self, auth_info: Dict) -> Dict:
+        """获取转存请求头"""
+        device_id = 'd765a49124d0b4c8d593d73daa738f51'
+        for cookie in self.cookies:
+            if cookie.get('name') == 'deviceid':
+                device_id = cookie.get('value', device_id)
+                break
+        
+        return {
+            'accept': '*/*',
+            'authorization': auth_info['authorization'],
+            'x-captcha-token': auth_info['x-captcha-token'],
+            'x-client-id': 'Xqp0kJBXWhwaTpB6',
+            'x-device-id': device_id,
+            'content-type': 'application/json',
+            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        }
+    
+    def _do_transfer(self, share_id: str, pass_code_token: str, file_ids: List[str], 
+                     target_folder_id: str, auth_info: Dict) -> str:
+        """执行转存"""
+        url = "https://api-pan.xunlei.com/drive/v1/share/restore"
+        data = {
+            "parent_id": target_folder_id,
+            "share_id": share_id,
+            "pass_code_token": pass_code_token,
+            "ancestor_ids": [],
+            "file_ids": file_ids,
+            "specify_parent_id": True
+        }
+        
+        headers = self._get_transfer_headers(auth_info)
+        response = requests.post(url, json=data, headers=headers)
+        result = response.json()
+        
+        if result.get('share_status') != 'OK':
+            raise XunleiAPIError(f"转存失败: {result}")
+        
+        return result.get('restore_task_id', '')
+    
+    def _poll_xunlei_task(self, task_id: str, auth_info: Dict):
+        """轮询任务"""
+        import time
+        
+        url = f"https://api-pan.xunlei.com/drive/v1/tasks/{task_id}"
+        headers = self._get_transfer_headers(auth_info)
+        
+        for _ in range(60):
+            time.sleep(1)
+            response = requests.get(url, headers=headers)
+            result = response.json()
+            
+            phase = result.get('phase')
+            if phase == 'PHASE_TYPE_COMPLETE':
+                return
+            elif phase == 'PHASE_TYPE_ERROR':
+                raise XunleiAPIError(f"转存失败: {result.get('message', 'Unknown error')}")
+        
+        raise XunleiAPIError("任务超时")
 
 
 def test():
