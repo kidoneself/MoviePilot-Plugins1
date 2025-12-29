@@ -375,12 +375,19 @@ class XunleiAPI:
         try:
             logger.info(f"📤 创建分享链接: file_id={file_id}")
             
+            # 从cookies中提取device_id
+            device_id = 'd765a49124d0b4c8d593d73daa738f51'  # 默认值
+            for cookie in self.cookies:
+                if cookie.get('name') == 'deviceid':
+                    device_id = cookie.get('value', device_id)
+                    break
+            
             headers = {
                 'accept': 'application/json, text/plain, */*',
                 'authorization': auth_info['authorization'],
                 'x-captcha-token': auth_info['x-captcha-token'],
                 'x-client-id': 'Xqp0kJBXWhwaTpB6',
-                'x-device-id': 'd765a49124d0b4c8d593d73daa738f51',
+                'x-device-id': device_id,  # 使用实际的device_id
                 'content-type': 'application/json',
                 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
             }
@@ -463,6 +470,43 @@ class XunleiAPI:
         return share_link, None
         
         # 注意：全局浏览器和页面保持打开，复用以提高性能
+    
+    def create_share_link_by_file_id(self, file_id: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        直接使用文件ID创建分享链接（跳过搜索步骤）
+        适用于通过OpenList等其他方式已获得file_id的场景
+        
+        Args:
+            file_id: 文件/文件夹ID
+            
+        Returns:
+            (share_link, error_msg): 成功返回(完整分享链接, None)，失败返回(None, 错误信息)
+        """
+        logger.info(f"使用文件ID创建迅雷分享链接: {file_id}")
+        
+        try:
+            # 1. 刷新token并获取auth_info
+            def refresh_in_thread():
+                page, auth_info = _browser_manager.get_page(self.cookies)
+                return self._refresh_token_sync(page, auth_info), auth_info
+            
+            success, auth_info = _browser_manager.run_in_thread(refresh_in_thread)
+            
+            if not success:
+                return None, "Token刷新失败"
+            
+            # 2. 创建分享链接
+            share_link, error = self.create_share_link(file_id, auth_info)
+            if error:
+                return None, error
+            
+            logger.info(f"✅ 使用文件ID创建分享链接成功: {file_id} -> {share_link}")
+            return share_link, None
+            
+        except Exception as e:
+            error_msg = f"创建分享链接时发生错误: {str(e)}"
+            logger.error(error_msg)
+            return None, error_msg
 
 
 def test():
