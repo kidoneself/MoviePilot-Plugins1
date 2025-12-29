@@ -157,7 +157,11 @@ class XianyuScheduler:
         
         try:
             # 获取商品标题列表
-            product_titles = json.loads(task.product_titles) if task.product_titles else []
+            try:
+                product_titles = json.loads(task.product_titles) if task.product_titles else []
+            except json.JSONDecodeError as e:
+                logger.error(f"解析商品标题JSON失败: {e}, 原始数据: {task.product_titles}")
+                product_titles = []
             
             # 任务类型翻译
             task_type_text = "上架" if task.task_type == "publish" else "下架"
@@ -221,7 +225,11 @@ class XianyuScheduler:
         
         try:
             # 获取商品标题列表
-            product_titles = json.loads(task.product_titles) if task.product_titles else []
+            try:
+                product_titles = json.loads(task.product_titles) if task.product_titles else []
+            except json.JSONDecodeError as e:
+                logger.error(f"解析商品标题JSON失败: {e}, 原始数据: {task.product_titles}")
+                product_titles = []
             
             # 任务类型翻译
             task_type_text = "上架" if task.task_type == "publish" else "下架"
@@ -333,7 +341,14 @@ class XianyuScheduler:
         
         try:
             # 解析商品ID列表
-            product_ids = json.loads(task.product_ids) if task.product_ids else []
+            try:
+                product_ids = json.loads(task.product_ids) if task.product_ids else []
+            except json.JSONDecodeError as e:
+                logger.error(f"解析商品ID JSON失败: {e}, 原始数据: {task.product_ids}")
+                task.status = 'FAILED'
+                task.execute_result = f'商品ID列表JSON格式错误: {str(e)}'
+                session.commit()
+                return
             
             if not product_ids:
                 task.status = 'FAILED'

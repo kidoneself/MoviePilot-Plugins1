@@ -841,6 +841,78 @@ async def delete_schedule_task(task_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/xianyu/schedule-task/cleanup")
+async def cleanup_schedule_tasks():
+    """清理所有有问题的定时任务（JSON格式错误或状态为PENDING的任务）"""
+    try:
+        session = _get_session()
+        try:
+            deleted_count = 0
+            error_tasks = []
+            
+            # 获取所有PENDING任务
+            tasks = session.query(GoofishScheduleTask).filter_by(status='PENDING').all()
+            
+            for task in tasks:
+                try:
+                    # 尝试解析JSON，检查是否有效
+                    if task.product_ids:
+                        json.loads(task.product_ids)
+                    if task.product_titles:
+                        json.loads(task.product_titles)
+                except json.JSONDecodeError as e:
+                    # JSON格式错误，删除该任务
+                    logger.warning(f"发现JSON格式错误的任务 {task.id}: {e}")
+                    error_tasks.append({
+                        'id': task.id,
+                        'task_type': task.task_type,
+                        'error': str(e)
+                    })
+                    session.delete(task)
+                    deleted_count += 1
+            
+            session.commit()
+            
+            return {
+                'success': True,
+                'message': f'清理完成，删除了 {deleted_count} 个有问题的任务',
+                'deleted_count': deleted_count,
+                'error_tasks': error_tasks
+            }
+        finally:
+            session.close()
+    
+    except Exception as e:
+        logger.error(f"清理定时任务失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/xianyu/schedule-task/cleanup-all")
+async def cleanup_all_schedule_tasks():
+    """清理所有定时任务（谨慎使用）"""
+    try:
+        session = _get_session()
+        try:
+            # 删除所有PENDING和FAILED任务
+            deleted = session.query(GoofishScheduleTask).filter(
+                GoofishScheduleTask.status.in_(['PENDING', 'FAILED'])
+            ).delete(synchronize_session=False)
+            
+            session.commit()
+            
+            return {
+                'success': True,
+                'message': f'已清理所有待执行和失败的任务，共 {deleted} 个',
+                'deleted_count': deleted
+            }
+        finally:
+            session.close()
+    
+    except Exception as e:
+        logger.error(f"清理所有定时任务失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== 卡密管理（Selenium） ====================
 
 @router.post("/xianyu/kami/create-kind")
