@@ -447,7 +447,7 @@ class MonitorService:
                                 LinkRecord.source_file == str(file_path)
                             ).first()
                             
-                            # 判断是否已同步过（检查对应网盘字段 + 文件是否存在）
+                            # 判断是否已同步过（检查对应网盘字段 + 文件是否存在 + 路径是否正确）
                             already_synced = False
                             if record:
                                 target_file_in_db = None
@@ -458,12 +458,33 @@ class MonitorService:
                                 elif idx == 2 and record.xunlei_target_file:
                                     target_file_in_db = record.xunlei_target_file
                                 
-                                # 必须同时满足：数据库有记录 AND 目标文件真实存在
-                                if target_file_in_db and Path(target_file_in_db).exists():
-                                    already_synced = True
-                                    logger.debug(f"文件已存在，跳过: {file_path} -> {target_file_in_db}")
-                                elif target_file_in_db:
-                                    logger.info(f"数据库有记录但文件不存在，重新创建: {target_file_in_db}")
+                                if target_file_in_db:
+                                    # 预先应用混淆逻辑，得到实际应该生成的路径
+                                    expected_target_path = linker._apply_folder_obfuscation(
+                                        file_path, target_file,
+                                        source_base=source,
+                                        target_base=target
+                                    )
+                                    expected_target = str(expected_target_path)
+                                    
+                                    if target_file_in_db == expected_target and Path(target_file_in_db).exists():
+                                        # 路径一致且文件存在，跳过
+                                        already_synced = True
+                                        logger.debug(f"文件已存在，跳过: {file_path} -> {target_file_in_db}")
+                                    elif target_file_in_db != expected_target:
+                                        # 路径不一致，说明映射名称改了，需要重新创建
+                                        logger.info(f"映射名称已变更，重新创建: {target_file_in_db} -> {expected_target}")
+                                        # 如果旧文件存在，删除旧的硬链接
+                                        old_path = Path(target_file_in_db)
+                                        if old_path.exists():
+                                            try:
+                                                old_path.unlink()
+                                                logger.info(f"已删除旧链接: {target_file_in_db}")
+                                            except Exception as e:
+                                                logger.warning(f"删除旧链接失败: {e}")
+                                    elif not Path(target_file_in_db).exists():
+                                        # 数据库有记录但文件不存在，重新创建
+                                        logger.info(f"数据库有记录但文件不存在，重新创建: {target_file_in_db}")
                             
                             if already_synced:
                                 skipped_count += 1
